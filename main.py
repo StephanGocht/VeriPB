@@ -3,21 +3,35 @@ from collections import namedtuple
 from recordclass import structclass
 #todo recordclass requires install
 from math import copysign, ceil
+from enum import Enum
 
 Term = structclass("Term","coefficient variable")
+
+class AllBooleanUpperBound():
+    """
+    Stub that needs to be replaced if we want to start handeling
+    integer constraitns.
+    """
+    def __getitem__(self, key):
+        return 1
 
 class Inequality():
     """
     Constraint representing sum of terms greater or equal degree.
-    Terms are stored in normalized form, i.e. negated literals but no negated coefficient.
-    The sign of the literal is stored in the coefficient
+    Terms are stored in normalized form, i.e. negated literals but no
+    negated coefficient. Variables are represented as ingtegers
+    greater 0, the sign of the literal is stored in the sign of the
+    integer representing the variable, i.e. x ~ 2 then not x ~ -2.
+
+    For integers 0 <= x <= d the not x is defined as d - x. Note that
+    a change in the upperbound invalidates the stored constraint.
     """
 
     def __init__(self, terms = list(), degree = 0):
         self.degree = degree
         self.terms = sorted(terms, key = lambda x: abs(x.variable))
 
-    def addWithFactor(self, factor, other):
+    def addWithFactor(self, factor, other, variableUpperBounds = AllBooleanUpperBound()):
         self.degree += factor * other.degree
         result = list()
 
@@ -46,7 +60,7 @@ class Inequality():
                 newVariable = copysign(abs(my.variable), newCoefficient)
                 newCoefficient = abs(newCoefficient)
                 cancellation = max(0, max(my.coefficient, other.coefficient) - newCoefficient)
-                self.degree -= cancellation
+                self.degree -= cancellation * variableUpperBounds[abs(my.variable)]
                 if newCoefficient != 0:
                     result.append(Term(newCoefficient, newVariable))
                 other = next(otherTerms, None)
@@ -259,17 +273,87 @@ Stats = structclass("Stats", "size space maxUsed")
 
 
 class Verifier():
-    def clean(self):
-        self.db = list()
-        self.db.append(DBEntry(DummyRule(), None, 0))
-        self.goals = list()
+    """
+    Class to veryfi a complete proof.
 
-    def forwardScan(self, rules):
-        # starting index is 1
-        constraintNum = 1
+    Attributese:
+        db      the database of proof lines
+        goals   index into db for lines that are needed for
+                verification
+        state   indicates the current state of the solve process
+    """
+
+    class State(Enum):
+        CLEAN = 0,
+        READ_PROOF = 1,
+        MARKED_LINES = 2,
+        DONE = 3
+
+    class Iterator():
+        def __init__(self, verifier):
+            self.rules = iter(verifier.rules)
+            self.counter = 0
+            self.rule = None
+            self.lines = iter(verifier.db)
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            if self.counter == 0:
+                self.rule = next(self.rules)
+                self.counter = self.rule.numConstraints()
+            if self.counter != 0:
+                self.counter -= 1
+                line = next(self.lines)
+            else:
+                line = None
+            return (
+                self.rule,
+                line,
+                None if line is None else self.rule.numConstraints() - (self.counter + 1)
+            )
+
+    class Settings():
+        def __init__(self, preset = None):
+            self.isInvariantsOn  = False
+            self.disableDeletion = False
+            self.skipUnused      = True
+
+            if preset is not None:
+                self.setPreset(preset)
+
+        def setPreset(self, preset):
+            for key, value in preset.items():
+                if hasattr(self, key):
+                    setattr(self, key, value)
+                else:
+                    raise ValueError("Got unknown setting %s."%key)
+
+
+
+    def __init__(self, settings = Settings()):
+        self.settings = settings
+
+    def __iter__(self):
+        return Verifier.Iterator(self)
+
+    def init(self, rules):
+        # we want to start indexing with 1 so we add a dummy rule.
+        dummy = DummyRule()
+        assert dummy.numConstraints() == 1
+        self.rules = [dummy] + rules
+        self.db = list()
+        self.goals = list()
+        self.state = Verifier.State.CLEAN
+
+        self._execCacheRule = None
+
+    def mapRulesToDB(self):
+        constraintNum = 0
 
         # Forward pass to find goals
-        for rule in rules:
+        for rule in self.rules:
             for i in range(rule.numConstraints()):
                 self.db.append(DBEntry(
                     rule = rule,
@@ -280,50 +364,84 @@ class Verifier():
                     self.goals.append(constraintNum)
                 constraintNum += 1
 
+            if rule.isGoal() and rule.numConstraints() == 0:
+                self.goals.extend(rule.antecedentIDs())
+
+        self.state = Verifier.State.READ_PROOF
+
     def markUsed(self):
         # Backward pass to mark used rules
         while self.goals:
             goal = self.goals.pop()
-            for antecedent in self.db[goal].rule.antecedentIDs():
-                assert antecedent < goal
-                db[antecedent].numUsed += 1
-                if db[antecedent].numUsed == 1:
-                    goals.append(antecedent)
+            line = self.db[goal]
+            line.numUsed += 1
+            if line.numUsed == 1:
+                for antecedent in line.rule.antecedentIDs():
+                    self.goals.append(antecedent)
+
+        self.state = Verifier.State.MARKED_LINES
+
+    def decreaseUse(self, line):
+        line.numUsed -= 1
+        assert line.numUsed >= 0
+        if line.numUsed == 0:
+            # free space of constraints that are no longer used
+            if not self.settings.disableDeletion:
+                line.constraint = None
+
+    def execRule(self, rule, numInRule = None):
+        assert rule is not None
+        if self._execCacheRule is not rule:
+            self._execCacheRule = rule
+            antecedentIDs = rule.antecedentIDs()
+
+            self._execCache = rule.computeConstraints(
+                [self.db[i].constraint for i in antecedentIDs])
+
+            for i in antecedentIDs:
+                self.decreaseUse(self.db[i])
+
+        if numInRule is not None:
+            return self._execCache[numInRule]
 
     def compute(self):
         # Forward pass to compute constraitns
         rule = None
         constraints = None
         antecedentIDs = None
+        db = self.db
 
-        for entry in self.db:
-            if entry.numUsed > 0 or entry.rule.isGoal:
-                if rule is None or rule != entry.rule:
-                    assert(constraints is None or len(constraints) == 0)
+        for rule, line, numInRule in self:
+            if line is None:
+                if rule.isGoal():
+                    self.execRule(rule)
+            elif line.numUsed > 0 or \
+                    self.settings.skipUnused == False:
+                assert numInRule is not None
+                line.constraint = self.execRule(rule, numInRule)
+                if rule.isGoal():
+                    self.decreaseUse(line)
 
-                    rule = entry.rule
-                    antecedentIDs = entry.rule.antecedentIDs()
+        self.state = Verifier.State.DONE
 
-                    constraints = entry.rule.computeConstraints(
-                        [db[i].constraint for i in antecedentIDs])
-                    constraints.reverse()
-
-                    for i in antecedentIDs:
-                        db[i].numUsed -= 1
-                        assert db[i].numUsed >= 0
-                        if db[i].numUsed == 0:
-                            # free space of constraints that are no longer used
-                            db[i].constraint = None
-
-                assert(len(constraints) > 0)
-
-                entry.constraint = constraints.pop()
+    def checkInvariants(self):
+        if self.settings.isInvariantsOn:
+            if self.state >= Verifier.State.READ_PROOF:
+                for goal in self.goals:
+                    assert db[goal].rule.isGoal() == True
 
     def __call__(self, rules):
-        self.clean()
-        self.forwardScan(rules)
+        self.init(rules)
+        self.checkInvariants()
+
+        self.mapRulesToDB()
+        self.checkInvariants()
+
         self.markUsed()
+        self.checkInvariants()
+
         self.compute()
+        self.checkInvariants()
 
 def main():
     p = argparse.ArgumentParser(

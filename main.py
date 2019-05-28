@@ -108,6 +108,26 @@ class Inequality():
         return str(self)
 
 
+class ParserPosition():
+    def __init__(self, file='', line=0, column=0, pos=0):
+        self.file   = file
+        self.line   = line
+        self.column = column
+
+    def __str__(self):
+        return "%s:%s:%s"%(self.file, self.line, self.column)
+
+    def __repr__(self):
+        return "%s(%r)" % (self.__class__, self.__dict__)
+
+class ParsingException(Exception):
+    pass
+
+class PseudoStream():
+    def __init__(self, stream, pos)
+        self.stream = stream
+        self.pos = pos
+
 class OpbParsingException(Exception):
     pass
 
@@ -121,37 +141,44 @@ class OpbParser:
     def cbDegree(self, op, degree):
         pass
 
-    def parseOpbFile(self, fileName):
+    def parseLine(self, line, position):
         emptyLine = re.compile(r"(^ *\*)|(^\s*$)")
         header = re.compile(r"\* *#variable *= *(?P<vars>[0-9]+) *#constraint *= *(?P<constr>[0-9]+)")
         term = re.compile(r" *(?P<coeff>[+-]?[0-9]+) *x(?P<var>[0-9]+) *")
         degree = re.compile(r"(?P<op>(>=)|=) *(?P<degree>[+-]?[0-9]+) *;")
 
-        foundHeader = False
+        match = emptyLine.match(line)
+        if (match):
+            if (not self.foundHeader):
+                match = header.match(line)
+                if match:
+                    self.foundHeader = True
+                    if self.cbHeader is not None:
+                        self.cbHeader(int(match["vars"]), int(match["constr"]))
+        else:
+            start = 0
+            for m in term.finditer(line):
+                if (start != m.start()):
+                    position.column = start
+                    raise OpbParsingException("Unexpected Symbol", position)
+                start = m.end()
+                if self.cbTerm is not None:
+                    self.cbTerm(int(m["coeff"]), int(m["var"]))
+            m = degree.match(line, start)
+            if m is None or start != m.start():
+                position.column = start
+                raise OpbParsingException("Unexpected Symbol", position)
+            if self.cbDegree is not None:
+                self.cbDegree(m["op"], int(m["degree"]))
+
+
+    def parseOpbFile(self, fileName):
+        self.foundHeader = False
         with open(fileName, "r") as f:
             for lineNum, line in enumerate(f):
-                match = emptyLine.match(line)
-                if (match):
-                    if (not foundHeader):
-                        match = header.match(line)
-                        if match:
-                            foundHeader = True
-                            if self.cbHeader is not None:
-                                self.cbHeader(int(match["vars"]), int(match["constr"]))
-                else:
-                    start = 0
-                    for m in term.finditer(line):
-                        if (start != m.start()):
-                            raise OpbParsingException("Unexpected Symbol", fileName, lineNum, start)
-                        start = m.end()
-                        if self.cbTerm is not None:
-                            self.cbTerm(int(m["coeff"]), int(m["var"]))
-                    m = degree.match(line, start)
-                    if m is None or start != m.start():
-                        raise OpbParsingException("Unexpected Symbol", fileName, lineNum, start)
-                    if self.cbDegree is not None:
-                        self.cbDegree(m["op"], int(m["degree"]))
-        if (not foundHeader):
+                self.parseLine(line, ParserPosition(fileName, lineNum))
+
+        if (not self.foundHeader):
             raise OpbParsingException("No header found. (* #variables = ... #constraints = ...) in %s"%(fileName))
 
 registered_rules = []
@@ -159,9 +186,18 @@ def register_rule(rule):
     registered_rules.append(rule)
 
 class Rule():
-    id = None
+    Id = None
 
-    def computeConstraints(self, antecedents):
+    def read(self, stream, position):
+        """
+        Args:
+            stream string like object compatible with re library
+            pos position to start parsing the rule from (does not include the Id)
+        """
+
+        raise NotImplementedError()
+
+    def __call__(self, antecedents):
         """
         Args:
             antecedents (list): Antecedents in the order given by antecedentIDs
@@ -188,7 +224,7 @@ class Rule():
         False
 
 class DummyRule(Rule):
-    def computeConstraints(self, db):
+    def __call__(self, db):
         return [Inequality([], 0)]
 
     def numConstraints(self):
@@ -202,10 +238,10 @@ class RuleFactory():
         self.rules = dict()
         for rule in rules:
             if rule.id not in rules.keys():
-                assert len(rule.id) == 1
-                self.rules[rule.id] = rule
+                assert len(rule.Id) == 1
+                self.rules[rule.Id] = rule
             else:
-                raise ValueError("Duplicate key for rule '%s'" % (rule.id))
+                raise ValueError("Duplicate key for rule '%s'" % (rule.Id))
 
         self._file = file
 
@@ -220,33 +256,159 @@ class RuleFactory():
                 raise NotImplementedError("Unsupported rule '%s'" % (rule))
 
     def __iter__(self):
-        for line in self._file:
-            yield rules[line[0]](line)
+        for lineNum, line in enumerate(self._file):
+            Id, data = line.split(" ", 1)
+            rule = rules[Id]()
+            end = rule.read(data, 0)
+            assert len(data) == end
+            yield rule
 
-class SimpleRule(Rule):
-    """
-    A simple rule is a rule that is starting with an identifier followed
-    by a stream of numbers that is 0 terminated.
-    """
-    def __init__(self, stream):
-        self._line = stream
 
-    @property
-    def id(self):
-        return self._id
+def tokenized(stream, pos, tokens):
+    pattern = re.compile('|'.join('(?P<%s>%s)' % pair
+        for pair in tokens))
 
-    def numberStream(self):
-        words = self._line.split(" ")
-        assert self._id == words[0]
-        foundEnd = False
-        for (i,word) in enumerate(words)[1:]:
-            assert foundEnd == False
+    for match in pattern.finditer(stream.stream, stream.pos):
+        token = match.lastgroup
 
-            res = int(word)
-            if res != 0:
-                yield res
+        yield (token, match)
+
+        stream.pos = match.end
+        lines = value.count("\n")
+        self.pos.line += lines
+
+        if lines == 0:
+            self.pos.column += len(value)
+        else:
+            self.pos.column = len(value) - value.rfind("\n")
+
+
+def parseOPBLine(stream, pos):
+    tokens = [
+        ("header", r"\* *#variable *= *(?P<vars>[0-9]+) *#constraint *= *(?P<constr>[0-9]+)" ),
+        ("term", r"(?P<coeff>[+-]?[0-9]+) *x(?P<var>[0-9]+)"),
+        ("rhs", r"(?P<op>(>=)|=) *(?P<degree>[+-]?[0-9]+)"),
+        ("space", r" *"),
+        ("emptyLine", r"(^ *\*)|(^\s*$)"),
+        ("endOfConstraint", r";")
+    ]
+
+    nospace = lambda x: x[0] != "space"
+    tokens = filter(nospace, tokenized(stream, pos, tokens))
+
+    token = None
+
+    terms = list()
+    op = None
+    degree = None
+
+    foundRhs = False
+    for token, match in tokens:
+        if token == "header":
+            break
+        if token == "emptyLine":
+            break
+        if token == "endOfConstraint":
+            break
+        if token == "term":
+            if not foundRhs:
+                terms.append((int(match.group("coeff")), int(match.group("var"))))
             else:
-                foundEnd = True
+                raise ParsingException(pos, "The line may not contain a term at this position.")
+        if token == "rhs":
+            foundRhs == True
+            op = match.group()
+
+
+
+
+
+
+def numberSequence(stream, pos):
+    """
+    Consume a stream of numbers that is 0 terminated.
+    """
+
+    tokens = [
+        ("number", r"[+-]?[0-9]+")
+        ("space",  r" *")
+    ]
+
+    for token, match in tokenized(stream, pos, tokens):
+        if token == "number":
+            res = int(match.group(0))
+            if res == 0:
+                return
+            else:
+                yield res
+
+    raise ParsingException(self.pos, "Expected 0 to end number sequence.")
+
+
+@register_rule
+class CheckConstraint(Rule):
+    Id = "e"
+
+    @classmethod
+    def fromStream(cls, stream, pos):
+        tokens = [
+            ("number", r"[+-]?[0-9]+")
+            ("space",  r" *")
+            ("type",   r"(cnf|opb)")
+        ]
+
+        nospace = lambda x: x[0] != "space"
+        tokens = filter(nospace, tokenized(stream, pos, tokens))
+
+        try:
+            token, match = next(tokens)
+        except StopIteration:
+            token = None
+
+        if token != "number":
+            raise ParsingException(pos, "Expected number to indicate which constraint needs to be equal.")
+        which = int(match.group(0))
+
+        try:
+            token, match = next(tokens)
+        except StopIteration:
+            token = None
+
+        if token != "type":
+            raise ParsingException(pos, "Expected type of constraint (cnf or opb).")
+        constraintType = match.group(0)
+
+        try:
+            next(tokens)
+        except StopIteration:
+            pass
+
+        if constraintType == "cnf":
+            constraint = readCNF(stream, pos)
+        elif constraintType == "opb":
+            constraint = readOPB(stream, pos)
+
+        return cls(which, constraint)
+
+
+    def __init__(self, which, constraint):
+        self.which = which
+        self.constraint = constraint
+
+
+    def __call__(self, antecedents):
+
+
+    def numConstraints(self):
+        return 0
+
+    def antecedentIDs(self):
+        return []
+
+
+
+    def isGoal(self):
+        True
 
 class LoadFormula(SimpleRule):
     id = "f"
@@ -255,7 +417,7 @@ class LoadFormula(SimpleRule):
         super().__init__(stream)
         self._formula = formula
 
-    def __call__(self, db):
+    def __call__(self, antecedents):
         yield
 
 class LoadFormulaWrapper():

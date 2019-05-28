@@ -99,10 +99,12 @@ Compute saturate([factor1]*[antecedent1] + [factor2]*[antecedent2] + ...)
 Verify that the constraint [which] is contradicting
 
 
-(e)ual
+(e)qual
 ======
 
-    e [which] [OPB style constraint]
+    e [which] opb [OPB style constraint]
+
+    e [which] cnf [DIMACS style clause]
 
 Verify that constraitn [which] is euqal to [OPB style constraint]
 

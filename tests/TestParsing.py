@@ -29,6 +29,19 @@ class TestParsing():
 
 class TestCheckConstraintParsing():
     def test_1(self):
-        parser = CheckConstraint.getParser()
+        parser = ConstraintEquals.getParser()
         res = parser.parse("1 opb 3 x1 >= 2;")
-        assert res == CheckConstraint(1, ([(3,1)], ">=", 2))
+        assert res == ConstraintEquals(1, Inequality([Term(3,1)], 2))
+
+class TestInequalityParsing():
+    def test_eq(self):
+        parser = Inequality.getOPBParser()
+        result = parser.parse("1x2 -2x1 = 2;")
+
+        ineq1 = Inequality([Term(-2,1), Term(1,2)], 2)
+        ineq2 = Inequality([Term(2,1), Term(-1,2)], -2)
+
+        assert len(result) == 2
+        print(result)
+        assert (result[0] == ineq1 and result[1] == ineq2) \
+            or (result[0] == ineq2 and result[1] == ineq1)

@@ -31,11 +31,46 @@ class Inequality():
     a change in the upperbound invalidates the stored constraint.
     """
 
-    def __init__(self, terms = list(), degree = 0):
-        self.degree = degree
-        self.terms = sorted(terms, key = lambda x: abs(x.variable))
+    @staticmethod
+    def fromParsy(t):
+        result = list()
 
-    def addWithFactor(self, factor, other, variableUpperBounds = AllBooleanUpperBound()):
+        if isinstance(t, list):
+            result.append(Inequality([Term(1,l) for l in t], 1))
+        else:
+            terms, eq, degree = t
+
+            if eq == "=":
+                result.append(Inequality([Term(-a,x) for a,x in terms], -degree))
+
+            result.append(Inequality([Term(a,x) for a,x in terms], degree))
+
+        return parsy.success(result)
+
+    @staticmethod
+    def getOPBParser(allowEq = True):
+        return getOPBConstraintParser(allowEq = True).bind(Inequality.fromParsy)
+
+    @staticmethod
+    def getCNFParser():
+        return getCNFConstraintParser().bind(Inequality.fromParsy)
+
+    def __init__(self, terms = list(), degree = 0, variableUpperBounds = AllBooleanUpperBound()):
+        self.degree = degree
+        self.terms = terms
+        self.variableUpperBounds = variableUpperBounds
+        self.normalize()
+
+    def normalize():
+        for term in self.terms:
+            if term.coefficient < 0:
+                term.variable = -term.variable
+                term.coefficient = abs(term.coefficient)
+                self.degree += variableUpperBounds[abs(term.variable)] * term.coefficient
+
+        terms.sort(key = lambda x: abs(x.variable))
+
+    def addWithFactor(self, factor, other):
         self.degree += factor * other.degree
         result = list()
 
@@ -64,7 +99,7 @@ class Inequality():
                 newVariable = copysign(abs(my.variable), newCoefficient)
                 newCoefficient = abs(newCoefficient)
                 cancellation = max(0, max(my.coefficient, other.coefficient) - newCoefficient)
-                self.degree -= cancellation * variableUpperBounds[abs(my.variable)]
+                self.degree -= cancellation * self.variableUpperBounds[abs(my.variable)]
                 if newCoefficient != 0:
                     result.append(Term(newCoefficient, newVariable))
                 other = next(otherTerms, None)
@@ -99,6 +134,7 @@ class Inequality():
 
 
     def __eq__(self, other):
+        # note that terms is assumed to be soreted
         return self.degree == other.degree \
             and self.terms == other.terms
 
@@ -119,22 +155,24 @@ def register_rule(rule):
 class Rule():
     Id = None
 
-    def read(self, stream, position):
+    @staticmethod
+    def getParser():
         """
-        Args:
-            stream string like object compatible with re library
-            pos position to start parsing the rule from (does not include the Id)
+        Returns:
+            A parser that creates this rule from the string following the Id
         """
-
         raise NotImplementedError()
 
-    def __call__(self, antecedents):
+    def compute(self, antecedents):
         """
+        Performs the action of the rule, e.g. compute new constraints or perform
+        checks on the current proof.
+
         Args:
             antecedents (list): Antecedents in the order given by antecedentIDs
 
         Returns:
-            computed constraint
+            computed constraints or empty list
         """
         raise NotImplementedError()
 
@@ -155,7 +193,7 @@ class Rule():
         False
 
 class DummyRule(Rule):
-    def __call__(self, db):
+    def compute(self, db):
         return [Inequality([], 0)]
 
     def numConstraints(self):
@@ -204,13 +242,16 @@ def getCNFConstraintParser():
 
     return (literal << space).many() << eol
 
-def getOPBConstraintParser():
+def getOPBConstraintParser(allowEq = True):
     space    = parsy.regex(r" +").desc("space").optional()
     coeff    = parsy.regex(r"[+-]?[0-9]+").map(int).desc("integer for the coefficient (make sure to not have spaces between the sign and the degree value)")
     variable = (parsy.regex(r"x") >> parsy.regex(r"[1-9][0-9]*").map(int)).desc("variable in the form 'x[1-9][0-9]*'")
     term     = parsy.seq(space >> coeff, space >> variable).map(tuple)
 
-    equality = space >> parsy.regex(r"(=|>=)").desc("= or >=")
+    if allowEq:
+        equality = space >> parsy.regex(r"(=|>=)").desc("= or >=")
+    else:
+        equality = space >> parsy.regex(r">=").desc(">=")
 
     degree   = space >> parsy.regex(r"[+-]?[0-9]+").map(int).desc("integer for the degree")
 
@@ -234,9 +275,14 @@ def getOPBParser():
 
     return parsy.seq(emptyLine >> header, (emptyLine >> constraint).many()) << emptyLine
 
+class InvalidProof(Exception):
+    pass
+
+class EqualityCheckFailed(InvalidProof):
+    pass
 
 @register_rule
-class CheckConstraint(Rule):
+class ConstraintEquals(Rule):
     Id = "e"
 
     @staticmethod
@@ -244,58 +290,204 @@ class CheckConstraint(Rule):
         space = parsy.regex(" +").desc("space")
 
         opb = space >> parsy.regex(r"opb") \
-                >> space >> getOPBConstraintParser()
+                >> space >> Inequality.getOPBParser(allowEq = False)
         cnf = space >> parsy.regex(r"cnf") \
-                >> space >> getCNFConstraintParser()
+                >> space >> Inequality.getCNFParser()
 
-        which = space.optional() >> parsy.regex(r"[+-]?[0-9]+").map(int)
+        constraintId = space.optional() >> parsy.regex(r"[+-]?[0-9]+").map(int)
 
-        return parsy.seq(which, opb | cnf).combine(CheckConstraint.fromParsy)
+        return parsy.seq(constraintId, opb | cnf).combine(ConstraintEquals.fromParsy)
 
     @staticmethod
-    def fromParsy(Id, constraint):
-        return CheckConstraint(Id, constraint)
+    def fromParsy(constraintId, constraint):
+        return ConstraintEquals(constraintId, constraint[0])
 
-    def __init__(self, which, constraint):
-        self.which = which
+    def __init__(self, constraintId, constraint):
+        self.constraintId = constraintId
         self.constraint = constraint
 
-    def __call__(self, antecedents):
-        pass
+    def compute(self, antecedents):
+        if antecedents[0] != self.constraint:
+            raise EqualityCheckFailed()
 
     def numConstraints(self):
         return 0
 
     def antecedentIDs(self):
-        return []
+        return [self.constraintId]
 
     def __eq__(self, other):
-        return self.which == other.which \
+        return self.constraintId == other.constraintId \
             and self.constraint == other.constraint
-
-
 
     def isGoal(self):
         True
 
+class ContradictionCheckFailed(InvalidProof):
+    pass
+
+@register_rule
+class IsContradiction(Rule):
+    Id = "c"
+
+    @staticmethod
+    def getParser():
+        space = parsy.regex(" +").desc("space")
+        constraintId = space.optional() >> parsy.regex(r"[+-]?[0-9]+").map(int)
+        zero  = parsy.regex("0").desc("0 to end number sequence")
+
+        return which << space << zero
+
+    @staticmethod
+    def fromParsy(which):
+        return IsContradiction(constraintId)
+
+    def __init__(self, constraintId):
+        self.constraintId = constraintId
+        self.constraint = constraint
+
+    def compute(self, antecedents):
+        if not antecedents[0].isContradiction():
+            raise ContradictionCheckFailed()
+
+    def numConstraints(self):
+        return 0
+
+    def antecedentIDs(self):
+        return [self.constraintId]
+
+    def __eq__(self, other):
+        return self.constraintId == other.constraintId
+
+    def isGoal(self):
+        True
+
+@register_rule
+class LinearCombination(Rule):
+    Id = "l"
+
+    @staticmethod
+    def getParser(create = True):
+        space = parsy.regex(" +").desc("space")
+        factor = parsy.regex(r"[0-9]+").map(int).desc("factor")
+        constraintId = parsy.regex(r"[1-9][0-9]+").map(int).desc("constraintId")
+        zero  = parsy.regex("0").desc("0 to end number sequence")
+
+        summand = parsy.seq(factor << space, constraintId << space).combine(tuple)
+        parser = space.optional() >> summand.many() << zero
+
+        if create:
+            return parser.map(LinearCombination.fromParsy)
+        else:
+            return parser
+
+    @staticmethod
+    def fromParsy(divisor, sequence):
+        factors, antecedentIds = zip(*sequence)
+        return LinearCombination(factors, antecedentIds)
+
+    def __init__(self, divisor, factors, antecedentIds):
+        assert len(factors) == len(antecedentIds)
+        self.antecedentIds = antecedentIds
+        self.factors = factors
+
+    def compute(self, antecedents):
+        result = Inequality()
+
+        for factor, constraint in zip(self.factors, self.antecedents):
+            result.addWithFactor(factor, constraint)
+
+        return [result]
+
+    def numConstraints(self):
+        return 1
+
+    def antecedentIDs(self):
+        return self.antecedentIds
+
+    def __eq__(self, other):
+        return self.antecedentIds == other.antecedentIds \
+            and self.divisor == other.divisor
+
+    def isGoal(self):
+        False
+
+@register_rule
+class Division(LinearCombination):
+    Id = "d"
+
+    @staticmethod
+    def getParser():
+        space = parsy.regex(" +").desc("space")
+        divisor = parsy.regex(r"[1-9][0-9]+").map(int).desc("positive divisor")
+
+        return parsy.seq(
+                space.optional() >> divisor << space,
+                LinearCombination.getParser(create = False)
+            ).combine(Division.fromParsy)
+
+    @staticmethod
+    def fromParsy(divisor, sequence):
+        factors, antecedentIds = zip(*sequence)
+        return Division(divisor, factors, antecedentIds)
+
+    def __init__(self, divisor, factors, antecedentIds):
+        assert len(factors) == len(antecedentIds)
+        super().__init__(factors, antecedentIds)
+        self.divisor = divisor
+
+    def compute(self, antecedents):
+        return [super().compute(antecedents)[0].divide(self.divisor)]
+
+@register_rule
+class Saturation(LinearCombination):
+    Id = "s"
+
+    @staticmethod
+    def getParser():
+        return LinearCombination.getParser(create = False).map(Saturation.fromParsy)
+
+    @staticmethod
+    def fromParsy(divisor, sequence):
+        factors, antecedentIds = zip(*sequence)
+        return Saturation(factors, antecedentIds)
+
+    def compute(self, antecedents):
+        return [super().compute(antecedents)[0].saturate()]
+
 class LoadFormula():
     id = "f"
 
-    def __init__(self, stream, formula):
-        # super().__init__(stream)
-        self._formula = formula
-
-    def __call__(self, antecedents):
-        yield
-
-class LoadFormulaWrapper():
-    id = LoadFormula.id
+    @staticmethod
+    def getParser(formula):
+        return parsy.regex(r" 0") >> parsy.success(LoadFormula(formula))
 
     def __init__(self, formula):
         self.formula = formula
 
-    def __call__(self, stream):
-        return LoadFormula(stream, self.formula)
+    def compute(self, antecedents):
+        return self.formula
+
+    def numConstraints(self):
+        return len(self.formula)
+
+    def antecedentIDs(self):
+        return []
+
+
+class LoadFormulaWrapper():
+    def __init__(self, formula):
+        self.formula = formula
+        self.id = LoadFormula.id
+
+    def getParser(self):
+        if self.formula is not None:
+            # for memory efficincy reasons
+            raise RuntimeException("Can not call load Formula twice.")
+
+        result = LoadFormula.getParser(self.formula)
+        self.formula = None
+        return result
 
 
 DBEntry = structclass("DBEntry","rule constraint numUsed")
@@ -425,7 +617,7 @@ class Verifier():
             self._execCacheRule = rule
             antecedentIDs = rule.antecedentIDs()
 
-            self._execCache = rule.computeConstraints(
+            self._execCache = rule.compute(
                 [self.db[i].constraint for i in antecedentIDs])
 
             for i in antecedentIDs:
@@ -487,9 +679,13 @@ def main():
         help="Only check steps that are necessary for contradiction.")
 
     rules = registered_rules
-    rules.append(LoadFormulaWrapper(args.formula))
-    ruleFactory = RuleFactory(rules, args.derivation)
-    rules = list(ruleFactory)
+    formula = getOPBParser().parse(args.formula)
+    rules.append(LoadFormulaWrapper(formula))
+    rules = RuleParser().parse(rules, args.derivation)
+
+    verify = Verifier()
+    verify(rules)
+
 
 if __name__ == '__main__':
     main()

@@ -14,7 +14,7 @@ r [antecedent1] [antecedent2] ... 0
 d [divisor] [factor1] [antecedent1] [factor2] [antecedent2] ... 0
 s [factor1] [antecedent1] [factor2] [antecedent2] ... 0
 c [which] 0
-e [which] [OPB style constraint]
+e [which] opb [OPB style constraint]
 
 Motivation
 ==========

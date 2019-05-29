@@ -4,6 +4,10 @@ from recordclass import structclass
 #todo recordclass requires install
 from math import copysign, ceil
 from enum import Enum
+import parsy
+
+from functools import partial
+
 
 Term = structclass("Term","coefficient variable")
 
@@ -107,83 +111,10 @@ class Inequality():
     def __repr__(self):
         return str(self)
 
-
-class ParserPosition():
-    def __init__(self, file='', line=0, column=0, pos=0):
-        self.file   = file
-        self.line   = line
-        self.column = column
-
-    def __str__(self):
-        return "%s:%s:%s"%(self.file, self.line, self.column)
-
-    def __repr__(self):
-        return "%s(%r)" % (self.__class__, self.__dict__)
-
-class ParsingException(Exception):
-    pass
-
-class PseudoStream():
-    def __init__(self, stream, pos)
-        self.stream = stream
-        self.pos = pos
-
-class OpbParsingException(Exception):
-    pass
-
-class OpbParser:
-    def cbHeader(self, var, constr):
-        pass
-
-    def cbTerm(self, coeff, var):
-        pass
-
-    def cbDegree(self, op, degree):
-        pass
-
-    def parseLine(self, line, position):
-        emptyLine = re.compile(r"(^ *\*)|(^\s*$)")
-        header = re.compile(r"\* *#variable *= *(?P<vars>[0-9]+) *#constraint *= *(?P<constr>[0-9]+)")
-        term = re.compile(r" *(?P<coeff>[+-]?[0-9]+) *x(?P<var>[0-9]+) *")
-        degree = re.compile(r"(?P<op>(>=)|=) *(?P<degree>[+-]?[0-9]+) *;")
-
-        match = emptyLine.match(line)
-        if (match):
-            if (not self.foundHeader):
-                match = header.match(line)
-                if match:
-                    self.foundHeader = True
-                    if self.cbHeader is not None:
-                        self.cbHeader(int(match["vars"]), int(match["constr"]))
-        else:
-            start = 0
-            for m in term.finditer(line):
-                if (start != m.start()):
-                    position.column = start
-                    raise OpbParsingException("Unexpected Symbol", position)
-                start = m.end()
-                if self.cbTerm is not None:
-                    self.cbTerm(int(m["coeff"]), int(m["var"]))
-            m = degree.match(line, start)
-            if m is None or start != m.start():
-                position.column = start
-                raise OpbParsingException("Unexpected Symbol", position)
-            if self.cbDegree is not None:
-                self.cbDegree(m["op"], int(m["degree"]))
-
-
-    def parseOpbFile(self, fileName):
-        self.foundHeader = False
-        with open(fileName, "r") as f:
-            for lineNum, line in enumerate(f):
-                self.parseLine(line, ParserPosition(fileName, lineNum))
-
-        if (not self.foundHeader):
-            raise OpbParsingException("No header found. (* #variables = ... #constraints = ...) in %s"%(fileName))
-
 registered_rules = []
 def register_rule(rule):
     registered_rules.append(rule)
+    return rule
 
 class Rule():
     Id = None
@@ -233,171 +164,104 @@ class DummyRule(Rule):
     def antecedentIDs(self):
         return []
 
-class RuleFactory():
-    def __init__(self, rules, file):
-        self.rules = dict()
-        for rule in rules:
-            if rule.id not in rules.keys():
-                assert len(rule.Id) == 1
-                self.rules[rule.Id] = rule
-            else:
-                raise ValueError("Duplicate key for rule '%s'" % (rule.Id))
+class RuleParser():
+    def checkIdentifier(self, Id):
+        if not Id in self.identifier:
+            return parsy.fail("Unsuported rule.")
 
-        self._file = file
-
-        header = self._file.readline()
-        header = header.split("using")
-        assert len(header) == 2
-        headerText = header[0]
-        usedRules = header[1].split(" ")
-        assert usedRules[-1] == "0"
-        for rule in usedRules[:-1]:
-            if rule not in rules.keys():
-                raise NotImplementedError("Unsupported rule '%s'" % (rule))
-
-    def __iter__(self):
-        for lineNum, line in enumerate(self._file):
-            Id, data = line.split(" ", 1)
-            rule = rules[Id]()
-            end = rule.read(data, 0)
-            assert len(data) == end
-            yield rule
+        return parsy.success(Id)
 
 
-def tokenized(stream, pos, tokens):
-    pattern = re.compile('|'.join('(?P<%s>%s)' % pair
-        for pair in tokens))
-
-    for match in pattern.finditer(stream.stream, stream.pos):
-        token = match.lastgroup
-
-        yield (token, match)
-
-        stream.pos = match.end
-        lines = value.count("\n")
-        self.pos.line += lines
-
-        if lines == 0:
-            self.pos.column += len(value)
-        else:
-            self.pos.column = len(value) - value.rfind("\n")
+    def parse(self, rules, stream):
+        self.identifier = set([rule.Id for rule in rules])
+        print(self.identifier)
 
 
-def parseOPBLine(stream, pos):
-    tokens = [
-        ("header", r"\* *#variable *= *(?P<vars>[0-9]+) *#constraint *= *(?P<constr>[0-9]+)" ),
-        ("term", r"(?P<coeff>[+-]?[0-9]+) *x(?P<var>[0-9]+)"),
-        ("rhs", r"(?P<op>(>=)|=) *(?P<degree>[+-]?[0-9]+)"),
-        ("space", r" *"),
-        ("emptyLine", r"(^ *\*)|(^\s*$)"),
-        ("endOfConstraint", r";")
-    ]
+        header = parsy.regex(r"refutation graph using").\
+            then(
+                parsy.regex(r" +").desc("space").\
+                    then(
+                        parsy.regex(r"[^0 ]+").desc("rule identifier").\
+                        bind(partial(RuleParser.checkIdentifier, self))
+                    ).\
+                    many()
+            ).skip(
+                parsy.regex(r" *0 *\n?").desc("0 at end of line")
+            )
 
-    nospace = lambda x: x[0] != "space"
-    tokens = filter(nospace, tokenized(stream, pos, tokens))
+        skipBlankLines = parsy.regex(r"\s*")
+        singleRules = [skipBlankLines >> parsy.regex(rule.Id) >> rule.getParser() for rule in rules]
+        anyRuleParser = parsy.alt(*singleRules)
 
-    token = None
+        parser = header >> anyRuleParser.many()
 
-    terms = list()
-    op = None
-    degree = None
+        return parser.parse(stream)
 
-    foundRhs = False
-    for token, match in tokens:
-        if token == "header":
-            break
-        if token == "emptyLine":
-            break
-        if token == "endOfConstraint":
-            break
-        if token == "term":
-            if not foundRhs:
-                terms.append((int(match.group("coeff")), int(match.group("var"))))
-            else:
-                raise ParsingException(pos, "The line may not contain a term at this position.")
-        if token == "rhs":
-            foundRhs == True
-            op = match.group()
+def getCNFConstraintParser():
+    space    = parsy.regex(r" +").desc("space")
+    literal  = parsy.regex(r"[+-]?[1-9][0-9]*").desc("literal").map(int)
+    eol      = parsy.regex(r"0").desc("end of line zero")
 
+    return (literal << space).many() << eol
 
+def getOPBConstraintParser():
+    space    = parsy.regex(r" +").desc("space").optional()
+    coeff    = parsy.regex(r"[+-]?[0-9]+").map(int).desc("integer for the coefficient (make sure to not have spaces between the sign and the degree value)")
+    variable = (parsy.regex(r"x") >> parsy.regex(r"[1-9][0-9]*").map(int)).desc("variable in the form 'x[1-9][0-9]*'")
+    term     = parsy.seq(space >> coeff, space >> variable).map(tuple)
 
+    equality = space >> parsy.regex(r"(=|>=)").desc("= or >=")
 
+    degree   = space >> parsy.regex(r"[+-]?[0-9]+").map(int).desc("integer for the degree")
 
+    end      = parsy.regex(r";").desc("termination of rhs with ';'")
+    finish   = space >> end
 
-def numberSequence(stream, pos):
-    """
-    Consume a stream of numbers that is 0 terminated.
-    """
+    return parsy.seq(term.many(), equality, degree << finish).map(tuple)
 
-    tokens = [
-        ("number", r"[+-]?[0-9]+")
-        ("space",  r" *")
-    ]
+def getOPBParser():
+    numVar = (parsy.regex(r" #variable = ") >> parsy.regex(r"[0-9]+")) \
+                    .map(int) \
+                    .desc("Number of variables in the form '#variable = [0-9]+'")
+    numC = (parsy.regex(r" #constraint = ") >> parsy.regex(r"[0-9]+")) \
+                    .map(int) \
+                    .desc("Number of constraints in the form '#constraint = [0-9]+'")
+    header = parsy.regex(r"\* ") >> parsy.seq(numVar, numC) << parsy.regex("\n")
 
-    for token, match in tokenized(stream, pos, tokens):
-        if token == "number":
-            res = int(match.group(0))
-            if res == 0:
-                return
-            else:
-                yield res
+    emptyLine = parsy.regex(r"(\s*\*.*\n)|(\s*\n)").many()
 
-    raise ParsingException(self.pos, "Expected 0 to end number sequence.")
+    constraint = getOPBConstraintParser() << parsy.regex(" *\n")
+
+    return parsy.seq(emptyLine >> header, (emptyLine >> constraint).many()) << emptyLine
 
 
 @register_rule
 class CheckConstraint(Rule):
     Id = "e"
 
-    @classmethod
-    def fromStream(cls, stream, pos):
-        tokens = [
-            ("number", r"[+-]?[0-9]+")
-            ("space",  r" *")
-            ("type",   r"(cnf|opb)")
-        ]
+    @staticmethod
+    def getParser():
+        space = parsy.regex(" +").desc("space")
 
-        nospace = lambda x: x[0] != "space"
-        tokens = filter(nospace, tokenized(stream, pos, tokens))
+        opb = space >> parsy.regex(r"opb") \
+                >> space >> getOPBConstraintParser()
+        cnf = space >> parsy.regex(r"cnf") \
+                >> space >> getCNFConstraintParser()
 
-        try:
-            token, match = next(tokens)
-        except StopIteration:
-            token = None
+        which = space.optional() >> parsy.regex(r"[+-]?[0-9]+").map(int)
 
-        if token != "number":
-            raise ParsingException(pos, "Expected number to indicate which constraint needs to be equal.")
-        which = int(match.group(0))
+        return parsy.seq(which, opb | cnf).combine(CheckConstraint.fromParsy)
 
-        try:
-            token, match = next(tokens)
-        except StopIteration:
-            token = None
-
-        if token != "type":
-            raise ParsingException(pos, "Expected type of constraint (cnf or opb).")
-        constraintType = match.group(0)
-
-        try:
-            next(tokens)
-        except StopIteration:
-            pass
-
-        if constraintType == "cnf":
-            constraint = readCNF(stream, pos)
-        elif constraintType == "opb":
-            constraint = readOPB(stream, pos)
-
-        return cls(which, constraint)
-
+    @staticmethod
+    def fromParsy(Id, constraint):
+        return CheckConstraint(Id, constraint)
 
     def __init__(self, which, constraint):
         self.which = which
         self.constraint = constraint
 
-
     def __call__(self, antecedents):
-
+        pass
 
     def numConstraints(self):
         return 0
@@ -405,16 +269,20 @@ class CheckConstraint(Rule):
     def antecedentIDs(self):
         return []
 
+    def __eq__(self, other):
+        return self.which == other.which \
+            and self.constraint == other.constraint
+
 
 
     def isGoal(self):
         True
 
-class LoadFormula(SimpleRule):
+class LoadFormula():
     id = "f"
 
     def __init__(self, stream, formula):
-        super().__init__(stream)
+        # super().__init__(stream)
         self._formula = formula
 
     def __call__(self, antecedents):

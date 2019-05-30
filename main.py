@@ -6,6 +6,8 @@ from math import copysign, ceil
 from enum import Enum
 import parsy
 
+import logging
+
 from functools import partial
 
 
@@ -61,14 +63,14 @@ class Inequality():
         self.variableUpperBounds = variableUpperBounds
         self.normalize()
 
-    def normalize():
+    def normalize(self):
         for term in self.terms:
             if term.coefficient < 0:
                 term.variable = -term.variable
                 term.coefficient = abs(term.coefficient)
-                self.degree += variableUpperBounds[abs(term.variable)] * term.coefficient
+                self.degree += self.variableUpperBounds[abs(term.variable)] * term.coefficient
 
-        terms.sort(key = lambda x: abs(x.variable))
+        self.terms.sort(key = lambda x: abs(x.variable))
 
     def addWithFactor(self, factor, other):
         self.degree += factor * other.degree
@@ -80,6 +82,7 @@ class Inequality():
         other = next(otherTerms, None)
         my    = next(myTerms, None)
         while (other is not None or my is not None):
+            print(other, my)
             if other is None:
                 if my is not None:
                     result.append(my)
@@ -190,7 +193,10 @@ class Rule():
         raise NotImplementedError()
 
     def isGoal(self):
-        False
+        return False
+
+    def __str__(self):
+        return type(self).__name__
 
 class DummyRule(Rule):
     def compute(self, db):
@@ -211,9 +217,9 @@ class RuleParser():
 
 
     def parse(self, rules, stream):
-        self.identifier = set([rule.Id for rule in rules])
-        print(self.identifier)
+        logging.info("Available Rules: %s"%(", ".join(["%s"%(rule.Id) for rule in rules])))
 
+        self.identifier = set([rule.Id for rule in rules])
 
         header = parsy.regex(r"refutation graph using").\
             then(
@@ -228,7 +234,7 @@ class RuleParser():
             )
 
         skipBlankLines = parsy.regex(r"\s*")
-        singleRules = [skipBlankLines >> parsy.regex(rule.Id) >> rule.getParser() for rule in rules]
+        singleRules = [skipBlankLines >> parsy.regex(rule.Id).desc("rule identifier") >> rule.getParser() << skipBlankLines for rule in rules]
         anyRuleParser = parsy.alt(*singleRules)
 
         parser = header >> anyRuleParser.many()
@@ -260,26 +266,42 @@ def getOPBConstraintParser(allowEq = True):
 
     return parsy.seq(term.many(), equality, degree << finish).map(tuple)
 
+
+def flatten(constraintList):
+    result = list()
+    for oneOrTwo in constraintList:
+        for c in oneOrTwo:
+            result.append(c)
+    return result
+
 def getOPBParser():
-    numVar = (parsy.regex(r" #variable = ") >> parsy.regex(r"[0-9]+")) \
+    numVar = (parsy.regex(r" *#variable *= *") >> parsy.regex(r"[0-9]+")) \
                     .map(int) \
                     .desc("Number of variables in the form '#variable = [0-9]+'")
-    numC = (parsy.regex(r" #constraint = ") >> parsy.regex(r"[0-9]+")) \
+    numC = (parsy.regex(r" *#constraint *= *") >> parsy.regex(r"[0-9]+")) \
                     .map(int) \
                     .desc("Number of constraints in the form '#constraint = [0-9]+'")
-    header = parsy.regex(r"\* ") >> parsy.seq(numVar, numC) << parsy.regex("\n")
 
-    emptyLine = parsy.regex(r"(\s*\*.*\n)|(\s*\n)").many()
+    eol = parsy.regex(" *\n").desc("return at end of line")
+    emptyLine = parsy.regex(r"(\s*)").desc("empty line")
+    commentLine = parsy.regex(r"(\s*\*.*)").desc("comment line starting with '*'")
+    header = (parsy.regex(r"\* ") >> parsy.seq(numVar, numC) << parsy.regex("\n")) \
+                    .desc("header line in form of '* #variable = [0-9]+ #constraint = [0-9]+'")
 
-    constraint = getOPBConstraintParser() << parsy.regex(" *\n")
+    nothing = (emptyLine << eol | commentLine << eol).many()
 
-    return parsy.seq(emptyLine >> header, (emptyLine >> constraint).many()) << emptyLine
+    constraint = getOPBConstraintParser().bind(Inequality.fromParsy)
+
+    return parsy.seq(header, (nothing >> constraint << eol).many().map(flatten)) \
+     + ((emptyLine | commentLine).map(lambda x: []) | constraint.map(lambda x: [x])) << eol.optional()
 
 class InvalidProof(Exception):
     pass
 
 class EqualityCheckFailed(InvalidProof):
-    pass
+    def __init__(self, expected, got):
+        self.expected = expected
+        self.got = got
 
 @register_rule
 class ConstraintEquals(Rule):
@@ -289,12 +311,13 @@ class ConstraintEquals(Rule):
     def getParser():
         space = parsy.regex(" +").desc("space")
 
-        opb = space >> parsy.regex(r"opb") \
+        opb = space.optional() >> parsy.regex(r"opb") \
                 >> space >> Inequality.getOPBParser(allowEq = False)
-        cnf = space >> parsy.regex(r"cnf") \
+        cnf = space.optional() >> parsy.regex(r"cnf") \
                 >> space >> Inequality.getCNFParser()
 
-        constraintId = space.optional() >> parsy.regex(r"[+-]?[0-9]+").map(int)
+        constraintId = space.optional() >> parsy.regex(r"[+-]?[0-9]+ ") \
+            .map(int).desc("constraintId")
 
         return parsy.seq(constraintId, opb | cnf).combine(ConstraintEquals.fromParsy)
 
@@ -307,8 +330,8 @@ class ConstraintEquals(Rule):
         self.constraint = constraint
 
     def compute(self, antecedents):
-        if antecedents[0] != self.constraint:
-            raise EqualityCheckFailed()
+        if self.constraint != antecedents[0]:
+            raise EqualityCheckFailed(self.constraint, antecedents[0])
 
     def numConstraints(self):
         return 0
@@ -321,7 +344,7 @@ class ConstraintEquals(Rule):
             and self.constraint == other.constraint
 
     def isGoal(self):
-        True
+        return True
 
 class ContradictionCheckFailed(InvalidProof):
     pass
@@ -333,18 +356,19 @@ class IsContradiction(Rule):
     @staticmethod
     def getParser():
         space = parsy.regex(" +").desc("space")
-        constraintId = space.optional() >> parsy.regex(r"[+-]?[0-9]+").map(int)
+        constraintId = space.optional() \
+            >> parsy.regex(r"[+-]?[0-9]+") \
+                .map(int).map(IsContradiction.fromParsy)
         zero  = parsy.regex("0").desc("0 to end number sequence")
 
-        return which << space << zero
+        return constraintId << space << zero
 
     @staticmethod
-    def fromParsy(which):
+    def fromParsy(constraintId):
         return IsContradiction(constraintId)
 
     def __init__(self, constraintId):
         self.constraintId = constraintId
-        self.constraint = constraint
 
     def compute(self, antecedents):
         if not antecedents[0].isContradiction():
@@ -360,7 +384,7 @@ class IsContradiction(Rule):
         return self.constraintId == other.constraintId
 
     def isGoal(self):
-        True
+        return True
 
 @register_rule
 class LinearCombination(Rule):
@@ -370,10 +394,10 @@ class LinearCombination(Rule):
     def getParser(create = True):
         space = parsy.regex(" +").desc("space")
         factor = parsy.regex(r"[0-9]+").map(int).desc("factor")
-        constraintId = parsy.regex(r"[1-9][0-9]+").map(int).desc("constraintId")
+        constraintId = parsy.regex(r"[1-9][0-9]*").map(int).desc("constraintId")
         zero  = parsy.regex("0").desc("0 to end number sequence")
 
-        summand = parsy.seq(factor << space, constraintId << space).combine(tuple)
+        summand = parsy.seq(factor << space, constraintId << space).map(tuple)
         parser = space.optional() >> summand.many() << zero
 
         if create:
@@ -382,11 +406,11 @@ class LinearCombination(Rule):
             return parser
 
     @staticmethod
-    def fromParsy(divisor, sequence):
+    def fromParsy(sequence):
         factors, antecedentIds = zip(*sequence)
         return LinearCombination(factors, antecedentIds)
 
-    def __init__(self, divisor, factors, antecedentIds):
+    def __init__(self, factors, antecedentIds):
         assert len(factors) == len(antecedentIds)
         self.antecedentIds = antecedentIds
         self.factors = factors
@@ -394,7 +418,7 @@ class LinearCombination(Rule):
     def compute(self, antecedents):
         result = Inequality()
 
-        for factor, constraint in zip(self.factors, self.antecedents):
+        for factor, constraint in zip(self.factors, antecedents):
             result.addWithFactor(factor, constraint)
 
         return [result]
@@ -406,11 +430,12 @@ class LinearCombination(Rule):
         return self.antecedentIds
 
     def __eq__(self, other):
-        return self.antecedentIds == other.antecedentIds \
-            and self.divisor == other.divisor
+        print(self.antecedentIds)
+        print(other.antecedentIds)
+        return self.antecedentIds == other.antecedentIds
 
     def isGoal(self):
-        False
+        return False
 
 @register_rule
 class Division(LinearCombination):
@@ -419,10 +444,10 @@ class Division(LinearCombination):
     @staticmethod
     def getParser():
         space = parsy.regex(" +").desc("space")
-        divisor = parsy.regex(r"[1-9][0-9]+").map(int).desc("positive divisor")
+        divisor = parsy.regex(r"[1-9][0-9]*").map(int).desc("positive divisor")
 
         return parsy.seq(
-                space.optional() >> divisor << space,
+                space.optional() >> divisor,
                 LinearCombination.getParser(create = False)
             ).combine(Division.fromParsy)
 
@@ -437,7 +462,12 @@ class Division(LinearCombination):
         self.divisor = divisor
 
     def compute(self, antecedents):
-        return [super().compute(antecedents)[0].divide(self.divisor)]
+        constraint = super().compute(antecedents)[0]
+        constraint.divide(self.divisor)
+        return [constraint]
+
+    def __eq__(self, other):
+        return super().__eq__(other) and self.divisor == other.divisor
 
 @register_rule
 class Saturation(LinearCombination):
@@ -448,14 +478,16 @@ class Saturation(LinearCombination):
         return LinearCombination.getParser(create = False).map(Saturation.fromParsy)
 
     @staticmethod
-    def fromParsy(divisor, sequence):
+    def fromParsy(sequence):
         factors, antecedentIds = zip(*sequence)
         return Saturation(factors, antecedentIds)
 
     def compute(self, antecedents):
-        return [super().compute(antecedents)[0].saturate()]
+        constraint = super().compute(antecedents)[0]
+        constraint.saturate()
+        return [constraint]
 
-class LoadFormula():
+class LoadFormula(Rule):
     id = "f"
 
     @staticmethod
@@ -478,12 +510,12 @@ class LoadFormula():
 class LoadFormulaWrapper():
     def __init__(self, formula):
         self.formula = formula
-        self.id = LoadFormula.id
+        self.Id = LoadFormula.id
 
     def getParser(self):
-        if self.formula is not None:
+        if self.formula is None:
             # for memory efficincy reasons
-            raise RuntimeException("Can not call load Formula twice.")
+            raise RuntimeError("Can not call load Formula twice.")
 
         result = LoadFormula.getParser(self.formula)
         self.formula = None
@@ -513,10 +545,10 @@ class Verifier():
 
     class Iterator():
         def __init__(self, verifier):
-            self.rules = iter(verifier.rules)
+            self.rules = enumerate(iter(verifier.rules))
             self.counter = 0
             self.rule = None
-            self.lines = iter(verifier.db)
+            self.lines = enumerate(iter(verifier.db))
 
         def __iter__(self):
             return self
@@ -524,38 +556,83 @@ class Verifier():
         def __next__(self):
             if self.counter == 0:
                 self.rule = next(self.rules)
-                self.counter = self.rule.numConstraints()
+                self.counter = self.rule[1].numConstraints()
             if self.counter != 0:
                 self.counter -= 1
                 line = next(self.lines)
             else:
-                line = None
+                line = (None, None)
             return (
                 self.rule,
                 line,
-                None if line is None else self.rule.numConstraints() - (self.counter + 1)
+                None if line is None else self.rule[1].numConstraints() - (self.counter + 1)
             )
 
     class Settings():
         def __init__(self, preset = None):
-            self.isInvariantsOn  = False
-            self.disableDeletion = False
-            self.skipUnused      = True
+            self.setPreset(type(self).defaults(), unchecked = True)
 
             if preset is not None:
                 self.setPreset(preset)
 
-        def setPreset(self, preset):
+        def setPreset(self, preset, unchecked = False):
             for key, value in preset.items():
-                if hasattr(self, key):
+                if unchecked or hasattr(self, key):
                     setattr(self, key, value)
                 else:
                     raise ValueError("Got unknown setting %s."%key)
 
+        @staticmethod
+        def defaults():
+            return {
+                "isInvariantsOn": False,
+                "disableDeletion": False,
+                "skipUnused": True
+            }
+
+        @classmethod
+        def addArgParser(cls, parser, name = "verifier"):
+            defaults = cls.defaults()
+            group = parser.add_argument_group(name)
+
+            group.add_argument("--invariants", dest=name+".isInvariantsOn",
+                action="store_true",
+                default=defaults["isInvariantsOn"],
+                help="Turn on invariant checking for debugging (might slow down cheking).")
+            group.add_argument("--no-invariants", dest=name+".isInvariantsOn",
+                action="store_false",
+                help="Turn off invariant checking.")
+
+            group.add_argument("--deletion", dest = name+".disableDeletion",
+                action="store_false",
+                default=defaults["disableDeletion"],
+                help="turn on deletion of no longer needed constraitns to save space")
+            group.add_argument("--no-deletion", dest = name+".disableDeletion",
+                action="store_true",
+                help="turn off deletion of no longer needed constraitns to save space")
 
 
-    def __init__(self, settings = Settings()):
-        self.settings = settings
+        @classmethod
+        def extract(cls, result, name = "verifier"):
+            preset = dict()
+            defaults = cls.defaults()
+            for key in defaults:
+                try:
+                    preset[key] = getattr(result, name + "." + key)
+                except AttributeError:
+                    pass
+            return cls(preset)
+
+        def __repr__(self):
+            return type(self).__name__ + repr(vars(self))
+
+
+
+    def __init__(self, settings = None):
+        if settings is not None:
+            self.settings = settings
+        else:
+            self.settings = Verifier.Settings()
 
     def __iter__(self):
         return Verifier.Iterator(self)
@@ -614,6 +691,7 @@ class Verifier():
     def execRule(self, rule, numInRule = None):
         assert rule is not None
         if self._execCacheRule is not rule:
+            logging.info("running rule: %s" %(rule))
             self._execCacheRule = rule
             antecedentIDs = rule.antecedentIDs()
 
@@ -634,6 +712,8 @@ class Verifier():
         db = self.db
 
         for rule, line, numInRule in self:
+            ruleNum, rule = rule
+            lineNum, line = line
             if line is None:
                 if rule.isGoal():
                     self.execRule(rule)
@@ -641,6 +721,7 @@ class Verifier():
                     self.settings.skipUnused == False:
                 assert numInRule is not None
                 line.constraint = self.execRule(rule, numInRule)
+                logging.info("new line: %i: %s"%(lineNum, str(line.constraint)))
                 if rule.isGoal():
                     self.decreaseUse(line)
 
@@ -648,9 +729,7 @@ class Verifier():
 
     def checkInvariants(self):
         if self.settings.isInvariantsOn:
-            if self.state >= Verifier.State.READ_PROOF:
-                for goal in self.goals:
-                    assert db[goal].rule.isGoal() == True
+            pass
 
     def __call__(self, rules):
         self.init(rules)
@@ -665,26 +744,84 @@ class Verifier():
         self.compute()
         self.checkInvariants()
 
+class MyParseError(parsy.ParseError):
+    def __init__(self, orig, fileName):
+        super().__init__(orig.expected, orig.stream, orig.index)
+        self.fileName = fileName
+
+    def line_info(self):
+        lineInfo = super().line_info()
+        lineInfoSplit = lineInfo.split(":")
+        if len(lineInfoSplit) == 2:
+            lineInfo = "%i:%i"%(int(lineInfoSplit[0]) + 1, int(lineInfoSplit[1]) + 1)
+        return "%s:%s"%(self.fileName, lineInfo)
+
+
+def run(formulaFile, rulesFile, settings = None):
+    rules = list(registered_rules)
+    try:
+        formula = getOPBParser().parse(formulaFile.read())
+        numVars, numConstraints = formula[0]
+        constraints = formula[1]
+    except parsy.ParseError as e:
+        raise MyParseError(e, formulaFile.name)
+
+    rules.append(LoadFormulaWrapper(constraints))
+    try:
+        rules = RuleParser().parse(rules, rulesFile.read())
+    except parsy.ParseError as e:
+        raise MyParseError(e, rulesFile.name)
+
+    verify = Verifier(settings)
+    verify(rules)
+
+def runUI(*args):
+    try:
+        run(*args)
+    except MyParseError as e:
+        print(e)
+        exit(1)
+
+
 def main():
     p = argparse.ArgumentParser(
-        descritpion = """Command line tool to verify derivation
+        description = """Command line tool to verify derivation
             graphs. See Readme.md for a description of the file
             format.""")
-
-    p.add_argumet("formula", help="Formula containing axioms.")
-    p.add_argumet("derivation", help="Derivation graph.")
-    p.add_argumet("-r", "--refutation", type=bool, default=False, action="store_true",
+    p.add_argument("formula", help="Formula containing axioms.", type=argparse.FileType('r'))
+    p.add_argument("derivation", help="Derivation graph.", type=argparse.FileType('r'))
+    p.add_argument("-r", "--refutation", default=False, action="store_true",
         help="Fail if the derivation is not a refutation, i.e. it does not contain contradiction.")
-    p.add_argumet("-l", "--lazy", type=bool, default=False, action="store_true",
+    p.add_argument("-l", "--lazy", default=False, action="store_true",
         help="Only check steps that are necessary for contradiction.")
 
-    rules = registered_rules
-    formula = getOPBParser().parse(args.formula)
-    rules.append(LoadFormulaWrapper(formula))
-    rules = RuleParser().parse(rules, args.derivation)
+    p.add_argument(
+        '-d', '--debug',
+        help="Print lots of debugging statements.",
+        action="store_const", dest="loglevel", const=logging.DEBUG,
+        default=logging.INFO,
+    )
+    p.add_argument(
+        '-v', '--verbose',
+        help="Be verbose",
+        action="store_const", dest="loglevel", const=logging.INFO,
+    )
 
-    verify = Verifier()
-    verify(rules)
+    Verifier.Settings.addArgParser(p)
+
+    args = p.parse_args()
+
+    verifyerSettings = Verifier.Settings.extract(args)
+
+    logging.basicConfig(level=args.loglevel)
+
+    try:
+        runUI(args.formula, args.derivation, verifyerSettings)
+    except Exception as e:
+        if args.loglevel != logging.DEBUG:
+            print("Sorry, there was an internal error. Please rerun with debugging and make a bug report.")
+        else:
+            raise e
 
 
 if __name__ == '__main__':

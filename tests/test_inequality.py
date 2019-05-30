@@ -1,8 +1,10 @@
 import unittest
-import env
 
-from main import Inequality, Term
 from math import copysign
+
+from env import refpy
+from refpy.constraints import Inequality, Term
+
 
 def toTerms(terms):
     return list(map(lambda x: Term(x[0], x[1]), terms))

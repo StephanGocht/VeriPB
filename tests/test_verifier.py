@@ -1,7 +1,10 @@
 import unittest
-import env
 
-from main import Verifier, Rule
+
+from env import refpy
+from refpy.verifier import Verifier
+from refpy.rules import *
+from refpy import InvalidProof
 from unittest.mock import MagicMock
 
 class MockRule(Rule):

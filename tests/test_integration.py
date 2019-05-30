@@ -2,8 +2,8 @@ import unittest
 
 from pathlib import Path
 
-import env
-from main import run, InvalidProof
+from env import refpy
+from refpy import run, InvalidProof
 
 class TestIntegration(unittest.TestCase):
     def run_single(self, formulaPath):

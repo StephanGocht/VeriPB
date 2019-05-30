@@ -1,8 +1,9 @@
-import env
-
 import unittest
 
-from main import *
+from env import refpy
+from refpy.parser import *
+from refpy.rules import *
+from refpy.constraints import Inequality, Term
 
 class TestParsing():
     def test_header(self):

@@ -1,13 +1,15 @@
-python refutation graph verifier
+refpy Refutations in Python
 ====
 
-prgV is a tool for verifying refutaiton graphs. A description of the
-proof file format follows.
+refpy is a tool for verifying refutaitons (proofs of unsatisfiablity)
+in python. A description of the proof file format follows.
+
+Currently it only supports pseudo-Boolean refutations.
 
 TLDR;
 =====
 
-refutation graph using r d s f l 0
+refutation using r d s f l 0
 f [nProblemConstraints] 0
 l [nVars] 0
 r [antecedent1] [antecedent2] ... 0

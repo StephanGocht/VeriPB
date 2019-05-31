@@ -292,19 +292,20 @@ class LoadFormula(Rule):
     @staticmethod
     def getParser(formula):
         def f(numVars):
-            return LoadFormula(formula, numVars)
+            if numVars is not None and len(formula) != numVars:
+                return parsy.fail("Number of constraints does not match.")
+            else:
+                return parsy.success(LoadFormula(formula, numVars))
 
 
         return parsy.regex(r" *[1-9][0-9]*") \
                 .map(int)\
-                .map(LoadLitteralAxioms.fromParsy)\
                 .desc("number of constraints")\
-                .optional().map(f) \
-                << parsy.regex(r" 0")
+                .optional()\
+                .bind(f)\
+                << parsy.regex(r" 0") \
 
     def __init__(self, formula, numVars = None):
-        assert numVars is None or len(formula) == numVars
-
         self.formula = formula
 
     def compute(self, antecedents):

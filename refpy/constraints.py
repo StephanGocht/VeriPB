@@ -36,10 +36,9 @@ class Inequality():
         else:
             terms, eq, degree = t
 
+            result.append(Inequality([Term(a,x) for a,x in terms], degree))
             if eq == "=":
                 result.append(Inequality([Term(-a,x) for a,x in terms], -degree))
-
-            result.append(Inequality([Term(a,x) for a,x in terms], degree))
 
         return parsy.success(result)
 

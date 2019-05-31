@@ -3,6 +3,7 @@ import logging
 import parsy
 
 from refpy import InvalidProof
+from refpy import ParseError
 from refpy.verifier import Verifier
 from refpy.parser import getOPBParser
 from refpy.rules import registered_rules

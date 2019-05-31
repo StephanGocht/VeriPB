@@ -273,8 +273,8 @@ class LoadLitteralAxioms(Rule):
     def compute(self, antecedents):
         result = list()
         for i in range(1, self.numLiterals + 1):
-            result.append(Inequality([Term(1, i)], 1))
-            result.append(Inequality([Term(1,-i)], 1))
+            result.append(Inequality([Term(1, i)], 0))
+            result.append(Inequality([Term(1,-i)], 0))
 
         return result
 

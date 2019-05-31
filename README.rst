@@ -9,14 +9,14 @@ Currently it only supports pseudo-Boolean refutations.
 TLDR;
 =====
 
-refutation using r d s f l 0
-f [nProblemConstraints] 0
-l [nVars] 0
-r [antecedent1] [antecedent2] ... 0
-d [divisor] [factor1] [antecedent1] [factor2] [antecedent2] ... 0
-s [factor1] [antecedent1] [factor2] [antecedent2] ... 0
-c [which] 0
-e [which] opb [OPB style constraint]
+    refutation using r d s f l 0
+    f [nProblemConstraints] 0
+    l [nVars] 0
+    r [antecedent1] [antecedent2] ... 0
+    d [divisor] [factor1] [antecedent1] [factor2] [antecedent2] ... 0
+    s [factor1] [antecedent1] [factor2] [antecedent2] ... 0
+    c [which] 0
+    e [which] opb [OPB style constraint]
 
 Motivation
 ==========

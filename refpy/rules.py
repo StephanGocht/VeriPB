@@ -1,4 +1,5 @@
 from refpy.constraints import Inequality
+from refpy.constraints import Term
 
 import parsy
 
@@ -10,8 +11,6 @@ def register_rule(rule):
     return rule
 
 class Rule():
-    Id = None
-
     @staticmethod
     def getParser():
         """
@@ -253,11 +252,12 @@ class Saturation(LinearCombination):
         constraint.saturate()
         return [constraint]
 
+@register_rule
 class LoadLitteralAxioms(Rule):
-    id = "l"
+    Id = "l"
 
     @staticmethod
-    def getParser(formula):
+    def getParser():
         return parsy.regex(r" *[1-9][0-9]*") \
                 .map(int)\
                 .map(LoadLitteralAxioms.fromParsy)\
@@ -272,7 +272,7 @@ class LoadLitteralAxioms(Rule):
 
     def compute(self, antecedents):
         result = list()
-        for i in range(self.numLiterals):
+        for i in range(1, self.numLiterals + 1):
             result.append(Inequality([Term(1, i)], 1))
             result.append(Inequality([Term(1,-i)], 1))
 
@@ -287,7 +287,7 @@ class LoadLitteralAxioms(Rule):
 
 
 class LoadFormula(Rule):
-    id = "f"
+    Id = "f"
 
     @staticmethod
     def getParser(formula):
@@ -320,7 +320,7 @@ class LoadFormula(Rule):
 class LoadFormulaWrapper():
     def __init__(self, formula):
         self.formula = formula
-        self.Id = LoadFormula.id
+        self.Id = LoadFormula.Id
 
     def getParser(self):
         if self.formula is None:

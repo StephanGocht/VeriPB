@@ -1,6 +1,6 @@
 refutation using f d e 0
 f 0
-l 1 1 1 2 0
+a 1 1 1 2 0
 e 3 opb 2x1 1x3 >= 2;
 d 42 1 1 1 2 0
 e 4 opb 1x1 1x3 >= 1;

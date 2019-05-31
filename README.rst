@@ -53,9 +53,28 @@ is the largest used ID before a file line is executed.
 Macro to load all axioms from the input formula (path to the formula
 will be provided separately when calling the proof checker).
 
-Equalities in the input formula are replaced by two inequalities.
+Equalities in the input formula are replaced by two inequalities,
+where the first inequality is '>=' and the second '<='.
 Afterwards, the i-th inequality in the input formula gets
 ID := IDmax + i.
+
+For example the opb file
+
+    * #variable= 3 #constraint= 1
+    1x1 2x2 >= 1;
+    1x3 1x4  = 1;
+
+with the proof file
+
+    refutation using f 0
+    f 3 0
+
+will be translated to
+
+    1: 1x1 2x2 >= 1;
+    2: 1x3 1x4 >= 1;
+    3: -1x3 -1x4 >= -1;
+
 
 
 (l)iteral axiom
@@ -67,6 +86,18 @@ Create literal axioms (1i) 0 <= x_i, (2i) x_i <= 1 for i = 1 to i <= nVars
 (1i) gets ID := IDmax + 2i - 1
 (2i) gets ID := IDmax + 2i
 (Note that variables are required to start from 1)
+
+For example the proof file
+
+    refutation using f 0
+    l 2 0
+
+will be translated to
+
+    1: 1x1 >= 0
+    2: -1x1 >= -1
+    3: 1x2 >= 0
+    4: -1x2 >= -1
 
 (r)esolution
 ============

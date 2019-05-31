@@ -154,7 +154,7 @@ class IsContradiction(Rule):
 
 @register_rule
 class LinearCombination(Rule):
-    Id = "l"
+    Id = "a"
 
     @staticmethod
     def getParser(create = True):
@@ -253,14 +253,58 @@ class Saturation(LinearCombination):
         constraint.saturate()
         return [constraint]
 
+class LoadLitteralAxioms(Rule):
+    id = "l"
+
+    @staticmethod
+    def getParser(formula):
+        return parsy.regex(r" *[1-9][0-9]*") \
+                .map(int)\
+                .map(LoadLitteralAxioms.fromParsy)\
+                .desc("number of literals") << parsy.regex(r" 0")
+
+    @staticmethod
+    def fromParsy(numLiterals):
+        return LoadLitteralAxioms(numLiterals)
+
+    def __init__(self, numLiterals):
+        self.numLiterals = numLiterals
+
+    def compute(self, antecedents):
+        result = list()
+        for i in range(self.numLiterals):
+            result.append(Inequality([Term(1, i)], 1))
+            result.append(Inequality([Term(1,-i)], 1))
+
+        return result
+
+    def numConstraints(self):
+        return 2 * self.numLiterals
+
+    def antecedentIDs(self):
+        return []
+
+
+
 class LoadFormula(Rule):
     id = "f"
 
     @staticmethod
     def getParser(formula):
-        return parsy.regex(r" 0") >> parsy.success(LoadFormula(formula))
+        def f(numVars):
+            return LoadFormula(formula, numVars)
 
-    def __init__(self, formula):
+
+        return parsy.regex(r" *[1-9][0-9]*") \
+                .map(int)\
+                .map(LoadLitteralAxioms.fromParsy)\
+                .desc("number of constraints")\
+                .optional().map(f) \
+                << parsy.regex(r" 0")
+
+    def __init__(self, formula, numVars = None):
+        assert numVars is None or len(formula) == numVars
+
         self.formula = formula
 
     def compute(self, antecedents):

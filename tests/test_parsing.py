@@ -8,7 +8,7 @@ from refpy.constraints import Inequality, Term
 class TestParsing():
     def test_header(self):
         parser = RuleParser()
-        print(parser.parse(registered_rules, "refutation graph using e 0"))
+        print(parser.parse(registered_rules, "refutation using e 0"))
 
     def test_OPB_line_1(self):
         res = getOPBConstraintParser().parse("3x1 >= 2;")

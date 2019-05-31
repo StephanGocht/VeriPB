@@ -1,4 +1,4 @@
-refutation graph using f d e 0
+refutation using f d e 0
 f 0
 l 1 1 1 2 0
 e 3 opb 2x1 1x3 >= 1;

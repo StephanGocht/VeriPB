@@ -17,7 +17,7 @@ class RuleParser():
 
         self.identifier = set([rule.Id for rule in rules])
 
-        header = parsy.regex(r"refutation graph using").\
+        header = parsy.regex(r"refutation using").\
             then(
                 parsy.regex(r" +").desc("space").\
                     then(

@@ -1,7 +1,11 @@
 from recordclass import structclass
 import parsy
 
-from math import copysign, ceil
+def copysign(a, b):
+       if b >= 0:
+               return abs(a)
+       else:
+               return -abs(a)
 
 from refpy.parser import getOPBConstraintParser, getCNFConstraintParser
 
@@ -119,8 +123,8 @@ class Inequality():
 
     def divide(self, d):
         for term in self.terms:
-            term.coefficient = ceil(term.coefficient / d)
-        self.degree = ceil(self.degree / d)
+            term.coefficient = (term.coefficient + d - 1) // d
+        self.degree = (self.degree + d - 1) // d
 
     def isContradiction(self):
         slack = -self.degree

@@ -1,23 +1,34 @@
 import parsy
 import logging
 import refpy.constraints
+import mmap
 
 from functools import partial
+from refpy.exceptions import ParseError
 
 class RuleParser():
     def checkIdentifier(self, Id):
-        if not Id in self.identifier:
+        if not Id in self.rules:
             return parsy.fail("Unsuported rule.")
 
         return parsy.success(Id)
 
 
-    def parse(self, rules, stream):
+    def _parse(self, rules, stream):
         logging.info("Available Rules: %s"%(", ".join(["%s"%(rule.Id) for rule in rules])))
 
         self.identifier = set([rule.Id for rule in rules])
 
-        header = parsy.regex(r"refutation using").\
+        skipBlankLines = parsy.regex(r"\s*")
+        singleRules = [skipBlankLines >> parsy.regex(rule.Id).desc("rule identifier") >> rule.getParser() << skipBlankLines for rule in rules]
+        anyRuleParser = parsy.alt(*singleRules)
+
+        parser = header >> anyRuleParser.many()
+
+        return parser.parse(stream)
+
+    def parseHeader(self, line, lineNum):
+        headerParser = parsy.regex(r"refutation using").\
             then(
                 parsy.regex(r" +").desc("space").\
                     then(
@@ -29,13 +40,37 @@ class RuleParser():
                 parsy.regex(r" *0 *\n?").desc("0 at end of line")
             )
 
-        skipBlankLines = parsy.regex(r"\s*")
-        singleRules = [skipBlankLines >> parsy.regex(rule.Id).desc("rule identifier") >> rule.getParser() << skipBlankLines for rule in rules]
-        anyRuleParser = parsy.alt(*singleRules)
+        try:
+            headerParser.parse(line)
+        except parsy.ParseError as e:
+            raise ParseError(e, line = lineNum)
 
-        parser = header >> anyRuleParser.many()
+    def parse(self, rules, file):
+        self.rules = {rule.Id: rule for rule in rules}
+        result = list()
 
-        return parser.parse(stream)
+        lineNum = 1
+        lines = iter(file)
+        self.parseHeader(next(lines), lineNum)
+
+        for line in lines:
+            lineNum += 1
+
+            try:
+                rule = self.rules[line[0]]
+            except KeyError as e:
+                raise ParseError("Unsupported rule %s"%(line[0]), line = lineNum)
+
+            try:
+                result.append(rule.parse(line[1:]))
+            except parsy.ParseError as e:
+                raise ParseError(e, line = lineNum)
+            except ValueError as e:
+                raise ParseError(e, line = lineNum)
+
+        return result
+
+
 
 def getCNFConstraintParser():
     space    = parsy.regex(r" +").desc("space")

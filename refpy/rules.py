@@ -10,6 +10,42 @@ def register_rule(rule):
     registered_rules.append(rule)
     return rule
 
+def fallback_on_error(parse):
+    """
+    Call the getParser() method of the class to get a
+    proper error message from the parser.
+    """
+    def f(*args, **kwargs):
+        try:
+            return parse(*args, **kwargs)
+        except ValueError as e:
+            try:
+                if len(args) >= 1:
+                    cls = args[0]
+                    args = args[1:]
+                else:
+                    cls = kwargs["cls"]
+                    del kwargs["cls"]
+                if len(args) >= 1:
+                    line = args[0]
+                    args = args[1:]
+                else:
+                    line = kwargs["line"]
+                    del kwargs["cls"]
+
+                cls.getParser(*args, **kwargs).parse(line)
+            except parsy.ParseError as parseError:
+                # the id is not supposed to be passed in line
+                # so we need to fix the position
+                parseError.index += len(cls.Id)
+                raise parseError
+            except AttributeError:
+                raise e
+            else:
+                raise e
+
+    return f
+
 class Rule():
     @staticmethod
     def getParser():
@@ -18,6 +54,10 @@ class Rule():
             A parser that creates this rule from the string following the Id
         """
         raise NotImplementedError()
+
+    @classmethod
+    def parse(cls, line):
+        return cls.getParser().parse(line.rstrip())
 
     def compute(self, antecedents):
         """
@@ -131,6 +171,14 @@ class IsContradiction(Rule):
     @staticmethod
     def fromParsy(constraintId):
         return IsContradiction(constraintId)
+
+    @classmethod
+    def parse(cls, line):
+        values = line.strip().split()
+        if len(values) != 2:
+            raise ValueError()
+
+        return cls(int(values[0]))
 
     def __init__(self, constraintId):
         self.constraintId = constraintId
@@ -267,6 +315,14 @@ class LoadLitteralAxioms(Rule):
     def fromParsy(numLiterals):
         return LoadLitteralAxioms(numLiterals)
 
+    # @classmethod
+    # def parse(cls, line):
+    #     values = line.strip().split()
+    #     if len(values) != 2:
+    #         raise ValueError()
+
+    #     return cls(int(values[0]))
+
     def __init__(self, numLiterals):
         self.numLiterals = numLiterals
 
@@ -321,6 +377,19 @@ class ReversePolishNotation(Rule):
         operator = parsy.regex(r"[+*ds]")
 
         return (space.optional() >> (number | operator).bind(check)).many().bind(finalCheck)
+
+
+    @classmethod
+    @fallback_on_error
+    def parse(cls, line):
+        def f(word):
+            if word in ["+", "*", "d", "s"]:
+                return word
+            else:
+                return int(word)
+
+        return cls(list(map(f, line.strip().split())))
+
 
     class AntecedentIterator():
         def __init__(self, instructions):
@@ -411,6 +480,16 @@ class LoadFormula(Rule):
                 .bind(f)\
                 << parsy.regex(r" 0") \
 
+    @classmethod
+    def parse(cls, line, formula):
+        values = line.strip().split()
+        if len(values) == 2:
+            return cls(formula, int(values[0]))
+        elif len(values) == 1:
+            return cls(formula)
+        else:
+            raise ValueError()
+
     def __init__(self, formula, numVars = None):
         self.formula = formula
 
@@ -437,3 +516,7 @@ class LoadFormulaWrapper():
         result = LoadFormula.getParser(self.formula)
         self.formula = None
         return result
+
+    @fallback_on_error
+    def parse(self, line):
+        return LoadFormula.parse(line, self.formula)

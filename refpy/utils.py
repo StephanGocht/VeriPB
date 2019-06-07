@@ -9,6 +9,7 @@ from refpy.parser import getOPBParser
 from refpy.rules import registered_rules
 from refpy.rules import LoadFormulaWrapper
 from refpy.parser import RuleParser
+from refpy.exceptions import ParseError
 from time import perf_counter
 
 def run(formulaFile, rulesFile, settings = None):
@@ -23,10 +24,12 @@ def run(formulaFile, rulesFile, settings = None):
         raise ParseError(e, formulaFile.name)
 
     rules.append(LoadFormulaWrapper(constraints))
+
     try:
-        rules = RuleParser().parse(rules, rulesFile.read())
-    except parsy.ParseError as e:
-        raise ParseError(e, rulesFile.name)
+        rules = RuleParser().parse(rules, rulesFile)
+    except ParseError as e:
+        e.fileName = rulesFile.name
+        raise e
 
     logging.info("Parsing Time: %.2f" % (perf_counter() - start_parse))
     verify = Verifier(settings)

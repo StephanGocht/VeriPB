@@ -172,7 +172,6 @@ class Inequality():
             term.coefficient = min(
                 term.coefficient,
                 self.degree)
-            assert self.dict[abs(term.variable)] == term
         return self
 
     def divide(self, d):

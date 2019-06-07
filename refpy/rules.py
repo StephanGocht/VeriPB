@@ -1,4 +1,5 @@
 from refpy.constraints import Inequality
+from refpy.constraints import LazyInequality
 from refpy.constraints import Term
 
 import parsy
@@ -427,32 +428,27 @@ class ReversePolishNotation(Rule):
         ins = next(it, None)
         while ins is not None:
             if isinstance(ins, int):
-                c = Inequality()
-                c.addWithFactor(1, next(antecedentIt))
-                stack.append(c)
+                stack.append(LazyInequality(next(antecedentIt)))
             elif ins == "+":
                 second = stack.pop()
                 first  = stack.pop()
-                first.addWithFactor(1, second)
-                stack.append(first)
+                stack.append(first.addWithFactor(1, second))
             elif ins == "*":
                 constraint = stack.pop()
                 factor = next(it)
-                constraint.multiply(factor)
-                stack.append(constraint)
+                stack.append(constraint.multiply(factor))
             elif ins == "d":
                 constraint = stack.pop()
                 divisor = next(it)
-                constraint.divide(divisor)
-                stack.append(constraint)
+                stack.append(constraint.divide(divisor))
             elif ins == "s":
                 constraint = stack.pop()
-                constraint.saturate()
-                stack.append(constraint)
+                stack.append(constraint.saturate())
 
             ins = next(it, None)
 
         assert len(stack) == 1
+        stack[0].contract()
         return stack
 
     def numConstraints(self):

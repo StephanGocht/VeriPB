@@ -19,6 +19,61 @@ class AllBooleanUpperBound():
     def __getitem__(self, key):
         return 1
 
+class LazyInequality():
+    """
+    Essentially the same interface as Inequality but postpones some
+    of the operations.
+    """
+
+    def __init__(self, constraint):
+        self.constraint = constraint
+        self.operations = []
+        self.degrees = []
+
+    @property
+    def terms(self):
+        return map(self.applyTerm, self.constraint.terms)
+
+    @property
+    def degree(self):
+        return self.apply(self.constraint.degree)
+
+    def applyTerm(self, value):
+        return Term(self.apply(value.coefficient), value.variable)
+
+    def apply(self, value):
+        for op, i in self.operations:
+            if op == "s":
+                value = min(self.degrees[i], value)
+            elif op == "d":
+                value = (value + i - 1) // i
+            elif op == "*":
+                value *= i
+        return value
+
+    def saturate(self):
+        self.degrees.append(self.apply(self.constraint.degree))
+        self.operations.append(("s",len(self.degrees) - 1))
+        return self
+
+    def divide(self, d):
+        self.operations.append(("d",d))
+        return self
+
+    def multiply(self, f):
+        self.operations.append(("*",f))
+        return self
+
+    def addWithFactor(self, factor, other):
+        result = Inequality(self.terms, self.degree)
+        return result.addWithFactor(factor, other)
+
+    def contract(self):
+        pass
+
+    def __repr__(self):
+        return str(Inequality(self.terms, self.degree))
+
 class Inequality():
     """
     Constraint representing sum of terms greater or equal degree.
@@ -58,9 +113,22 @@ class Inequality():
 
     def __init__(self, terms = list(), degree = 0, variableUpperBounds = AllBooleanUpperBound()):
         self.degree = degree
-        self.terms = terms
+        self.terms = list(terms)
+        self.expanded = False
         self.variableUpperBounds = variableUpperBounds
         self.normalize()
+        self._dict = None
+
+    @property
+    def dict(self):
+        if self._dict is None:
+            self._dict = {abs(x.variable): x for x in self.terms}
+        return self._dict
+
+    def contract(self):
+        if self._dict is not None:
+            self.terms = [x for x in self.dict.values() if x.coefficient != 0]
+            self._dict = None
 
     def normalize(self):
         for term in self.terms:
@@ -69,69 +137,55 @@ class Inequality():
                 term.coefficient = abs(term.coefficient)
                 self.degree += self.variableUpperBounds[abs(term.variable)] * term.coefficient
 
-        self.terms.sort(key = lambda x: abs(x.variable))
+        # self.terms.sort(key = lambda x: abs(x.variable))
 
     # @profile
     def addWithFactor(self, factor, other):
         self.degree += factor * other.degree
-        result = list()
 
         otherTerms = map(lambda x: Term(factor * x.coefficient, x.variable), other.terms)
-        myTerms = iter(self.terms)
 
-        other = next(otherTerms, None)
-        my    = next(myTerms, None)
-        while (other is not None or my is not None):
-            if other is None:
-                if my is not None:
-                    result.append(my)
-                    result.extend(myTerms)
-                break
-
-            if my is None:
-                if other is not None:
-                    result.append(other)
-                    result.extend(otherTerms)
-                break
-
-            if (abs(my.variable) == abs(other.variable)):
-                a = copysign(my.coefficient, my.variable)
-                b = copysign(other.coefficient, other.variable)
-                newCoefficient = a + b
-                newVariable = copysign(abs(my.variable), newCoefficient)
-                newCoefficient = abs(newCoefficient)
-                cancellation = max(0, max(my.coefficient, other.coefficient) - newCoefficient)
-                self.degree -= cancellation * self.variableUpperBounds[abs(my.variable)]
-                if newCoefficient != 0:
-                    result.append(Term(newCoefficient, newVariable))
-                other = next(otherTerms, None)
-                my    = next(myTerms, None)
-
-            elif abs(my.variable) < abs(other.variable):
-                result.append(my)
-                my    = next(myTerms, None)
-
+        for other in otherTerms:
+            try:
+                my = self.dict[abs(other.variable)]
+            except KeyError:
+                self.terms.append(Term(other.coefficient, other.variable))
+                self.dict[abs(other.variable)] = self.terms[-1]
             else:
-                result.append(other)
-                other = next(otherTerms, None)
+                if (abs(my.variable) == abs(other.variable)):
+                    a = copysign(my.coefficient, my.variable)
+                    b = copysign(other.coefficient, other.variable)
+                    newCoefficient = a + b
+                    newVariable = copysign(abs(my.variable), newCoefficient)
+                    newCoefficient = abs(newCoefficient)
+                    cancellation = max(0, max(my.coefficient, other.coefficient) - newCoefficient)
+                    self.degree -= cancellation * self.variableUpperBounds[abs(my.variable)]
 
-        self.terms = result
+                    my.coefficient = newCoefficient
+                    my.variable = newVariable
+
+        return self
 
     def saturate(self):
+        self.dict
         for term in self.terms:
             term.coefficient = min(
                 term.coefficient,
                 self.degree)
+            assert self.dict[abs(term.variable)] == term
+        return self
 
     def divide(self, d):
         for term in self.terms:
             term.coefficient = (term.coefficient + d - 1) // d
         self.degree = (self.degree + d - 1) // d
+        return self
 
     def multiply(self, f):
         for term in self.terms:
             term.coefficient = term.coefficient * f
         self.degree = self.degree * f
+        return self
 
     def isContradiction(self):
         slack = -self.degree
@@ -142,8 +196,11 @@ class Inequality():
 
     def __eq__(self, other):
         # note that terms is assumed to be soreted
+        self.contract()
+        other.contract()
+        key = lambda x: abs(x.variable)
         return self.degree == other.degree \
-            and self.terms == other.terms
+            and sorted(self.terms, key = key) == sorted(other.terms, key = key)
 
     def __str__(self):
         return " ".join(

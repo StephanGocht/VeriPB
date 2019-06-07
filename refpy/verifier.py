@@ -1,8 +1,10 @@
 from recordclass import structclass
 from enum import Enum
 from refpy.rules import DummyRule
+from time import perf_counter
 
 import logging
+# import cProfile
 
 DBEntry = structclass("DBEntry","rule constraint numUsed")
 Stats = structclass("Stats", "size space maxUsed")
@@ -157,6 +159,7 @@ class Verifier():
             line.numUsed += 1
             if line.numUsed == 1:
                 for antecedent in line.rule.antecedentIDs():
+                    # assert(antecedent < goal)
                     self.goals.append(antecedent)
 
         self.state = Verifier.State.MARKED_LINES
@@ -172,7 +175,7 @@ class Verifier():
     def execRule(self, rule, numInRule = None):
         assert rule is not None
         if self._execCacheRule is not rule:
-            logging.info("running rule: %s" %(rule))
+            # logging.info("running rule: %s" %(rule))
             self._execCacheRule = rule
             antecedentIDs = rule.antecedentIDs()
 
@@ -202,7 +205,7 @@ class Verifier():
                     self.settings.skipUnused == False:
                 assert numInRule is not None
                 line.constraint = self.execRule(rule, numInRule)
-                logging.info("new line: %i: %s"%(lineNum, str(line.constraint)))
+                # logging.info("new line: %i: %s"%(lineNum, str(line.constraint)))
                 if rule.isGoal():
                     self.decreaseUse(line)
 
@@ -213,14 +216,26 @@ class Verifier():
             pass
 
     def __call__(self, rules):
+        # pr = cProfile.Profile()
+        # pr.enable()
+
         self.init(rules)
         self.checkInvariants()
 
+        start_forward = perf_counter()
         self.mapRulesToDB()
         self.checkInvariants()
+        logging.info("Forward Pass Time: %.2f" % (perf_counter() - start_forward))
 
+        start_backward = perf_counter()
         self.markUsed()
         self.checkInvariants()
+        logging.info("Backward Pass Time: %.2f" % (perf_counter() - start_backward))
 
+        start_verify = perf_counter()
         self.compute()
         self.checkInvariants()
+        logging.info("Verify Pass Time: %.2f" % (perf_counter() - start_verify))
+
+        # pr.disable()
+        # pr.print_stats()

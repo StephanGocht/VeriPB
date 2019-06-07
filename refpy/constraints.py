@@ -36,8 +36,10 @@ class Inequality():
         result = list()
 
         if isinstance(t, list):
+            # we got a clause from getCNFParser
             result.append(Inequality([Term(1,l) for l in t], 1))
         else:
+            # we got a tuple containing a constraint
             terms, eq, degree = t
 
             result.append(Inequality([Term(a,x) for a,x in terms], degree))
@@ -69,6 +71,7 @@ class Inequality():
 
         self.terms.sort(key = lambda x: abs(x.variable))
 
+    # @profile
     def addWithFactor(self, factor, other):
         self.degree += factor * other.degree
         result = list()
@@ -79,7 +82,6 @@ class Inequality():
         other = next(otherTerms, None)
         my    = next(myTerms, None)
         while (other is not None or my is not None):
-            print(other, my)
             if other is None:
                 if my is not None:
                     result.append(my)
@@ -125,6 +127,11 @@ class Inequality():
         for term in self.terms:
             term.coefficient = (term.coefficient + d - 1) // d
         self.degree = (self.degree + d - 1) // d
+
+    def multiply(self, f):
+        for term in self.terms:
+            term.coefficient = term.coefficient * f
+        self.degree = self.degree * f
 
     def isContradiction(self):
         slack = -self.degree

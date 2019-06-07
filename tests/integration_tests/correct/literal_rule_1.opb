@@ -1,2 +1,5 @@
 * #variable= 3 #constraint= 1
 1x1 1x2 1x3 >= 1;
+-1x1 >= 0;
+-1x2 >= 0;
+-1x3 >= 0;

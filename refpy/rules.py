@@ -284,7 +284,113 @@ class LoadLitteralAxioms(Rule):
     def antecedentIDs(self):
         return []
 
+@register_rule
+class ReversePolishNotation(Rule):
+    Id = "p"
 
+    @staticmethod
+    def getParser():
+        stackSize = 0
+        def check(thing):
+            nonlocal stackSize
+
+            if isinstance(thing, int):
+                stackSize += 1
+            elif thing in ["+", "*", "d"]:
+                stackSize -= 1
+            elif thing == "s":
+                stackSize += 0
+
+            if stackSize < 0:
+                return parsy.fail("Trying to pop from empty stack in reverse polish notation.")
+            else:
+                return parsy.success(thing)
+
+        def finalCheck(instructions):
+            nonlocal stackSize
+
+            failed = stackSize != 1
+            stackSize = 0
+            if failed:
+                return parsy.fail("Non empty stack at end of polish notation")
+            else:
+                return parsy.success(ReversePolishNotation(instructions))
+
+        space = parsy.regex(r" +")
+        number = parsy.regex(r"[0-9]+").map(int)
+        operator = parsy.regex(r"[+*ds]")
+
+        return (space.optional() >> (number | operator).bind(check)).many().bind(finalCheck)
+
+    class AntecedentIterator():
+        def __init__(self, instructions):
+            self.instructions = iter(instructions)
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            while (True):
+                current = next(self.instructions)
+                if isinstance(current, int):
+                    return current
+                if current in ["*", "d"]:
+                    # consume one more, remember that we swaped the right operand and operator
+                    next(self.instructions)
+
+    def __init__(self, instructions):
+        for i, x in enumerate(instructions):
+            # the last operand of multiplication and division always
+            # needs to be a constant and not a constraint, so we (can) switch
+            # positions, which makes it easier to distinguish constraints from
+            # constants later on
+            if x in ["*", "d"]:
+                instructions[i] = instructions[i - 1]
+                instructions[i - 1] = x
+
+        self.instructions = instructions
+
+    def compute(self, antecedents):
+        stack = list()
+        antecedentIt = iter(antecedents)
+
+        it = iter(self.instructions)
+        ins = next(it, None)
+        while ins is not None:
+            if isinstance(ins, int):
+                c = Inequality()
+                c.addWithFactor(1, next(antecedentIt))
+                stack.append(c)
+            elif ins == "+":
+                second = stack.pop()
+                first  = stack.pop()
+                first.addWithFactor(1, second)
+                stack.append(first)
+            elif ins == "*":
+                constraint = stack.pop()
+                factor = next(it)
+                constraint.multiply(factor)
+                stack.append(constraint)
+            elif ins == "d":
+                constraint = stack.pop()
+                divisor = next(it)
+                constraint.divide(divisor)
+                stack.append(constraint)
+            elif ins == "s":
+                constraint = stack.pop()
+                constraint.saturate()
+                stack.append(constraint)
+
+            ins = next(it, None)
+
+        assert len(stack) == 1
+        return stack
+
+    def numConstraints(self):
+        return 1
+
+    def antecedentIDs(self):
+        return ReversePolishNotation.AntecedentIterator(self.instructions)
 
 class LoadFormula(Rule):
     Id = "f"

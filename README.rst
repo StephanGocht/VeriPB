@@ -9,7 +9,8 @@ Currently it only supports pseudo-Boolean refutations.
 Installation
 ============
 
-.. code::
+::
+
     git clone git@github.com:StephanGocht/refpy.git
     pip3 install -e ./refpy
 
@@ -25,7 +26,8 @@ Proof Format
 TLDR;
 ----
 
-.. code::
+::
+
     refutation using f l p r c e 0
     f [nProblemConstraints] 0
     l [nVars] 0
@@ -49,7 +51,9 @@ before a rule is executed.
 (f)ormula
 ----
 
-.. code::
+::
+
+
     f [nProblemConstraints] 0
 
 This rule loads all axioms from the input formula (the path to the
@@ -84,7 +88,8 @@ will be translated to::
 (l)iteral axiom
 ----
 
-.. code::
+::
+
     l [nVars] 0
 
 Create literal axioms for i = 1 to i <= nVars:
@@ -108,7 +113,8 @@ will be translated to::
 (r)esolution
 ----
 
-.. code::
+::
+
     r [antecedent1] [antecedent2] ... 0
 
 Performs multiple (input) resolution steps. Requires antecedents to be
@@ -118,7 +124,8 @@ clausal (degree 1).
 (c)ontradiction
 ----
 
-.. code::
+::
+
     c [ConstraintId] 0
 
 Verify that the constraint [ConstraintId] is contradicting.
@@ -127,7 +134,8 @@ Verify that the constraint [ConstraintId] is contradicting.
 (e)quals
 ----
 
-.. code::
+::
+
     e [ConstraintId] opb [OPB style constraint]
 
     e [ConstraintId] cnf [DIMACS style clause]
@@ -137,7 +145,8 @@ Verify that constraitn [ConstraintId] is euqal to [OPB style constraint].
 reverse (p)olish notation
 ----
 
-.. code::
+::
+
     p [sequence in reverse polish notation] 0
 
 The refutation itself is constructed by a 0 terminated sequence of
@@ -183,7 +192,8 @@ division by 2.
 Example
 ----
 
-.. code::
+::
+
     refutation graph using f l p 0
     l 5 0               # IDs 1-10 now contain literal axioms
     f 10 0              # IDs 11-20 now contain the formula constraints

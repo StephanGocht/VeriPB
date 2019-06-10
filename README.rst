@@ -21,6 +21,14 @@ Update
 
 If installed as described above the tool can be updated with ``git pull``.
 
+
+Formula Format
+==============
+
+The formula is provided in `OPB<http://www.cril.univ-artois.fr/PB10/format.pdf>`_ format. A short overview can be
+found
+`here<https://github.com/elffersj/roundingsat/blob/proof_logging/InputFormats.md>`_.
+
 Proof Format
 ============
 TLDR;

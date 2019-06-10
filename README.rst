@@ -31,7 +31,7 @@ TLDR;
     refutation using f l p r c e 0
     f [nProblemConstraints] 0
     l [nVars] 0
-    p [sequence of operations in reverse polish notation]
+    p [sequence of operations in reverse polish notation] 0
     r [antecedent1] [antecedent2] ... 0
     c [which] 0
     e [which] opb [OPB style constraint]

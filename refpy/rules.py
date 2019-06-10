@@ -373,11 +373,12 @@ class ReversePolishNotation(Rule):
             else:
                 return parsy.success(ReversePolishNotation(instructions))
 
-        space = parsy.regex(r" +")
-        number = parsy.regex(r"[0-9]+").map(int)
-        operator = parsy.regex(r"[+*ds]")
+        space = parsy.regex(r" +").desc("space")
+        number = parsy.regex(r"[0-9]+").map(int).desc("number")
+        operator = parsy.regex(r"[+*ds]").desc("operator +,*,d,s")
 
-        return (space.optional() >> (number | operator).bind(check)).many().bind(finalCheck)
+        return (space.optional() >> (number | operator).bind(check)).many().bind(finalCheck) \
+            << space << parsy.regex(r"0").desc("0 to terminate sequence").optional()
 
 
     @classmethod
@@ -389,7 +390,10 @@ class ReversePolishNotation(Rule):
             else:
                 return int(word)
 
-        return cls(list(map(f, line.strip().split())))
+        sequence = list(map(f, line.strip().split()))
+        if sequence[-1] == 0:
+            sequence.pop()
+        return cls(sequence)
 
 
     class AntecedentIterator():

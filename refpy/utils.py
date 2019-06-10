@@ -62,12 +62,7 @@ def run_cmd_main():
             graphs. See Readme.md for a description of the file
             format.""")
     p.add_argument("formula", help="Formula containing axioms.", type=argparse.FileType('r'))
-    p.add_argument("derivation", help="Derivation graph.", type=argparse.FileType('r'))
-    p.add_argument("-r", "--refutation", default=False, action="store_true",
-        help="Fail if the derivation is not a refutation, i.e. it does not contain contradiction.")
-    p.add_argument("-l", "--lazy", default=False, action="store_true",
-        help="Only check steps that are necessary for contradiction.")
-
+    p.add_argument("derivation", help="Refutation / Proof Log.", type=argparse.FileType('r'))
     p.add_argument(
         '-d', '--debug',
         help="Print lots of debugging statements.",

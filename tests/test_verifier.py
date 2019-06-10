@@ -36,7 +36,7 @@ class TestVerifierImpl(unittest.TestCase):
         settings = Verifier.Settings()
         settings.checkInvariants = True
         settings.disableDeletion = True
-        settings.skipUnused      = False
+        settings.lazy            = False
 
         verify = Verifier(settings)
 
@@ -58,7 +58,7 @@ class TestVerifierImpl(unittest.TestCase):
         settings = Verifier.Settings()
         settings.checkInvariants = True
         settings.disableDeletion = True
-        settings.skipUnused      = False
+        settings.lazy            = False
 
         verify = Verifier(settings)
 
@@ -108,7 +108,7 @@ class TestVerifierImpl(unittest.TestCase):
     def test_findGoal_multi1(self):
         option = {
             "disableDeletion" : True,
-            "skipUnused" : False
+            "lazy" : False
         }
         result = [
             ("r1", 0),
@@ -122,7 +122,7 @@ class TestVerifierImpl(unittest.TestCase):
     def test_findGoal_multi2(self):
         option = {
             "disableDeletion" : True,
-            "skipUnused" : True
+            "lazy" : True
         }
         result = [
             None, # unused constraint
@@ -136,7 +136,7 @@ class TestVerifierImpl(unittest.TestCase):
     def test_findGoal_multi3(self):
         option = {
             "disableDeletion" : False,
-            "skipUnused" : True
+            "lazy" : True
         }
         result = [
             None,

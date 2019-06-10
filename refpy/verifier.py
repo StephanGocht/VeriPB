@@ -1,6 +1,6 @@
 from recordclass import structclass
 from enum import Enum
-from refpy.rules import DummyRule
+from refpy.rules import DummyRule, IsContradiction
 from time import perf_counter
 
 import logging
@@ -70,7 +70,8 @@ class Verifier():
             return {
                 "isInvariantsOn": False,
                 "disableDeletion": False,
-                "skipUnused": True
+                "lazy": True,
+                "trace": False,
             }
 
         @classmethod
@@ -93,6 +94,19 @@ class Verifier():
             group.add_argument("--no-deletion", dest = name+".disableDeletion",
                 action="store_true",
                 help="turn off deletion of no longer needed constraitns to save space")
+
+            group.add_argument("--trace", dest = name+".trace",
+                action="store_true",
+                default=False,
+                help="print a trace of derived constraints")
+
+            group.add_argument("--lazy", dest = name+".lazy",
+                action="store_true",
+                default=defaults["lazy"],
+                help="only compute constraints necessary for verification")
+            group.add_argument("--no-lazy", dest = name+".lazy",
+                action="store_false",
+                help="compute all constraints")
 
 
         @classmethod
@@ -133,6 +147,7 @@ class Verifier():
 
     def mapRulesToDB(self):
         constraintNum = 0
+        self.foundContradiction = False
 
         # Forward pass to find goals
         for rule in self.rules:
@@ -147,6 +162,8 @@ class Verifier():
                 constraintNum += 1
 
             if rule.isGoal() and rule.numConstraints() == 0:
+                if isinstance(rule, IsContradiction):
+                    self.foundContradiction = True
                 self.goals.extend(rule.antecedentIDs())
 
         self.state = Verifier.State.READ_PROOF
@@ -202,10 +219,11 @@ class Verifier():
                 if rule.isGoal():
                     self.execRule(rule)
             elif line.numUsed > 0 or \
-                    self.settings.skipUnused == False:
+                    self.settings.lazy == False:
                 assert numInRule is not None
                 line.constraint = self.execRule(rule, numInRule)
-                # logging.info("new line: %i: %s"%(lineNum, str(line.constraint)))
+                if self.settings.trace:
+                    print("%i (rule %i): %s"%(lineNum, ruleNum, str(line.constraint)))
                 if rule.isGoal():
                     self.decreaseUse(line)
 
@@ -236,6 +254,9 @@ class Verifier():
         self.compute()
         self.checkInvariants()
         logging.info("Verify Pass Time: %.2f" % (perf_counter() - start_verify))
+
+        if not self.foundContradiction:
+            logging.warn("The provided proof did not claim contradiction.")
 
         # pr.disable()
         # pr.print_stats()

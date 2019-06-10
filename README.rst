@@ -6,9 +6,26 @@ in python. A description of the proof file format follows.
 
 Currently it only supports pseudo-Boolean refutations.
 
-TLDR;
-=====
+Installation
+============
 
+::
+    git clone git@github.com:StephanGocht/refpy.git
+    pip3 install -e ./refpy
+
+run ``refpy --help`` for help
+
+Update
+------
+
+If installed as described above the tool can be updated with ``git pull``.
+
+Proof Format
+============
+TLDR;
+----
+
+::
     refutation using f l p r c e 0
     f [nProblemConstraints] 0
     l [nVars] 0
@@ -18,7 +35,7 @@ TLDR;
     e [which] opb [OPB style constraint]
 
 Introduction
-============
+----
 
 There are multiple rules, which are described in more detail below.
 Each rule can create an arbitrary number of constraints (including
@@ -30,8 +47,9 @@ In what follows we will use IDmax to refer to the largest used ID
 before a rule is executed.
 
 (f)ormula
-=========
+----
 
+::
     f [nProblemConstraints] 0
 
 This rule loads all axioms from the input formula (the path to the
@@ -44,18 +62,18 @@ the second '<='. Afterwards, the i-th inequality in the input formula
 gets ID := IDmax + i.
 
 
-For example the opb file
+For example the opb file::
 
     * #variable= 3 #constraint= 1
     1x1 2x2 >= 1;
     1x3 1x4  = 1;
 
-with the proof file
+with the proof file::
 
     refutation using f 0
     f 3 0
 
-will be translated to
+will be translated to::
 
     1: 1x1 2x2 >= 1;
     2: 1x3 1x4 >= 1;
@@ -64,22 +82,23 @@ will be translated to
 
 
 (l)iteral axiom
-===============
+----
 
+::
     l [nVars] 0
 
-Create literal axioms (1i) 0 <= x_i, (2i) x_i <= 1 for i = 1 to i <= nVars
-(1i) gets ID := IDmax + 2i - 1
-(2i) gets ID := IDmax + 2i
+Create literal axioms for i = 1 to i <= nVars:
+* 0   <= x_i gets ID := IDmax + 2i - 1
+* x_i <= 1 gets ID := IDmax + 2i
 
 Note that variables are required to start from 1.
 
-For example the proof file
+For example the proof file::
 
     refutation using f 0
     l 2 0
 
-will be translated to
+will be translated to::
 
     1: 1x1 >= 0
     2: -1x1 >= -1
@@ -87,8 +106,9 @@ will be translated to
     4: -1x2 >= -1
 
 (r)esolution
-============
+----
 
+::
     r [antecedent1] [antecedent2] ... 0
 
 Performs multiple (input) resolution steps. Requires antecedents to be
@@ -96,16 +116,18 @@ clausal (degree 1).
 
 
 (c)ontradiction
-===============
+----
 
+::
     c [ConstraintId] 0
 
 Verify that the constraint [ConstraintId] is contradicting.
 
 
 (e)quals
-========
+----
 
+::
     e [ConstraintId] opb [OPB style constraint]
 
     e [ConstraintId] cnf [DIMACS style clause]
@@ -113,26 +135,27 @@ Verify that the constraint [ConstraintId] is contradicting.
 Verify that constraitn [ConstraintId] is euqal to [OPB style constraint].
 
 reverse (p)olish notation
-=========================
+----
 
+::
     p [sequence in reverse polish notation] 0
 
 The refutation itself is constructed by a 0 terminated sequence of
 arithmetic operations over the constraints. These are written down in
 reverse polish notation. Available operations are:
 
-* Addition
+* Addition::
 
     [constraint] [constraint] +
 
-* Scalar Multiplication
+* Scalar Multiplication::
 
     [constraint] [factor] *
 
 The factor is a strictly positive integer and needs to be the second
 operand.
 
-* Boolean Division
+* Boolean Division::
 
     [constraint] [divisor] d
 
@@ -140,7 +163,7 @@ The divisor is a strictly positive integer and needs to be the second
 operand.
 
 
-* Boolean Saturation
+* Boolean Saturation::
 
     [constraint] s
 
@@ -149,7 +172,7 @@ reverse polish notation.
 
 This allows to write down any treelike refutation with a single rule.
 
-For example
+For example::
 
     p 42 3 * 43 + s 2 d 0
 
@@ -158,10 +181,11 @@ Creates a new constraint by taking 3 times the constraint with index
 division by 2.
 
 Example
-=======
+----
 
-refutation graph using f l p 0
-l 5 0               # IDs 1-10 now contain literal axioms
-f 10 0              # IDs 11-20 now contain the formula constraints
-p 11 1 3 * + 42 d 0 # Take the first constraint from the formula,
-                      weaken with 3 x_1 >= 0 and then divide by 42
+::
+    refutation graph using f l p 0
+    l 5 0               # IDs 1-10 now contain literal axioms
+    f 10 0              # IDs 11-20 now contain the formula constraints
+    p 11 1 3 * + 42 d 0 # Take the first constraint from the formula,
+                          weaken with 3 x_1 >= 0 and then divide by 42

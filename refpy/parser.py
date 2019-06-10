@@ -80,9 +80,15 @@ def getCNFConstraintParser():
     return (literal << space).many() << eol
 
 def getOPBConstraintParser(allowEq = True):
+    def lit2int(sign, num):
+        if sign == "~":
+            return -int(num)
+        else:
+            return int(num)
+
     space    = parsy.regex(r" +").desc("space").optional()
     coeff    = parsy.regex(r"[+-]?[0-9]+").map(int).desc("integer for the coefficient (make sure to not have spaces between the sign and the degree value)")
-    variable = (parsy.regex(r"x") >> parsy.regex(r"[1-9][0-9]*").map(int)).desc("variable in the form 'x[1-9][0-9]*'")
+    variable = parsy.seq(parsy.regex(r"~").optional(), parsy.regex(r"x") >> parsy.regex(r"[1-9][0-9]*")).combine(lit2int).desc("variable in the form '~?x[1-9][0-9]*'")
     term     = parsy.seq(space >> coeff, space >> variable).map(tuple)
 
     if allowEq:

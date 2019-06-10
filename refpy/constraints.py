@@ -202,9 +202,14 @@ class Inequality():
             and sorted(self.terms, key = key) == sorted(other.terms, key = key)
 
     def __str__(self):
+        def term2str(term):
+            if term.variable < 0:
+                return "%+i~x%i"%(term.coefficient, -term.variable)
+            else:
+                return "%+ix%i"%(term.coefficient, term.variable)
+
         return " ".join(
-            ["%+ix%i"%(term.coefficient, term.variable)
-                for term in self.terms]) + \
+            map(term2str, self.terms)) + \
             " >= %i" % self.degree
 
     def __repr__(self):

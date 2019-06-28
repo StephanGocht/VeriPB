@@ -1,0 +1,14 @@
+* #variable= 3 #constraint= 1
+*
+* this is a very small formula
+*
+
+* these comments are for testing
+1x1 +1x2 >= 1;
+1x2 +1x3 >= 1;
+1x1 +1x3 +1x4 >= 1;
+
+* we have three constraints so far
+1x1 +1x3 -1x4 >= 0;
+-1x1 -1x2 -1x3 >= -1;
+* now we have 5

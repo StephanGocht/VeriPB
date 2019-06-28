@@ -10,7 +10,7 @@ class ParseError(Exception):
         if isinstance(self.error, parsy.ParseError):
             return str(ParsyErrorAdapter(self.error, self.fileName, self.line))
         else:
-            return "%s:%s: %s"(self.fileName, self.line, str(self.error))
+            return "%s:%s: %s"%(self.fileName, self.line, str(self.error))
 
 class ParsyErrorAdapter(parsy.ParseError):
     def __init__(self, orig, fileName, line = None):

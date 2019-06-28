@@ -45,28 +45,41 @@ class RuleParser():
         except parsy.ParseError as e:
             raise ParseError(e, line = lineNum)
 
+    def isEmpty(self, line):
+        if  len(line) == 0 \
+            or line == "\n" \
+            or line[0] == "*" \
+            or ((line[0] == " " or line[0] == "\t")
+                and line.strip() == ""):
+
+            return True
+        else:
+            return False
+
     def parse(self, rules, file):
         self.rules = {rule.Id: rule for rule in rules}
         result = list()
 
         lineNum = 1
         lines = iter(file)
+        # the first line is not allowed to be comment line or empty but must be the header
         self.parseHeader(next(lines), lineNum)
 
         for line in lines:
             lineNum += 1
 
-            try:
-                rule = self.rules[line[0]]
-            except KeyError as e:
-                raise ParseError("Unsupported rule %s"%(line[0]), line = lineNum)
+            if not self.isEmpty(line):
+                try:
+                    rule = self.rules[line[0]]
+                except KeyError as e:
+                    raise ParseError("Unsupported rule '%s'"%(line[0]), line = lineNum)
 
-            try:
-                result.append(rule.parse(line[1:]))
-            except parsy.ParseError as e:
-                raise ParseError(e, line = lineNum)
-            except ValueError as e:
-                raise ParseError(e, line = lineNum)
+                try:
+                    result.append(rule.parse(line[1:]))
+                except parsy.ParseError as e:
+                    raise ParseError(e, line = lineNum)
+                except ValueError as e:
+                    raise ParseError(e, line = lineNum)
 
         return result
 
@@ -125,9 +138,11 @@ def getOPBParser():
     header = (parsy.regex(r"\* ") >> parsy.seq(numVar, numC) << eol) \
                     .desc("header line in form of '* #variable = [0-9]+ #constraint = [0-9]+'")
 
-    nothing = (emptyLine << eol | commentLine << eol).many()
+    nothing = (emptyLine << eol | commentLine << eol).map(lambda x: [])
 
-    constraint = getOPBConstraintParser().bind(refpy.constraints.Inequality.fromParsy)
+    constraint = getOPBConstraintParser().bind(refpy.constraints.Inequality.fromParsy) << eol
 
-    return parsy.seq(header, (nothing >> constraint << eol).many().map(flatten)) \
-     + ((emptyLine | commentLine).map(lambda x: []) | constraint.map(lambda x: [x])) << eol.optional()
+    return parsy.seq(
+            header,
+            (nothing | constraint).many().map(flatten)
+        )

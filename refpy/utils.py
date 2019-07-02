@@ -40,6 +40,7 @@ def runUI(*args):
         run(*args)
     except InvalidProof as e:
         print("Verification failed.")
+        return 1
     except ParseError as e:
         logging.error(e)
         exit(1)
@@ -54,6 +55,7 @@ def runUI(*args):
             raise e
     else:
         print("Verification succeeded.")
+    return 0
 
 
 def run_cmd_main():
@@ -83,4 +85,4 @@ def run_cmd_main():
 
     logging.basicConfig(level=args.loglevel)
 
-    runUI(args.formula, args.derivation, verifyerSettings)
+    return runUI(args.formula, args.derivation, verifyerSettings)

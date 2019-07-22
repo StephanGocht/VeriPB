@@ -250,7 +250,9 @@ class LinearCombination(Rule):
         result = Inequality()
 
         for factor, constraint in zip(self.factors, antecedents):
-            result.addWithFactor(factor, constraint)
+            constraint = constraint.copy()
+            constraint = constraint.multiply(factor)
+            result = result.add(constraint)
 
         return [result]
 
@@ -453,7 +455,7 @@ class ReversePolishNotation(Rule):
             elif ins == "+":
                 second = stack.pop()
                 first  = stack.pop()
-                stack.append(first.addWithFactor(1, second))
+                stack.append(first.add(second))
             elif ins == "*":
                 constraint = stack.pop()
                 factor = next(it)

@@ -64,9 +64,9 @@ class LazyInequality():
         self.operations.append(("*",f))
         return self
 
-    def addWithFactor(self, factor, other):
+    def add(self, other):
         result = Inequality(self.terms, self.degree)
-        return result.addWithFactor(factor, other)
+        return result.add(other)
 
     def contract(self):
         pass
@@ -159,12 +159,10 @@ class Inequality():
         # self.terms.sort(key = lambda x: abs(x.variable))
 
     # @profile
-    def addWithFactor(self, factor, other):
-        self.degree += factor * other.degree
+    def add(self, other):
+        self.degree += other.degree
 
-        otherTerms = map(lambda x: Term(factor * x.coefficient, x.variable), other.terms)
-
-        for other in otherTerms:
+        for other in other.terms:
             try:
                 my = self.dict[abs(other.variable)]
             except KeyError:

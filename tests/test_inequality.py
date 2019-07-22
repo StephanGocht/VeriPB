@@ -169,7 +169,9 @@ class TestInequality():
         a = geq([(1, 1)], 1)
         b = geq([(1, 1)], 1)
 
-        a.addWithFactor(1,b)
+        b = b.copy()
+        b = b.multiply(1)
+        a = a.add(b)
 
         r = geq([(2, 1)], 2)
         assert r == a
@@ -178,7 +180,9 @@ class TestInequality():
         a = geq([(2, 1)], 1)
         b = geq([(3, 1)], 1)
 
-        a.addWithFactor(5,b)
+        b = b.copy()
+        b = b.multiply(5)
+        a = a.add(b)
 
         r = geq([(17, 1)], 6)
         assert r == a
@@ -187,7 +191,9 @@ class TestInequality():
         a = geq([(2, 1)], 1)
         b = geq([(3, 2)], 1)
 
-        a.addWithFactor(5,b)
+        b = b.copy()
+        b = b.multiply(5)
+        a = a.add(b)
 
         r = geq([(2, 1), (15,2)], 6)
         assert r == a
@@ -196,7 +202,9 @@ class TestInequality():
         a = geq([(3, 2)], 1)
         b = geq([(2, 1)], 1)
 
-        a.addWithFactor(5,b)
+        b = b.copy()
+        b = b.multiply(5)
+        a = a.add(b)
 
         r = geq([(10, 1), (3,2)], 6)
         assert r == a
@@ -205,7 +213,9 @@ class TestInequality():
         a = geq([(1, 1), (1,2)], 1)
         b = geq([(1, 2), (1,3)], 1)
 
-        a.addWithFactor(1,b)
+        b = b.copy()
+        b = b.multiply(1)
+        a = a.add(b)
 
         r = geq([(1, 1), (2,2), (1,3)], 2)
         assert r == a
@@ -214,7 +224,9 @@ class TestInequality():
         a = geq([(1, 2), (1,3)], 1)
         b = geq([(1, 1), (1,2)], 1)
 
-        a.addWithFactor(1,b)
+        b = b.copy()
+        b = b.multiply(1)
+        a = a.add(b)
 
         r = geq([(1, 1), (2,2), (1,3)], 2)
         assert r == a
@@ -223,7 +235,9 @@ class TestInequality():
         a = geq([(5, 2), (1,3)], 1)
         b = geq([(1, 1), (3,2)], 1)
 
-        a.addWithFactor(7,b)
+        b = b.copy()
+        b = b.multiply(7)
+        a = a.add(b)
 
         r = geq([(7, 1), (26,2), (1,3)], 8)
         assert r == a
@@ -232,7 +246,9 @@ class TestInequality():
         a = geq([], 0)
         b = geq([(1, 1), (3,2)], 1)
 
-        a.addWithFactor(2,b)
+        b = b.copy()
+        b = b.multiply(2)
+        a = a.add(b)
 
         r = geq([(2, 1), (6,2)], 2)
         assert r == a
@@ -241,7 +257,9 @@ class TestInequality():
         a = geq([(1, 1), (3,2)], 1)
         b = geq([], 0)
 
-        a.addWithFactor(2,b)
+        b = b.copy()
+        b = b.multiply(2)
+        a = a.add(b)
 
         r = geq([(1, 1), (3,2)], 1)
         assert r == a
@@ -250,7 +268,9 @@ class TestInequality():
         a = geq([(1, -1)], 1)
         b = geq([(1,  1)], 1)
 
-        a.addWithFactor(1,b)
+        b = b.copy()
+        b = b.multiply(1)
+        a = a.add(b)
 
         r = geq([], 1)
         assert r == a
@@ -259,7 +279,9 @@ class TestInequality():
         a = geq([(1, -1)], 1)
         b = geq([(1,  1)], 1)
 
-        a.addWithFactor(2,b)
+        b = b.copy()
+        b = b.multiply(2)
+        a = a.add(b)
 
         r = geq([(1,  1)], 2)
         assert r == a
@@ -268,7 +290,9 @@ class TestInequality():
         a = geq([(2, -1)], 1)
         b = geq([(1,  1)], 1)
 
-        a.addWithFactor(2,b)
+        b = b.copy()
+        b = b.multiply(2)
+        a = a.add(b)
 
         r = geq([], 1)
         assert r == a
@@ -277,7 +301,9 @@ class TestInequality():
         a = geq([(2, -1), (1, 2)], 1)
         b = geq([(1,  -2), (1, 3)], 1)
 
-        a.addWithFactor(2,b)
+        b = b.copy()
+        b = b.multiply(2)
+        a = a.add(b)
 
         r = geq([(2,-1), (1,-2), (2,3)], 2)
         assert r == a
@@ -286,7 +312,9 @@ class TestInequality():
         a = geq([(2, -1), (1, 2), (2, -3)], 1)
         b = geq([(1,  -2), (1, 3)], 1)
 
-        a.addWithFactor(2,b)
+        b = b.copy()
+        b = b.multiply(2)
+        a = a.add(b)
 
         r = geq([(2,-1), (1,-2)], 0)
         assert r == a
@@ -296,8 +324,12 @@ class TestInequality():
         b = geq([(1, 1), (-1, 2)], 1)
 
         i = Inequality()
-        i.addWithFactor(1,a)
-        i.addWithFactor(1,b)
+        a = a.copy()
+        a = a.multiply(1)
+        i = i.add(a)
+        b = b.copy()
+        b = b.multiply(1)
+        i = i.add(b)
 
         r = geq([(2,1), (1,3)], 2)
         assert r == i

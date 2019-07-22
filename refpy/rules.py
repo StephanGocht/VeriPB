@@ -449,7 +449,7 @@ class ReversePolishNotation(Rule):
         ins = next(it, None)
         while ins is not None:
             if isinstance(ins, int):
-                stack.append(LazyInequality(next(antecedentIt)))
+                stack.append(next(antecedentIt).copy())
             elif ins == "+":
                 second = stack.pop()
                 first  = stack.pop()

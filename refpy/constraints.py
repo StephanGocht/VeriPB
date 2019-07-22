@@ -71,6 +71,9 @@ class LazyInequality():
     def contract(self):
         pass
 
+    def copy(self):
+        return LazyInequality(self)
+
     def __repr__(self):
         return str(Inequality(self.terms, self.degree))
 
@@ -245,3 +248,6 @@ class Inequality():
 
     def __repr__(self):
         return str(self)
+
+    def copy(self):
+        return LazyInequality(self)

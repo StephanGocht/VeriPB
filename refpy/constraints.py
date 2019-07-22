@@ -113,22 +113,38 @@ class Inequality():
 
     def __init__(self, terms = list(), degree = 0, variableUpperBounds = AllBooleanUpperBound()):
         self.degree = degree
-        self.terms = list(terms)
+        self._terms = list(terms)
+        self._dict = None
         self.expanded = False
         self.variableUpperBounds = variableUpperBounds
         self.normalize()
-        self._dict = None
 
     @property
     def dict(self):
-        if self._dict is None:
-            self._dict = {abs(x.variable): x for x in self.terms}
+        self._expand()
         return self._dict
 
+    @property
+    def terms(self):
+        self.contract()
+        return self._terms
+
+    @terms.setter
+    def set_terms(self, l):
+        self.contract()
+        self._terms = l
+
     def contract(self):
-        if self._dict is not None:
-            self.terms = [x for x in self.dict.values() if x.coefficient != 0]
+        assert((self._dict is None) != (self._terms is None))
+        if self._terms is None:
+            self._terms = [x for x in self.dict.values() if x.coefficient != 0]
             self._dict = None
+
+    def _expand(self):
+        assert((self._dict is None) != (self._terms is None))
+        if self._dict is None:
+            self._dict = {abs(x.variable): x for x in self._terms}
+            self._terms = None
 
     def normalize(self):
         for term in self.terms:
@@ -167,7 +183,6 @@ class Inequality():
         return self
 
     def saturate(self):
-        self.dict
         for term in self.terms:
             term.coefficient = min(
                 term.coefficient,
@@ -192,11 +207,27 @@ class Inequality():
             slack += term.coefficient
         return slack < 0
 
+    def implies(self, other):
+        """
+        perform a syntactic implication check, i.e. coefficients of
+        self are <= coefficients of other and degree of self is larger
+        than degree of other
+        """
+
+        for var, mine in self.dict.items():
+            theirs = other.dict.get(var, Term(0, mine.variable))
+            if mine.variable != theirs.variable:
+                return False
+            if mine.coefficient > theirs.coefficient:
+                return False
+
+        if self.degree < other.degree:
+            return False
+
+        return True
 
     def __eq__(self, other):
         # note that terms is assumed to be soreted
-        self.contract()
-        other.contract()
         key = lambda x: abs(x.variable)
         return self.degree == other.degree \
             and sorted(self.terms, key = key) == sorted(other.terms, key = key)

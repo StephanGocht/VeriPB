@@ -13,6 +13,32 @@ def geq(terms, degree):
     return Inequality(toTerms(terms), degree)
 
 class TestInequality():
+
+    def test_equals_1(self):
+        a = geq([(4, -1)], 3)
+        b = geq([(4, -1)], 3)
+        assert a == b
+
+    def test_equals_2(self):
+        a = geq([(4, -1), (3,2)], 3)
+        b = geq([(3,2), (4, -1)], 3)
+        assert a == b
+
+    def test_implies_1(self):
+        a = geq([(4, -1), (3,2)], 3)
+        b = geq([(3,2), (4, -1), (3, 3)], 3)
+        assert a.implies(b)
+
+    def test_implies_2(self):
+        a = geq([(4, -1), (3,2)], 4)
+        b = geq([(3,2), (4, -1)], 3)
+        assert a.implies(b)
+
+    def test_implies_3(self):
+        a = geq([(4, -1), (3,2)], 4)
+        b = geq([(3,2), (4, -1), (3, 3)], 3)
+        assert a.implies(b)
+
     def test_saturate_signle_1(self):
         a = geq([(4, -1)], 3)
         a.saturate()

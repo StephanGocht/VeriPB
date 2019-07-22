@@ -27,6 +27,11 @@ class TestParsing():
         rule = parser.parse("42 opb 3 x1 >= 2;")
         assert rule == ConstraintEquals(42, Inequality([Term(3,1)], 2))
 
+    def test_implies(self):
+        parser = ConstraintImplies.getParser()
+        rule = parser.parse("42 opb 3 x1 >= 2;")
+        assert rule == ConstraintImplies(42, Inequality([Term(3,1)], 2))
+
     def test_contradiction(self):
         parser = IsContradiction.getParser()
         rule = parser.parse("42 0")

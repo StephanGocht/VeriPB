@@ -109,12 +109,12 @@ class EqualityCheckFailed(InvalidProof):
         self.expected = expected
         self.got = got
 
-@register_rule
-class ConstraintEquals(Rule):
-    Id = "e"
+class CompareToConstraint(Rule):
+    @classmethod
+    def getParser(cls):
+        def f(constraintId, constraint):
+            return cls.fromParsy(constraintId, constraint)
 
-    @staticmethod
-    def getParser():
         space = parsy.regex(" +").desc("space")
 
         opb = space.optional() >> parsy.regex(r"opb") \
@@ -125,19 +125,15 @@ class ConstraintEquals(Rule):
         constraintId = space.optional() >> parsy.regex(r"[+-]?[0-9]+ ") \
             .map(int).desc("constraintId")
 
-        return parsy.seq(constraintId, opb | cnf).combine(ConstraintEquals.fromParsy)
+        return parsy.seq(constraintId, opb | cnf).combine(f)
 
-    @staticmethod
-    def fromParsy(constraintId, constraint):
-        return ConstraintEquals(constraintId, constraint[0])
+    @classmethod
+    def fromParsy(cls,constraintId, constraint):
+        return cls(constraintId, constraint[0])
 
     def __init__(self, constraintId, constraint):
         self.constraintId = constraintId
         self.constraint = constraint
-
-    def compute(self, antecedents):
-        if self.constraint != antecedents[0]:
-            raise EqualityCheckFailed(self.constraint, antecedents[0])
 
     def numConstraints(self):
         return 0
@@ -151,6 +147,27 @@ class ConstraintEquals(Rule):
 
     def isGoal(self):
         return True
+
+@register_rule
+class ConstraintEquals(CompareToConstraint):
+    Id = "e"
+
+    def compute(self, antecedents):
+        if self.constraint != antecedents[0]:
+            raise EqualityCheckFailed(self.constraint, antecedents[0])
+
+class ImpliesCheckFailed(InvalidProof):
+    def __init__(self, expected, got):
+        self.expected = expected
+        self.got = got
+
+@register_rule
+class ConstraintImplies(CompareToConstraint):
+    Id = "i"
+
+    def compute(self, antecedents):
+        if not antecedents[0].implies(self.constraint):
+            raise ImpliesCheckFailed(self.constraint, antecedents[0])
 
 class ContradictionCheckFailed(InvalidProof):
     pass

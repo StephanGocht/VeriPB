@@ -1,7 +1,7 @@
 refpy Refutations in Python
 ====
 
-refpy is a tool for verifying refutaitons (proofs of unsatisfiablity)
+refpy is a tool for verifying refutations (proofs of unsatisfiability)
 in python. A description of the proof file format follows.
 
 Currently it only supports pseudo-Boolean refutations.
@@ -43,13 +43,14 @@ TLDR;
     r [antecedent1] [antecedent2] ... 0
     c [which] 0
     e [which] opb [OPB style constraint]
+    i [which] opb [OPB style constraint]
 
 Introduction
 ----
 
 There are multiple rules, which are described in more detail below.
 Each rule can create an arbitrary number of constraints (including
-none). The verifyer keeps a database of constraints and each
+none). The verifier keeps a database of constraints and each
 constraint is assigned an index, called ConstraintId, starting from 1.
 Rules can reference other constraints by their ConstraintId.
 
@@ -148,7 +149,22 @@ Verify that the constraint [ConstraintId] is contradicting.
 
     e [ConstraintId] cnf [DIMACS style clause]
 
-Verify that constraitn [ConstraintId] is euqal to [OPB style constraint].
+Verify that constraint [ConstraintId] is equal to [OPB style constraint].
+
+(i)mplies
+----
+
+::
+
+    i [C: ConstraintId] opb [D: OPB style constraint]
+
+    i [C: ConstraintId] cnf [D: DIMACS style clause]
+
+Verify that C implies D. Currently only a syntactic check is
+performed, i.e. it checks that the degree of C is >= degree of D and
+for coefficients a_i (b_i) of C (D) it holds that a_i <= b_i. The
+current implementation requires the literals in both constraints to
+have the same sign.
 
 reverse (p)olish notation
 ----

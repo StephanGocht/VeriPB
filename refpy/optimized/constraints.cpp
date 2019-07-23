@@ -1,6 +1,6 @@
 /*
 <%
-cfg['compiler_args'] = ['-std=c++11', '-g', '-DPY_BINDINGS']
+cfg['compiler_args'] = ['-std=c++14', '-g', '-DPY_BINDINGS']
 setup_pybind11(cfg)
 %>
 */
@@ -18,7 +18,7 @@ setup_pybind11(cfg)
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
-
+#include <memory>
 
 bool nonzero(std::vector<int> aList){
     for (auto &item: aList)
@@ -82,10 +82,6 @@ public:
         bussy = false;
     }
 
-    ~FatInequality(){
-        // std::cout << "test" << std::endl;
-    }
-
     void load(std::vector<T>& coeffs, std::vector<int>& lits, T degree) {
         if (bussy) {
             std::cout << "critical error: I am too bussy for this!" << std::endl;
@@ -109,8 +105,6 @@ public:
         coeffs.reserve(this->usedList.size());
         lits.clear();
         lits.reserve(this->usedList.size());
-
-        std::cout << this->usedList.size() << std::endl;
 
         for (int var: this->usedList) {
             T coeff = this->coeffs[var];
@@ -154,11 +148,12 @@ bool orderByVar(std::pair<T, int> &a, std::pair<T, int> &b) {
     return a.second > b.second;
 }
 
+template<typename T>
+using FatInequalityPtr = std::unique_ptr<FatInequality<T>>;
 
 /**
  * stores constraint in (literal) normalized form
  */
-
 template<typename T>
 class Inequality {
 private:
@@ -166,8 +161,9 @@ private:
     std::vector<int> lits;
     int degree;
     bool loaded;
+    FatInequalityPtr<T> expanded;
 
-    static FatInequality<T> storage;
+    static std::vector<FatInequalityPtr<T>> pool;
 
 public:
     Inequality(std::vector<int>&& coeffs_, std::vector<int>&& lits_, int degree_):
@@ -176,6 +172,10 @@ public:
         degree(degree_)
     {
         loaded = false;
+    }
+
+    ~Inequality(){
+        contract();
     }
 
     Inequality* saturate(){
@@ -207,20 +207,27 @@ public:
 
     Inequality* add(Inequality* other){
         expand();
-        storage.add(other->coeffs, other->lits, other->degree);
+        expanded->add(other->coeffs, other->lits, other->degree);
         return this;
     }
 
     void expand() {
         if (!loaded) {
             loaded = true;
-            storage.load(coeffs, lits, degree);
+            if (pool.size() > 0) {
+                expanded = std::move(pool.back());
+                pool.pop_back();
+            } else {
+                expanded = std::make_unique<FatInequality<T>>();
+            }
+            expanded->load(coeffs, lits, degree);
         }
     }
 
     void contract() {
         if (loaded) {
-            storage.unload(coeffs, lits, degree);
+            expanded->unload(coeffs, lits, degree);
+            pool.push_back(std::move(expanded));
             loaded = false;
         }
     }
@@ -311,7 +318,7 @@ public:
 
 // we need to initialzie the static template member manually;
 template<typename T>
-FatInequality<T> Inequality<T>::storage;
+std::vector<FatInequalityPtr<T>> Inequality<T>::pool;
 
 
 int main(int argc, char const *argv[])

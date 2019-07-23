@@ -3,7 +3,8 @@ import unittest
 from env import refpy
 from refpy.parser import *
 from refpy.rules import *
-from refpy.constraints import Inequality, Term
+from refpy.constraints import Term
+from refpy.constraints import defaultFactory as ineqFactory
 
 class TestParsing():
     def test_header(self):
@@ -25,12 +26,12 @@ class TestParsing():
     def test_equals(self):
         parser = ConstraintEquals.getParser()
         rule = parser.parse("42 opb 3 x1 >= 2;")
-        assert rule == ConstraintEquals(42, Inequality([Term(3,1)], 2))
+        assert rule == ConstraintEquals(42, ineqFactory.fromTerms([Term(3,1)], 2))
 
     def test_implies(self):
         parser = ConstraintImplies.getParser()
         rule = parser.parse("42 opb 3 x1 >= 2;")
-        assert rule == ConstraintImplies(42, Inequality([Term(3,1)], 2))
+        assert rule == ConstraintImplies(42, ineqFactory.fromTerms([Term(3,1)], 2))
 
     def test_contradiction(self):
         parser = IsContradiction.getParser()
@@ -56,15 +57,15 @@ class TestCheckConstraintParsing():
     def test_1(self):
         parser = ConstraintEquals.getParser()
         res = parser.parse("1 opb 3 x1 >= 2;")
-        assert res == ConstraintEquals(1, Inequality([Term(3,1)], 2))
+        assert res == ConstraintEquals(1, ineqFactory.fromTerms([Term(3,1)], 2))
 
 class TestInequalityParsing():
     def test_eq(self):
-        parser = Inequality.getOPBParser()
+        parser = ineqFactory.getOPBParser()
         result = parser.parse("1x2 -2x1 = 2;")
 
-        ineq1 = Inequality([Term(-2,1), Term(1,2)], 2)
-        ineq2 = Inequality([Term(2,1), Term(-1,2)], -2)
+        ineq1 = ineqFactory.fromTerms([Term(-2,1), Term(1,2)], 2)
+        ineq2 = ineqFactory.fromTerms([Term(2,1), Term(-1,2)], -2)
 
         assert len(result) == 2
         print(result)

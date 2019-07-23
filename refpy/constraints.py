@@ -1,11 +1,12 @@
 from recordclass import structclass
 import parsy
+import cppimport
 
 def copysign(a, b):
-       if b >= 0:
-               return abs(a)
-       else:
-               return -abs(a)
+    if b >= 0:
+        return abs(a)
+    else:
+        return -abs(a)
 
 from refpy.parser import getOPBConstraintParser, getCNFConstraintParser
 
@@ -65,7 +66,7 @@ class LazyInequality():
         return self
 
     def add(self, other):
-        result = Inequality(self.terms, self.degree)
+        result = PyInequality(self.terms, self.degree)
         return result.add(other)
 
     def contract(self):
@@ -75,9 +76,9 @@ class LazyInequality():
         return LazyInequality(self)
 
     def __repr__(self):
-        return str(Inequality(self.terms, self.degree))
+        return str(PyInequality(self.terms, self.degree))
 
-class Inequality():
+class PyInequality():
     """
     Constraint representing sum of terms greater or equal degree.
     Terms are stored in normalized form, i.e. negated literals but no
@@ -88,31 +89,6 @@ class Inequality():
     For integers 0 <= x <= d the not x is defined as d - x. Note that
     a change in the upperbound invalidates the stored constraint.
     """
-
-    @staticmethod
-    def fromParsy(t):
-        result = list()
-
-        if isinstance(t, list):
-            # we got a clause from getCNFParser
-            result.append(Inequality([Term(1,l) for l in t], 1))
-        else:
-            # we got a tuple containing a constraint
-            terms, eq, degree = t
-
-            result.append(Inequality([Term(a,x) for a,x in terms], degree))
-            if eq == "=":
-                result.append(Inequality([Term(-a,x) for a,x in terms], -degree))
-
-        return parsy.success(result)
-
-    @staticmethod
-    def getOPBParser(allowEq = True):
-        return getOPBConstraintParser(allowEq = True).bind(Inequality.fromParsy)
-
-    @staticmethod
-    def getCNFParser():
-        return getCNFConstraintParser().bind(Inequality.fromParsy)
 
     def __init__(self, terms = list(), degree = 0, variableUpperBounds = AllBooleanUpperBound()):
         self.degree = degree
@@ -249,3 +225,50 @@ class Inequality():
 
     def copy(self):
         return LazyInequality(self)
+
+optimized = cppimport.imp("refpy.optimized.constraints")
+CppInequality = optimized.CppInequality
+
+
+class IneqFactory():
+    def fromTerms(self, terms, degree):
+        return PyInequality(terms, degree)
+
+    def fromParsy(self, t):
+        result = list()
+
+        if isinstance(t, list):
+            # we got a clause from getCNFParser
+            result.append(self.fromTerms([Term(1,l) for l in t], 1))
+        else:
+            # we got a tuple containing a constraint
+            terms, eq, degree = t
+
+            result.append(self.fromTerms([Term(a,x) for a,x in terms], degree))
+            if eq == "=":
+                result.append(self.fromTerms([Term(-a,x) for a,x in terms], -degree))
+
+        return parsy.success(result)
+
+    def getOPBParser(self, allowEq = True):
+        def f(t):
+            return self.fromParsy(t)
+
+        return getOPBConstraintParser(allowEq = True).bind(f)
+
+    def getCNFParser(self):
+        def f(t):
+            return self.fromParsy(t)
+
+        return getCNFConstraintParser().bind(f)
+
+def terms2lists(terms):
+    return zip(*[(t.coefficient, t.variable) for t in terms]) \
+        if len(terms) > 0 else ([],[])
+
+class CppIneqFactory(IneqFactory):
+    def fromTerms(self, terms, degree):
+        ineq = super().fromTerms(terms, degree)
+        return CppInequality(*terms2lists(ineq.terms), ineq.degree)
+
+defaultFactory = CppIneqFactory()

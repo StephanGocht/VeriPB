@@ -124,7 +124,10 @@ def flatten(constraintList):
             result.append(c)
     return result
 
-def getOPBParser():
+def getOPBParser(ineqFactory = None):
+    if ineqFactory is None:
+        ineqFactory = refpy.constraints.defaultFactory
+
     numVar = (parsy.regex(r" *#variable *= *") >> parsy.regex(r"[0-9]+")) \
                     .map(int) \
                     .desc("Number of variables in the form '#variable = [0-9]+'")
@@ -140,7 +143,7 @@ def getOPBParser():
 
     nothing = (emptyLine << eol | commentLine << eol).map(lambda x: [])
 
-    constraint = getOPBConstraintParser().bind(refpy.constraints.Inequality.fromParsy) << eol
+    constraint = ineqFactory.getOPBParser() << eol
 
     return parsy.seq(
             header,

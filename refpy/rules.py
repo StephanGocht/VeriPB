@@ -1,6 +1,6 @@
-from refpy.constraints import Inequality
-from refpy.constraints import LazyInequality
+import refpy.constraints
 from refpy.constraints import Term
+from refpy.constraints import defaultFactory as ineqFactory
 
 import parsy
 
@@ -94,7 +94,7 @@ class Rule():
 
 class DummyRule(Rule):
     def compute(self, db):
-        return [Inequality([], 0)]
+        return [ineqFactory.fromTerms([], 0)]
 
     def numConstraints(self):
         return 1
@@ -118,9 +118,9 @@ class CompareToConstraint(Rule):
         space = parsy.regex(" +").desc("space")
 
         opb = space.optional() >> parsy.regex(r"opb") \
-                >> space >> Inequality.getOPBParser(allowEq = False)
+                >> space >> ineqFactory.getOPBParser(allowEq = False)
         cnf = space.optional() >> parsy.regex(r"cnf") \
-                >> space >> Inequality.getCNFParser()
+                >> space >> ineqFactory.getCNFParser()
 
         constraintId = space.optional() >> parsy.regex(r"[+-]?[0-9]+ ") \
             .map(int).desc("constraintId")
@@ -247,9 +247,12 @@ class LinearCombination(Rule):
         self.factors = factors
 
     def compute(self, antecedents):
-        result = Inequality()
+        it = zip(self.factors, antecedents)
+        factor, constraint = next(it)
+        result = constraint.copy()
+        result.multiply(factor)
 
-        for factor, constraint in zip(self.factors, antecedents):
+        for factor, constraint in it:
             constraint = constraint.copy()
             constraint = constraint.multiply(factor)
             result = result.add(constraint)
@@ -349,8 +352,8 @@ class LoadLitteralAxioms(Rule):
     def compute(self, antecedents):
         result = list()
         for i in range(1, self.numLiterals + 1):
-            result.append(Inequality([Term(1, i)], 0))
-            result.append(Inequality([Term(1,-i)], 0))
+            result.append(ineqFactory.fromTerms([Term(1, i)], 0))
+            result.append(ineqFactory.fromTerms([Term(1,-i)], 0))
 
         return result
 

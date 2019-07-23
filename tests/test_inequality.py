@@ -3,14 +3,15 @@ import unittest
 from math import copysign
 
 from env import refpy
-from refpy.constraints import Inequality, Term
 
+from refpy.constraints import Term
+from refpy.constraints import defaultFactory as ineqFactory
 
 def toTerms(terms):
     return list(map(lambda x: Term(x[0], x[1]), terms))
 
 def geq(terms, degree):
-    return Inequality(toTerms(terms), degree)
+    return ineqFactory.fromTerms(toTerms(terms), degree)
 
 class TestInequality():
 
@@ -321,9 +322,9 @@ class TestInequality():
 
     def test_add_canceling_6(self):
         a = geq([(1, 1), (1, 2), (1, 3)], 1)
-        b = geq([(1, 1), (-1, 2)], 1)
+        b = geq([(1, 1), (1, -2)], 2)
 
-        i = Inequality()
+        i = geq([], 0)
         a = a.copy()
         a = a.multiply(1)
         i = i.add(a)

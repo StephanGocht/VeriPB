@@ -19,6 +19,26 @@ setup_pybind11(cfg)
 #include <sstream>
 #include <unordered_map>
 #include <memory>
+#include <chrono>
+
+class Timer {
+private:
+    std::chrono::high_resolution_clock::time_point start;
+    std::chrono::duration<double> &targetTimer;
+public:
+    Timer(std::chrono::duration<double> &targetTimer_):
+        targetTimer(targetTimer_)
+    {
+        start = std::chrono::high_resolution_clock::now();
+    }
+
+    ~Timer(){
+        auto stop = std::chrono::high_resolution_clock::now();
+        targetTimer += (stop - start);
+    }
+};
+
+std::chrono::duration<double> addTimer;
 
 bool nonzero(std::vector<int> aList){
     for (auto &item: aList)
@@ -179,6 +199,7 @@ public:
     }
 
     Inequality* saturate(){
+        Timer t(addTimer);
         contract();
         for (T& coeff: coeffs) {
             using namespace std;
@@ -188,6 +209,7 @@ public:
     }
 
     Inequality* divide(T divisor){
+        Timer t(addTimer);
         contract();
         this->degree = divideAndRoundUp(this->degree, divisor);
         for (T& coeff: coeffs) {
@@ -197,6 +219,7 @@ public:
     }
 
     Inequality* multiply(T factor){
+        Timer t(addTimer);
         contract();
         this->degree *= factor;
         for (T& coeff: coeffs) {
@@ -206,6 +229,7 @@ public:
     }
 
     Inequality* add(Inequality* other){
+        Timer t(addTimer);
         expand();
         expanded->add(other->coeffs, other->lits, other->degree);
         return this;
@@ -225,6 +249,7 @@ public:
     }
 
     void contract() {
+        Timer t(addTimer);
         if (loaded) {
             expanded->unload(coeffs, lits, degree);
             pool.push_back(std::move(expanded));
@@ -299,6 +324,7 @@ public:
     }
 
     Inequality* copy(){
+        Timer t(addTimer);
         contract();
         return new Inequality(
             std::vector<T>(coeffs),
@@ -339,7 +365,11 @@ int main(int argc, char const *argv[])
         m.attr("redirect_output") =
             py::capsule(
                 new py::scoped_ostream_redirect(),
-                [](void *sor) { delete static_cast<py::scoped_ostream_redirect *>(sor); });
+                [&addTimer](void *sor) {
+                    // std::cout << "add run " << addTimer.count() << "s" << std::endl;
+                    delete static_cast<py::scoped_ostream_redirect *>(sor);
+                });
+
         py::class_<Inequality<int>>(m, "CppInequality")
             .def(py::init<std::vector<int>&&, std::vector<int>&&, int>())
             .def("saturate", &Inequality<int>::saturate)

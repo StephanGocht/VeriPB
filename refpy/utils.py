@@ -44,6 +44,9 @@ def runUI(*args):
     except ParseError as e:
         logging.error(e)
         exit(1)
+    except NotImplementedError as e:
+        logging.error(e)
+        exit(1)
     except Exception as e:
         if logging.getLogger().getEffectiveLevel() != logging.DEBUG:
             logging.error("Sorry, there was an internal error. Please rerun with debugging "

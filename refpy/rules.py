@@ -374,6 +374,8 @@ class ReversePolishNotation(Rule):
                 stackSize += 1
             elif thing in ["+", "*", "d"]:
                 stackSize -= 1
+            elif thing == "r":
+                stackSize -= 2
             elif thing == "s":
                 stackSize += 0
 
@@ -394,7 +396,7 @@ class ReversePolishNotation(Rule):
 
         space = parsy.regex(r" +").desc("space")
         number = parsy.regex(r"[0-9]+").map(int).desc("number")
-        operator = parsy.regex(r"[+*ds]").desc("operator +,*,d,s")
+        operator = parsy.regex(r"[+*dsr]").desc("operator +,*,d,s,r")
 
         return (space.optional() >> (number | operator).bind(check)).many().bind(finalCheck) \
             << space << parsy.regex(r"0").desc("0 to terminate sequence").optional()
@@ -404,7 +406,7 @@ class ReversePolishNotation(Rule):
     @fallback_on_error
     def parse(cls, line):
         def f(word):
-            if word in ["+", "*", "d", "s"]:
+            if word in ["+", "*", "d", "s", "r"]:
                 return word
             else:
                 return int(word)
@@ -427,7 +429,7 @@ class ReversePolishNotation(Rule):
                 current = next(self.instructions)
                 if isinstance(current, int):
                     return current
-                if current in ["*", "d"]:
+                if current in ["*", "d", "r"]:
                     # consume one more, remember that we swaped the right operand and operator
                     next(self.instructions)
 
@@ -437,7 +439,7 @@ class ReversePolishNotation(Rule):
             # needs to be a constant and not a constraint, so we (can) switch
             # positions, which makes it easier to distinguish constraints from
             # constants later on
-            if x in ["*", "d"]:
+            if x in ["*", "d", "r"]:
                 instructions[i] = instructions[i - 1]
                 instructions[i - 1] = x
 
@@ -464,6 +466,11 @@ class ReversePolishNotation(Rule):
                 constraint = stack.pop()
                 divisor = next(it)
                 stack.append(constraint.divide(divisor))
+            elif ins = "r":
+                second = stack.pop()
+                first = stack.pop()
+                resolvedVar = next(it)
+                stack.append(first.resolve(second, resolvedVar))
             elif ins == "s":
                 constraint = stack.pop()
                 stack.append(constraint.saturate())

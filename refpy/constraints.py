@@ -242,22 +242,21 @@ class Inequality():
 
     def implies(self, other):
         """
-        perform a syntactic implication check, i.e. coefficients of
-        self are <= coefficients of other and degree of self is larger
-        than degree of other
+        check if self semantically implies other
         """
 
+        weakenCost = 0
         for var, mine in self.dict.items():
             theirs = other.dict.get(var, Term(0, mine.variable))
             if mine.variable != theirs.variable:
-                return False
-            if mine.coefficient > theirs.coefficient:
-                return False
+                weakenCost += mine.coefficient
+            elif mine.coefficient > theirs.coefficient:
+                weakenCost += mine.coefficient - theirs.coefficient
 
-        if self.degree < other.degree:
+        if self.degree - weakenCost < other.degree:
             return False
-
-        return True
+        else:
+            return True
 
     def __eq__(self, other):
         # note that terms is assumed to be soreted

@@ -169,6 +169,17 @@ class ConstraintImplies(CompareToConstraint):
         if not antecedents[0].implies(self.constraint):
             raise ImpliesCheckFailed(self.constraint, antecedents[0])
 
+class ConstraintImpliesGetImplied(ConstraintImplies):
+    Id = "j"
+
+    def compute(self, antecedents):
+        super().compute(antecedents)
+        return [self.constraint]
+
+    def numConstraints(self):
+        return 1
+
+
 class ContradictionCheckFailed(InvalidProof):
     pass
 

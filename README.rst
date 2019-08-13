@@ -44,6 +44,7 @@ TLDR;
     c [which] 0
     e [which] opb [OPB style constraint]
     i [which] opb [OPB style constraint]
+    j [which] opb [OPB style constraint]
 
 Introduction
 ----
@@ -166,6 +167,12 @@ for coefficients a_i (b_i) of C (D) it holds that a_i <= b_i. The
 current implementation requires the literals in both constraints to
 have the same sign.
 
+(j) implies and add
+---
+
+Identical to (i)mplies but also adds the constraint that is implied to
+the database
+
 reverse (p)olish notation
 ----
 
@@ -202,6 +209,15 @@ operand.
 
 Where [constraint] is either a ConstraintId or a subsequence in
 reverse polish notation.
+
+* Resolve Maybe::
+
+    [constraint1] [constraint2] [variable] r
+
+Try to resolve [constraint1] and [constrain2] over [variable]
+(requires the constraints to be clausal (degree 1 an only coefficents
+1). If one of the constraints does not contain [variable] than this
+constraint is returned.
 
 This allows to write down any treelike refutation with a single rule.
 

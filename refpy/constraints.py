@@ -221,9 +221,9 @@ class Inequality():
         theirs = other.dict.get(resolvedVar, None)
 
         if mine is None:
-            return theirs
+            return self
         elif theirs is None:
-            return mine
+            return other
         else:
             if mine.coefficient != 1 or theirs.coefficient != 1:
                 raise NotImplementedError("Resolution is currently only implemented for clausal constraints (all coefficients must be 1)")
@@ -231,8 +231,7 @@ class Inequality():
             if mine.variable * theirs.variable >= 0:
                 raise NotImplementedError("Resolution is currently only implemented for clashing constraints (one must contain ~resolvedVar and the other resolvedVar)")
 
-            result = self.add(other).saturate()
-        return result
+            return self.add(other).saturate()
 
     def isContradiction(self):
         slack = -self.degree

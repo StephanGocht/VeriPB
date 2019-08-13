@@ -169,6 +169,7 @@ class ConstraintImplies(CompareToConstraint):
         if not antecedents[0].implies(self.constraint):
             raise ImpliesCheckFailed(self.constraint, antecedents[0])
 
+@register_rule
 class ConstraintImpliesGetImplied(ConstraintImplies):
     Id = "j"
 
@@ -477,7 +478,7 @@ class ReversePolishNotation(Rule):
                 constraint = stack.pop()
                 divisor = next(it)
                 stack.append(constraint.divide(divisor))
-            elif ins = "r":
+            elif ins == "r":
                 second = stack.pop()
                 first = stack.pop()
                 resolvedVar = next(it)

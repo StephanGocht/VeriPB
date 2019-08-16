@@ -6,7 +6,7 @@ from time import perf_counter
 import logging
 # import cProfile
 
-DBEntry = structclass("DBEntry","rule constraint numUsed")
+DBEntry = structclass("DBEntry","rule ruleNum constraint numUsed deleted")
 Stats = structclass("Stats", "size space maxUsed")
 
 class Verifier():
@@ -75,7 +75,7 @@ class Verifier():
             }
 
         @classmethod
-        def addArgParser(cls, parser, name = "verifier"):
+        def addArgParsefr(cls, parser, name = "verifier"):
             defaults = cls.defaults()
             group = parser.add_argument_group(name)
 
@@ -145,26 +145,44 @@ class Verifier():
 
         self._execCacheRule = None
 
+    def antecedentIds(self, rule, ruleNum):
+        def isActive(entry):
+            if entry.deleted == False and entry.ruleNum < ruleNum:
+                return True
+            else:
+                return entry.ruleNum < ruleNum and ruleNum < entry.deleted
+
+        ids = rule.antecedentIDs()
+        if ids == "all":
+            return [i for i,e in enumerate(self.db) if isActive(e)]
+        return ids
+
     def mapRulesToDB(self):
         constraintNum = 0
         self.foundContradiction = False
 
         # Forward pass to find goals
-        for rule in self.rules:
+        for ruleNum, rule in enumerate(self.rules):
             for i in range(rule.numConstraints()):
                 self.db.append(DBEntry(
                     rule = rule,
+                    ruleNum = ruleNum,
                     constraint = None,
-                    numUsed = 0))
+                    numUsed = 0,
+                    deleted = False))
 
                 if rule.isGoal():
                     self.goals.append(constraintNum)
+
+                for constraintId in rule.deletedConstraints():
+                    self.db[constraintId].deleted = ruleNum
+
                 constraintNum += 1
 
             if rule.isGoal() and rule.numConstraints() == 0:
                 if isinstance(rule, IsContradiction):
                     self.foundContradiction = True
-                self.goals.extend(rule.antecedentIDs())
+                self.goals.extend(self.antecedentIds(rule, ruleNum))
 
         self.state = Verifier.State.READ_PROOF
 
@@ -175,7 +193,7 @@ class Verifier():
             line = self.db[goal]
             line.numUsed += 1
             if line.numUsed == 1:
-                for antecedent in line.rule.antecedentIDs():
+                for antecedent in self.antecedentIds(line.rule, line.ruleNum):
                     # assert(antecedent < goal)
                     self.goals.append(antecedent)
 
@@ -189,12 +207,12 @@ class Verifier():
             if not self.settings.disableDeletion:
                 line.constraint = None
 
-    def execRule(self, rule, numInRule = None):
+    def execRule(self, rule, ruleNum, numInRule = None):
         assert rule is not None
         if self._execCacheRule is not rule:
             # logging.info("running rule: %s" %(rule))
             self._execCacheRule = rule
-            antecedentIDs = rule.antecedentIDs()
+            antecedentIDs = self.antecedentIds(rule, ruleNum)
 
             self._execCache = rule.compute(
                 [self.db[i].constraint for i in antecedentIDs])
@@ -217,11 +235,11 @@ class Verifier():
             lineNum, line = line
             if line is None:
                 if rule.isGoal():
-                    self.execRule(rule)
+                    self.execRule(rule, ruleNum)
             elif line.numUsed > 0 or \
                     self.settings.lazy == False:
                 assert numInRule is not None
-                line.constraint = self.execRule(rule, numInRule)
+                line.constraint = self.execRule(rule, ruleNum, numInRule)
                 if self.settings.trace:
                     print("%i (rule %i): %s"%(lineNum, ruleNum, str(line.constraint)))
                 if rule.isGoal():

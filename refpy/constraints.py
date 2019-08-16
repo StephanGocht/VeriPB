@@ -75,6 +75,10 @@ class LazyInequality():
     def contract(self):
         pass
 
+    def negated(self):
+        result = Inequality(self.terms, self.degree)
+        return result.negated()
+
     def copy(self):
         return LazyInequality(self)
 
@@ -257,22 +261,33 @@ class Inequality():
         else:
             return True
 
+    def negated(self):
+        self.degree = -self.degree + 1
+        for term in self.terms:
+            self.degree += term.coefficient
+            term.variable = -term.variable
+
+        return self
+
     def __eq__(self, other):
         # note that terms is assumed to be soreted
         key = lambda x: abs(x.variable)
         return self.degree == other.degree \
             and sorted(self.terms, key = key) == sorted(other.terms, key = key)
 
-    def __str__(self):
+    def toOPB(self):
         def term2str(term):
             if term.variable < 0:
-                return "%+i~x%i"%(term.coefficient, -term.variable)
+                return "%+i ~x%i"%(term.coefficient, -term.variable)
             else:
-                return "%+ix%i"%(term.coefficient, term.variable)
+                return "%+i x%i"%(term.coefficient, term.variable)
 
         return " ".join(
             map(term2str, self.terms)) + \
             " >= %i" % self.degree
+
+    def __str__(self):
+        return self.toOPB()
 
     def __repr__(self):
         return str(self)

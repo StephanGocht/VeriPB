@@ -1,0 +1,13 @@
+refutation using f d s c 0
+f 0
+p 3 1 * 4 1 * + s
+e 6 opb +1x3 >= 1;
+j 6 opb 1x1 +1x3 >= 1;
+e 7 opb 1x1 +1x3 >= 1;
+p 1 2 3 r
+e 8 opb 1x1 +1x2 >= 1;
+p 8 7 +
+e 9 opb +2x1 +1x2 +1x3 >= 2;
+p 5 2 * 9 2 * +
+e 10 opb >= 2;
+c 10 0

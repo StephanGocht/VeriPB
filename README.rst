@@ -229,6 +229,41 @@ Creates a new constraint by taking 3 times the constraint with index
 42, then adds constraint 43, followed by a saturation step and a
 division by 2.
 
+reverse (u)nit propagation <experimental>
+----
+
+::
+
+    u opb [OPB style constraint]
+
+    u cnf [DIMACS style clause]
+
+Use reverse unit propagation to check if the constraint is implied,
+i.e. it assumes that the negation of the constraint and all other
+active constraints in the database and and passes if this yields
+contradiction by unit propagation.
+
+If the constraint is implied it is added to the database. Otherwise,
+verification fails.
+
+Using this rule currently currently requires roundingsat to be
+available in the PATH environment. Alternatively you can use the bash
+command ``alias roundingsat=[path/to/roundingsat/binary]`` to
+configure the path to the roundingsat binary.
+
+(w)ithdraw constraint
+----
+
+::
+
+    w [constraintId1] [constraintId2] [constraintId3] ... 0
+
+Delete constraints with given constrain ids. They can no longer be
+used after deletion and verification fails if they are accessed after
+deletion.
+
+Note that this rule is not compatible with the DRAT deletion rule.
+
 Example
 ----
 

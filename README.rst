@@ -246,7 +246,8 @@ contradiction by unit propagation.
 If the constraint is implied it is added to the database. Otherwise,
 verification fails.
 
-Using this rule currently currently requires roundingsat to be
+Using this rule currently currently requires
+`roundingsat<https://github.com/elffersj/roundingsat>`_ to be
 available in the PATH environment. Alternatively you can use the bash
 command ``alias roundingsat=[path/to/roundingsat/binary]`` to
 configure the path to the roundingsat binary.

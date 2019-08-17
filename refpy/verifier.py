@@ -2,6 +2,7 @@ from recordclass import structclass
 from enum import Enum
 from refpy.rules import DummyRule, IsContradiction
 from time import perf_counter
+from refpy import InvalidProof
 
 import logging
 # import cProfile
@@ -75,7 +76,7 @@ class Verifier():
             }
 
         @classmethod
-        def addArgParsefr(cls, parser, name = "verifier"):
+        def addArgParser(cls, parser, name = "verifier"):
             defaults = cls.defaults()
             group = parser.add_argument_group(name)
 
@@ -155,6 +156,8 @@ class Verifier():
         ids = rule.antecedentIDs()
         if ids == "all":
             return [i for i,e in enumerate(self.db) if isActive(e)]
+        else:
+            ids = list(ids)
         return ids
 
     def mapRulesToDB(self):
@@ -172,7 +175,7 @@ class Verifier():
                     deleted = False))
 
                 if rule.isGoal():
-                    self.goals.append(constraintNum)
+                    self.goals.append(([constraintNum], ruleNum))
 
                 for constraintId in rule.deletedConstraints():
                     self.db[constraintId].deleted = ruleNum
@@ -182,20 +185,33 @@ class Verifier():
             if rule.isGoal() and rule.numConstraints() == 0:
                 if isinstance(rule, IsContradiction):
                     self.foundContradiction = True
-                self.goals.extend(self.antecedentIds(rule, ruleNum))
+                self.goals.append((self.antecedentIds(rule, ruleNum), ruleNum))
 
         self.state = Verifier.State.READ_PROOF
 
+    def checkGoals(self, goals, ruleNum):
+        for goal in goals:
+            if goal >= len(self.db):
+                raise InvalidProof("Rule %i tries to access constraint "\
+                    "(constraintId %i) which is never created."%(ruleNum, goal))
+
     def markUsed(self):
+
+        todo = list()
+        for goals, ruleNum in self.goals:
+            self.checkGoals(goals, ruleNum)
+            todo.extend(goals)
+
         # Backward pass to mark used rules
-        while self.goals:
-            goal = self.goals.pop()
+        while todo:
+            goal = todo.pop()
             line = self.db[goal]
+
             line.numUsed += 1
             if line.numUsed == 1:
-                for antecedent in self.antecedentIds(line.rule, line.ruleNum):
-                    # assert(antecedent < goal)
-                    self.goals.append(antecedent)
+                antecedents = self.antecedentIds(line.rule, line.ruleNum)
+                self.checkGoals(antecedents, line.ruleNum)
+                todo.extend(antecedents)
 
         self.state = Verifier.State.MARKED_LINES
 
@@ -207,15 +223,33 @@ class Verifier():
             if not self.settings.disableDeletion:
                 line.constraint = None
 
-    def execRule(self, rule, ruleNum, numInRule = None):
+    def execRule(self, rule, ruleNum, lineNum, numInRule = None):
         assert rule is not None
         if self._execCacheRule is not rule:
             # logging.info("running rule: %s" %(rule))
             self._execCacheRule = rule
             antecedentIDs = self.antecedentIds(rule, ruleNum)
+            antecedents = list()
 
-            self._execCache = rule.compute(
-                [self.db[i].constraint for i in antecedentIDs])
+            for otherLineNum in antecedentIDs:
+                constraint = self.db[otherLineNum].constraint
+                deleted = self.db[otherLineNum].deleted
+                if constraint is None:
+                    if lineNum <= otherLineNum:
+                        raise InvalidProof("Rule %i is trying to access constraint "\
+                            "(constraintId %i), which is not derived, yet."%(ruleNum, otherLineNum))
+                    elif deleted is not False and deleted < ruleNum:
+                        raise InvalidProof("Rule %i is trying to access constraint "\
+                            "(constraintId %i), that was marked as save to delete by rule %i."\
+                            %(ruleNum, otherLineNum, deleted))
+                    else:
+                        # seeems like we did something wrong...
+                        raise RuntimeError("Rule %i tried to access constraint (constraintId %i) "\
+                            "that should be available, but is not."%(ruleNum, otherLineNum))
+
+                antecedents.append(constraint)
+
+            self._execCache = rule.compute(antecedents)
 
             for i in antecedentIDs:
                 self.decreaseUse(self.db[i])
@@ -235,11 +269,11 @@ class Verifier():
             lineNum, line = line
             if line is None:
                 if rule.isGoal():
-                    self.execRule(rule, ruleNum)
+                    self.execRule(rule, ruleNum, lineNum)
             elif line.numUsed > 0 or \
                     self.settings.lazy == False:
                 assert numInRule is not None
-                line.constraint = self.execRule(rule, ruleNum, numInRule)
+                line.constraint = self.execRule(rule, ruleNum, lineNum, numInRule)
                 if self.settings.trace:
                     print("%i (rule %i): %s"%(lineNum, ruleNum, str(line.constraint)))
                 if rule.isGoal():

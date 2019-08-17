@@ -40,6 +40,9 @@ def runUI(*args):
         run(*args)
     except InvalidProof as e:
         print("Verification failed.")
+        hint = str(e)
+        if len(hint) > 0:
+            print("Hint: %s" %(str(e)))
         return 1
     except ParseError as e:
         logging.error(e)

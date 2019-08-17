@@ -1,5 +1,5 @@
 refutation using f d s c 0
-f 0
+f 5 0
 p 3 1 * 4 1 * + s
 e 6 opb 1x1 +1x3 >= 1;
 p 1 2 + 6 +

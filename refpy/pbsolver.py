@@ -108,7 +108,6 @@ class RoundingSat:
 
     def propagatesToConflict(self, formula):
         result = self.solve(formula)
-        print(result)
         try:
             return result["result"] == "UNSATISFIABLE" and int(result["conflicts"]) <= 1
         except KeyError:

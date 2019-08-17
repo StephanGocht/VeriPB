@@ -177,9 +177,6 @@ class Verifier():
                 if rule.isGoal():
                     self.goals.append(([constraintNum], ruleNum))
 
-                for constraintId in rule.deletedConstraints():
-                    self.db[constraintId].deleted = ruleNum
-
                 constraintNum += 1
 
             if rule.isGoal() and rule.numConstraints() == 0:
@@ -187,19 +184,23 @@ class Verifier():
                     self.foundContradiction = True
                 self.goals.append((self.antecedentIds(rule, ruleNum), ruleNum))
 
+            self.checkAccess(rule.deleteConstraints(), ruleNum)
+            for constraintId in rule.deleteConstraints():
+                self.db[constraintId].deleted = ruleNum
+
         self.state = Verifier.State.READ_PROOF
 
-    def checkGoals(self, goals, ruleNum):
+    def checkAccess(self, goals, ruleNum):
         for goal in goals:
             if goal >= len(self.db):
                 raise InvalidProof("Rule %i tries to access constraint "\
-                    "(constraintId %i) which is never created."%(ruleNum, goal))
+                    "(constraintId %i) which is not (yet?) created."%(ruleNum, goal))
 
     def markUsed(self):
 
         todo = list()
         for goals, ruleNum in self.goals:
-            self.checkGoals(goals, ruleNum)
+            self.checkAccess(goals, ruleNum)
             todo.extend(goals)
 
         # Backward pass to mark used rules
@@ -210,7 +211,7 @@ class Verifier():
             line.numUsed += 1
             if line.numUsed == 1:
                 antecedents = self.antecedentIds(line.rule, line.ruleNum)
-                self.checkGoals(antecedents, line.ruleNum)
+                self.checkAccess(antecedents, line.ruleNum)
                 todo.extend(antecedents)
 
         self.state = Verifier.State.MARKED_LINES
@@ -251,10 +252,12 @@ class Verifier():
 
             self._execCache = rule.compute(antecedents)
 
-            for i in antecedentIDs:
-                self.decreaseUse(self.db[i])
-
         if numInRule is not None:
+            if self.db[lineNum].numUsed > 0:
+                # only decrease others use if we are used our selfs
+                for i in self.antecedentIds(rule, ruleNum):
+                    self.decreaseUse(self.db[i])
+
             return self._execCache[numInRule]
 
     def compute(self):
@@ -268,16 +271,18 @@ class Verifier():
             ruleNum, rule = rule
             lineNum, line = line
             if line is None:
-                if rule.isGoal():
+                if rule.isGoal() or \
+                        self.settings.lazy == False:
                     self.execRule(rule, ruleNum, lineNum)
             elif line.numUsed > 0 or \
-                    self.settings.lazy == False:
+                    not self.settings.lazy:
                 assert numInRule is not None
                 line.constraint = self.execRule(rule, ruleNum, lineNum, numInRule)
                 if self.settings.trace:
                     print("%i (rule %i): %s"%(lineNum, ruleNum, str(line.constraint)))
                 if rule.isGoal():
                     self.decreaseUse(line)
+
 
         self.state = Verifier.State.DONE
 

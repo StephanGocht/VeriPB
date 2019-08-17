@@ -91,7 +91,7 @@ class Rule():
     def isGoal(self):
         return False
 
-    def deletedConstraints(self):
+    def deleteConstraints(self):
         """
         Return a list of constraintId's that can be removed from the database
         """
@@ -127,7 +127,7 @@ class DeleteConstraints(Rule):
     @classmethod
     def getParser(cls):
         def f(toDelete):
-            cls.fromParsy(toDelete)
+            return cls.fromParsy(toDelete)
 
         space = parsy.regex(" +").desc("space")
         constraintId = parsy.regex(r"[1-9][0-9]*").map(int).desc("constraintId")
@@ -139,13 +139,13 @@ class DeleteConstraints(Rule):
 
     @classmethod
     def fromParsy(cls, toDelete):
-        cls(toDelete)
+        return cls(toDelete)
 
     def __init__(self, toDelete):
         self.toDelete = toDelete
 
     def compute(self, antecedents):
-        pass
+        return []
 
     def numConstraints(self):
         return 0
@@ -156,7 +156,7 @@ class DeleteConstraints(Rule):
     def isGoal(self):
         return False
 
-    def deletedConstraints(self):
+    def deleteConstraints(self):
         return self.toDelete
 
 @register_rule
@@ -203,7 +203,7 @@ class ReverseUnitPropagation(Rule):
         if solver.propagatesToConflict(Formula(antecedents + [self.constraint.copy().negated()])):
             return [self.constraint]
         else:
-            raise ReverseUnitPropagationFailed(self.constraint)
+            raise ReverseUnitPropagationFailed("Failed to show '%s' by reverse unit propagation."%(str(self.constraint)))
 
 class CompareToConstraint(Rule):
     @classmethod

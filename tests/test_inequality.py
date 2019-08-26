@@ -13,7 +13,10 @@ def toTerms(terms):
 def geq(terms, degree):
     return ineqFactory.fromTerms(toTerms(terms), degree)
 
-class TestInequality():
+def clause(literals):
+    return Inequality([Term(1, l) for l in literals] , 1)
+
+class TestInequality(unittest.TestCase):
 
     def test_equals_1(self):
         a = geq([(4, -1)], 3)
@@ -39,6 +42,16 @@ class TestInequality():
         a = geq([(4, -1), (3,2)], 4)
         b = geq([(3,2), (4, -1), (3, 3)], 3)
         assert a.implies(b)
+
+    def test_implies_4(self):
+        a = geq([(4, -1), (3,2)], 4 + 1 + 3)
+        b = geq([(2,2), (2, 1), (3, 3)], 3)
+        assert a.implies(b)
+
+    def test_implies_4_f(self):
+        a = geq([(4, -1), (3,2)], 4 + 1 + 3)
+        b = geq([(2,2), (2, 1), (3, 3)], 4)
+        assert (not a.implies(b))
 
     def test_saturate_signle_1(self):
         a = geq([(4, -1)], 3)
@@ -334,3 +347,38 @@ class TestInequality():
 
         r = geq([(2,1), (1,3)], 2)
         assert r == i
+
+    def test_resolve_1(self):
+        a = clause([1, 2])
+        b = clause([-1, 3])
+        r = a.resolve(b, 1)
+
+        e = clause([2,3])
+
+    def test_resolve_2(self):
+        a = clause([1, 2])
+        b = clause([3])
+        r = a.resolve(b, 1)
+
+        e = clause([3])
+
+    def test_resolve_3(self):
+        a = clause([2])
+        b = clause([-1, 3])
+        r = a.resolve(b, 1)
+
+        e = clause([2])
+
+    def test_resolve_fail_1(self):
+        a = geq([(2,  1), (1, 2)], 1)
+        b = geq([(1, -1), (1, 2)], 1)
+
+        with self.assertRaises(NotImplementedError):
+            r = a.resolve(b, 1)
+
+    def test_resolve_fail_2(self):
+        a = geq([(1,  1), (1, 2)], 1)
+        b = geq([(1, -1), (1, 2)], 2)
+
+        with self.assertRaises(NotImplementedError):
+            r = a.resolve(b, 1)

@@ -135,8 +135,8 @@ def getOPBParser(ineqFactory = None):
                     .map(int) \
                     .desc("Number of constraints in the form '#constraint = [0-9]+'")
 
-    eol = parsy.regex(" *\n").desc("return at end of line")
-    emptyLine = parsy.regex(r"(\s*)").desc("empty line")
+    eol = parsy.regex(" *\n").desc("return at end of line").many()
+    emptyLine = parsy.regex(r"(\s+)").desc("empty line")
     commentLine = parsy.regex(r"(\s*\*.*)").desc("comment line starting with '*'")
     header = (parsy.regex(r"\* ") >> parsy.seq(numVar, numC) << eol) \
                     .desc("header line in form of '* #variable = [0-9]+ #constraint = [0-9]+'")

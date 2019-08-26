@@ -69,8 +69,16 @@ class LazyInequality():
         result = PyInequality(self.terms, self.degree)
         return result.add(other)
 
+    def resolve(self, other, resolvedVar):
+        result = Inequality(self.terms, self.degree)
+        return result.resolve(other, resolvedVar)
+
     def contract(self):
         pass
+
+    def negated(self):
+        result = Inequality(self.terms, self.degree)
+        return result.negated()
 
     def copy(self):
         return LazyInequality(self)
@@ -84,7 +92,8 @@ class PyInequality():
     Terms are stored in normalized form, i.e. negated literals but no
     negated coefficient. Variables are represented as ingtegers
     greater 0, the sign of the literal is stored in the sign of the
-    integer representing the variable, i.e. x ~ 2 then not x ~ -2.
+    integer representing the variable, i.e. x is represented as 2 then
+    (not x) is represented as (-2).
 
     For integers 0 <= x <= d the not x is defined as d - x. Note that
     a change in the upperbound invalidates the stored constraint.
@@ -178,6 +187,32 @@ class PyInequality():
         self.degree = self.degree * f
         return self
 
+    def resolve(self, other, resolvedVar):
+        # todo: clean up. this is ugly
+        # we do not know if we have a lazy inequality or not
+        other = Inequality(other.terms, other.degree)
+
+        if self.degree != 1 or other.degree != 1:
+            # todo: find a good implementation for this case
+            raise NotImplementedError("Resolution is currently only implemented for clausal constraints (degree = 1)")
+
+        resolvedVar = abs(resolvedVar)
+        mine   =  self.dict.get(resolvedVar, None)
+        theirs = other.dict.get(resolvedVar, None)
+
+        if mine is None:
+            return self
+        elif theirs is None:
+            return other
+        else:
+            if mine.coefficient != 1 or theirs.coefficient != 1:
+                raise NotImplementedError("Resolution is currently only implemented for clausal constraints (all coefficients must be 1)")
+
+            if mine.variable * theirs.variable >= 0:
+                raise NotImplementedError("Resolution is currently only implemented for clashing constraints (one must contain ~resolvedVar and the other resolvedVar)")
+
+            return self.add(other).saturate()
+
     def isContradiction(self):
         slack = -self.degree
         for term in self.terms:
@@ -186,22 +221,29 @@ class PyInequality():
 
     def implies(self, other):
         """
-        perform a syntactic implication check, i.e. coefficients of
-        self are <= coefficients of other and degree of self is larger
-        than degree of other
+        check if self semantically implies other
         """
 
+        weakenCost = 0
         for var, mine in self.dict.items():
             theirs = other.dict.get(var, Term(0, mine.variable))
             if mine.variable != theirs.variable:
-                return False
-            if mine.coefficient > theirs.coefficient:
-                return False
+                weakenCost += mine.coefficient
+            elif mine.coefficient > theirs.coefficient:
+                weakenCost += mine.coefficient - theirs.coefficient
 
-        if self.degree < other.degree:
+        if self.degree - weakenCost < other.degree:
             return False
+        else:
+            return True
 
-        return True
+    def negated(self):
+        self.degree = -self.degree + 1
+        for term in self.terms:
+            self.degree += term.coefficient
+            term.variable = -term.variable
+
+        return self
 
     def __eq__(self, other):
         # note that terms is assumed to be soreted
@@ -209,16 +251,19 @@ class PyInequality():
         return self.degree == other.degree \
             and sorted(self.terms, key = key) == sorted(other.terms, key = key)
 
-    def __str__(self):
+    def toOPB(self):
         def term2str(term):
             if term.variable < 0:
-                return "%+i~x%i"%(term.coefficient, -term.variable)
+                return "%+i ~x%i"%(term.coefficient, -term.variable)
             else:
-                return "%+ix%i"%(term.coefficient, term.variable)
+                return "%+i x%i"%(term.coefficient, term.variable)
 
         return " ".join(
             map(term2str, self.terms)) + \
             " >= %i" % self.degree
+
+    def __str__(self):
+        return self.toOPB()
 
     def __repr__(self):
         return str(self)

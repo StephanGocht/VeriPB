@@ -8,6 +8,7 @@ from refpy import run, InvalidProof, ParseError
 class TestIntegration(unittest.TestCase):
     def run_single(self, formulaPath):
         proofPath = formulaPath.with_suffix(".proof")
+        print("refpy %s %s"%(formulaPath, proofPath))
         with formulaPath.open() as formula:
             with proofPath.open() as proof:
                 run(formula, proof)
@@ -36,21 +37,25 @@ def create(formulaPath, helper):
         helper(self, formulaPath)
     return fun
 
-current = Path(__file__).parent
+def findProblems(globExpression):
+    current = Path(__file__).parent
+    files = current.glob(globExpression)
+    files = [f for f in files if f.suffix in [".cnf",".opb"] and f.is_file()]
+    return files
 
-correct = current.glob("integration_tests/correct/**/*.opb")
+correct = findProblems("integration_tests/correct/**/*.*")
 for file in correct:
     method = create(file, TestIntegration.correct_proof)
     method.__name__ = "test_correct_%s"%(file.stem)
     setattr(TestIntegration, method.__name__, method)
 
-incorrect = current.glob("integration_tests/incorrect/**/*.opb")
+incorrect = findProblems("integration_tests/incorrect/**/*.*")
 for file in incorrect:
     method = create(file, TestIntegration.incorrect_proof)
     method.__name__ = "test_incorrect_%s"%(file.stem)
     setattr(TestIntegration, method.__name__, method)
 
-parsing_failure = current.glob("integration_tests/parsing_failure/**/*.opb")
+parsing_failure = findProblems("integration_tests/parsing_failure/**/*.*")
 for file in parsing_failure:
     method = create(file, TestIntegration.parsing_failure)
     method.__name__ = "test_fail_parsing_%s"%(file.stem)

@@ -44,6 +44,7 @@ TLDR;
     c [which] 0
     e [which] opb [OPB style constraint]
     i [which] opb [OPB style constraint]
+    j [which] opb [OPB style constraint]
 
 Introduction
 ----
@@ -166,6 +167,12 @@ for coefficients a_i (b_i) of C (D) it holds that a_i <= b_i. The
 current implementation requires the literals in both constraints to
 have the same sign.
 
+(j) implies and add
+---
+
+Identical to (i)mplies but also adds the constraint that is implied to
+the database
+
 reverse (p)olish notation
 ----
 
@@ -203,6 +210,15 @@ operand.
 Where [constraint] is either a ConstraintId or a subsequence in
 reverse polish notation.
 
+* Resolve Maybe::
+
+    [constraint1] [constraint2] [variable] r
+
+Try to resolve [constraint1] and [constrain2] over [variable]
+(requires the constraints to be clausal (degree 1 an only coefficents
+1). If one of the constraints does not contain [variable] than this
+constraint is returned.
+
 This allows to write down any treelike refutation with a single rule.
 
 For example::
@@ -212,6 +228,42 @@ For example::
 Creates a new constraint by taking 3 times the constraint with index
 42, then adds constraint 43, followed by a saturation step and a
 division by 2.
+
+reverse (u)nit propagation <experimental>
+----
+
+::
+
+    u opb [OPB style constraint]
+
+    u cnf [DIMACS style clause]
+
+Use reverse unit propagation to check if the constraint is implied,
+i.e. it assumes that the negation of the constraint and all other
+active constraints in the database and and passes if this yields
+contradiction by unit propagation.
+
+If the constraint is implied it is added to the database. Otherwise,
+verification fails.
+
+Using this rule currently currently requires
+`roundingsat<https://github.com/elffersj/roundingsat>`_ to be
+available in the PATH environment. Alternatively you can use the bash
+command ``alias roundingsat=[path/to/roundingsat/binary]`` to
+configure the path to the roundingsat binary.
+
+(w)ithdraw constraint
+----
+
+::
+
+    w [constraintId1] [constraintId2] [constraintId3] ... 0
+
+Delete constraints with given constrain ids. They can no longer be
+used after deletion and verification fails if they are accessed after
+deletion.
+
+Note that this rule is not compatible with the DRAT deletion rule.
 
 Example
 ----

@@ -2,6 +2,8 @@ import refpy.constraints
 from refpy.constraints import Term
 from refpy.constraints import defaultFactory as ineqFactory
 
+from refpy.pbsolver import RoundingSat, Formula
+
 import parsy
 
 from refpy import InvalidProof
@@ -89,6 +91,12 @@ class Rule():
     def isGoal(self):
         return False
 
+    def deleteConstraints(self):
+        """
+        Return a list of constraintId's that can be removed from the database
+        """
+        return []
+
     def __str__(self):
         return type(self).__name__
 
@@ -108,6 +116,94 @@ class EqualityCheckFailed(InvalidProof):
     def __init__(self, expected, got):
         self.expected = expected
         self.got = got
+
+class ReverseUnitPropagationFailed(InvalidProof):
+    pass
+
+@register_rule
+class DeleteConstraints(Rule):
+    Id = "w" #(w)ithdraw
+
+    @classmethod
+    def getParser(cls):
+        def f(toDelete):
+            return cls.fromParsy(toDelete)
+
+        space = parsy.regex(" +").desc("space")
+        constraintId = parsy.regex(r"[1-9][0-9]*").map(int).desc("constraintId")
+        zero  = parsy.regex("0").desc("0 to end number sequence")
+
+        parser = space.optional() >> (constraintId << space).many() << zero
+
+        return parser.map(f)
+
+    @classmethod
+    def fromParsy(cls, toDelete):
+        return cls(toDelete)
+
+    def __init__(self, toDelete):
+        self.toDelete = toDelete
+
+    def compute(self, antecedents):
+        return []
+
+    def numConstraints(self):
+        return 0
+
+    def antecedentIDs(self):
+        return []
+
+    def isGoal(self):
+        return False
+
+    def deleteConstraints(self):
+        return self.toDelete
+
+@register_rule
+class ReverseUnitPropagation(Rule):
+    Id = "u"
+    solverClass = RoundingSat
+
+    @classmethod
+    def getParser(cls):
+        def f(constraint):
+            return cls.fromParsy(constraint)
+
+        space = parsy.regex(" +").desc("space")
+
+        opb = space.optional() >> parsy.regex(r"opb") \
+                >> space >> Inequality.getOPBParser(allowEq = False)
+        cnf = space.optional() >> parsy.regex(r"cnf") \
+                >> space >> Inequality.getCNFParser()
+
+        return (opb | cnf).map(f)
+
+    @classmethod
+    def fromParsy(cls, constraint):
+        return cls(constraint[0])
+
+    def __init__(self, constraint):
+        self.constraint = constraint
+
+    def numConstraints(self):
+        return 1
+
+    def antecedentIDs(self):
+        return "all"
+
+    def __eq__(self, other):
+        return self.constraint == other.constraint
+
+    def isGoal(self):
+        return False
+
+    def compute(self, antecedents):
+        solver = self.solverClass()
+
+        if solver.propagatesToConflict(Formula(antecedents + [self.constraint.copy().negated()])):
+            return [self.constraint]
+        else:
+            raise ReverseUnitPropagationFailed("Failed to show '%s' by reverse unit propagation."%(str(self.constraint)))
 
 class CompareToConstraint(Rule):
     @classmethod
@@ -168,6 +264,18 @@ class ConstraintImplies(CompareToConstraint):
     def compute(self, antecedents):
         if not antecedents[0].implies(self.constraint):
             raise ImpliesCheckFailed(self.constraint, antecedents[0])
+
+@register_rule
+class ConstraintImpliesGetImplied(ConstraintImplies):
+    Id = "j"
+
+    def compute(self, antecedents):
+        super().compute(antecedents)
+        return [self.constraint]
+
+    def numConstraints(self):
+        return 1
+
 
 class ContradictionCheckFailed(InvalidProof):
     pass
@@ -377,6 +485,8 @@ class ReversePolishNotation(Rule):
                 stackSize += 1
             elif thing in ["+", "*", "d"]:
                 stackSize -= 1
+            elif thing == "r":
+                stackSize -= 2
             elif thing == "s":
                 stackSize += 0
 
@@ -397,7 +507,7 @@ class ReversePolishNotation(Rule):
 
         space = parsy.regex(r" +").desc("space")
         number = parsy.regex(r"[0-9]+").map(int).desc("number")
-        operator = parsy.regex(r"[+*ds]").desc("operator +,*,d,s")
+        operator = parsy.regex(r"[+*dsr]").desc("operator +,*,d,s,r")
 
         return (space.optional() >> (number | operator).bind(check)).many().bind(finalCheck) \
             << space << parsy.regex(r"0").desc("0 to terminate sequence").optional()
@@ -407,7 +517,7 @@ class ReversePolishNotation(Rule):
     @fallback_on_error
     def parse(cls, line):
         def f(word):
-            if word in ["+", "*", "d", "s"]:
+            if word in ["+", "*", "d", "s", "r"]:
                 return word
             else:
                 return int(word)
@@ -430,7 +540,7 @@ class ReversePolishNotation(Rule):
                 current = next(self.instructions)
                 if isinstance(current, int):
                     return current
-                if current in ["*", "d"]:
+                if current in ["*", "d", "r"]:
                     # consume one more, remember that we swaped the right operand and operator
                     next(self.instructions)
 
@@ -440,7 +550,7 @@ class ReversePolishNotation(Rule):
             # needs to be a constant and not a constraint, so we (can) switch
             # positions, which makes it easier to distinguish constraints from
             # constants later on
-            if x in ["*", "d"]:
+            if x in ["*", "d", "r"]:
                 instructions[i] = instructions[i - 1]
                 instructions[i - 1] = x
 
@@ -467,6 +577,11 @@ class ReversePolishNotation(Rule):
                 constraint = stack.pop()
                 divisor = next(it)
                 stack.append(constraint.divide(divisor))
+            elif ins == "r":
+                second = stack.pop()
+                first = stack.pop()
+                resolvedVar = next(it)
+                stack.append(first.resolve(second, resolvedVar))
             elif ins == "s":
                 constraint = stack.pop()
                 stack.append(constraint.saturate())

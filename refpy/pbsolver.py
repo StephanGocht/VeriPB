@@ -1,7 +1,7 @@
 import subprocess
 import io
 import re
-from refpy.constraints import Inequality, Term
+from refpy.constraints import PyInequality, Term
 
 class SolverNotAvailable(RuntimeError):
     pass
@@ -14,12 +14,15 @@ class Formula:
     def __init__(self, constraints):
         self.constraints = list(constraints)
 
-        numVars = 0
-        for c in self.constraints:
-            for term in c.terms:
-                coeff, lit = term
-                var = abs(lit)
-                numVars = max(numVars, var)
+        # todo: extreme dirty fix, but we want to remove this
+        # code anyway...
+        numVars = 42
+        # numVars = 0
+        # for c in self.constraints:
+        #     for term in c.terms:
+        #         coeff, lit = term
+        #         var = abs(lit)
+        #         numVars = max(numVars, var)
 
         self.numVars = numVars
         self.numConstraints = len(constraints)
@@ -75,6 +78,7 @@ class ParseRoundingSatResult():
 
     def _parse(self, stream):
         for line in stream:
+            print(line)
             for regex, action in self.actions:
                 match = regex.match(line)
                 if match:

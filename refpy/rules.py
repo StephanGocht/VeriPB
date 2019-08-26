@@ -172,9 +172,9 @@ class ReverseUnitPropagation(Rule):
         space = parsy.regex(" +").desc("space")
 
         opb = space.optional() >> parsy.regex(r"opb") \
-                >> space >> Inequality.getOPBParser(allowEq = False)
+                >> space >> ineqFactory.getOPBParser(allowEq = False)
         cnf = space.optional() >> parsy.regex(r"cnf") \
-                >> space >> Inequality.getCNFParser()
+                >> space >> ineqFactory.getCNFParser()
 
         return (opb | cnf).map(f)
 

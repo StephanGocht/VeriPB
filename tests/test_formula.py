@@ -3,13 +3,13 @@ import io
 
 from env import refpy
 from refpy.pbsolver import Formula
-from refpy.constraints import Inequality, Term
+from refpy.constraints import PyInequality, Term
 
-class TestInequality(unittest.TestCase):
+class TestFormula(unittest.TestCase):
     def test_toString(self):
         f = Formula(
-            [ Inequality([Term(2,-1)], 1)
-            , Inequality([Term(2, 2)], 2)
+            [ PyInequality([Term(2,-1)], 1)
+            , PyInequality([Term(2, 2)], 2)
             ]
         )
 
@@ -18,6 +18,6 @@ class TestInequality(unittest.TestCase):
 
         print(stream.getvalue())
         assert stream.getvalue() == \
-            "* #variable= 2 #constraint= 2\n" \
+            "* #variable= 42 #constraint= 2\n" \
             "+2 ~x1 >= 1;\n" \
             "+2 x2 >= 2;\n"

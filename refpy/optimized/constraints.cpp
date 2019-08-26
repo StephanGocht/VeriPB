@@ -283,7 +283,7 @@ public:
         std::stringstream s;
         for (auto term: this->toPairs()) {
             using namespace std;
-            s << term.first;
+            s << term.first << " ";
             if (term.second < 0) {
                 s << "~";
             }
@@ -294,7 +294,8 @@ public:
     }
 
     bool implies(Inequality* other) {
-        contract();
+        this->contract();
+        other->contract();
         std::unordered_map<int, std::pair<T, int>> lookup;
         auto otherPairs = other->toPairs();
         for (auto term:otherPairs) {
@@ -302,25 +303,36 @@ public:
             lookup.insert(make_pair(abs(term.second), term));
         }
 
+        T weakenCost = 0;
         for (auto mine:this->toPairs()) {
             using namespace std;
             int var = abs(mine.second);
 
             auto search = lookup.find(var);
             if (search == lookup.end()) {
-                return false;
+                weakenCost += mine.first;
             } else {
                 auto theirs = search->second;
                 if (mine.second != theirs.second) {
-                    return false;
-                }
-                if (mine.first > theirs.first) {
-                    return false;
+                    weakenCost += mine.first;
+                } else if (mine.first > theirs.first) {
+                    weakenCost += mine.first - theirs.first;
                 }
             }
         }
 
-        return true;
+        return this->degree - weakenCost >= other->degree;
+    }
+
+    Inequality* negated() {
+        this->contract();
+        this->degree = -this->degree + 1;
+        for (int i = 0; i < this->coeffs.size(); i++) {
+            this->degree += this->coeffs[i];
+            this->lits[i] *= -1;
+        }
+
+        return this;
     }
 
     Inequality* copy(){
@@ -381,8 +393,10 @@ int main(int argc, char const *argv[])
             .def("implies", &Inequality<int>::implies)
             .def("expand", &Inequality<int>::expand)
             .def("contract", &Inequality<int>::contract)
+            .def("negated", &Inequality<int>::negated)
             .def("__eq__", &Inequality<int>::eq)
             .def("__repr__", &Inequality<int>::repr)
+            .def("toOPB", &Inequality<int>::repr)
             .def("isContradiction", &Inequality<int>::isContradiction);
 
         py::add_ostream_redirect(m, "ostream_redirect");

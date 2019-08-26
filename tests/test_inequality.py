@@ -348,37 +348,38 @@ class TestInequality(unittest.TestCase):
         r = geq([(2,1), (1,3)], 2)
         assert r == i
 
-    def test_resolve_1(self):
-        a = clause([1, 2])
-        b = clause([-1, 3])
-        r = a.resolve(b, 1)
-
-        e = clause([2,3])
-
-    def test_resolve_2(self):
-        a = clause([1, 2])
-        b = clause([3])
-        r = a.resolve(b, 1)
-
-        e = clause([3])
-
-    def test_resolve_3(self):
-        a = clause([2])
-        b = clause([-1, 3])
-        r = a.resolve(b, 1)
-
-        e = clause([2])
-
-    def test_resolve_fail_1(self):
-        a = geq([(2,  1), (1, 2)], 1)
-        b = geq([(1, -1), (1, 2)], 1)
-
-        with self.assertRaises(NotImplementedError):
+    if not isinstance(ineqFactory, refpy.constraints.CppIneqFactory):
+        def test_resolve_1(self):
+            a = clause([1, 2])
+            b = clause([-1, 3])
             r = a.resolve(b, 1)
 
-    def test_resolve_fail_2(self):
-        a = geq([(1,  1), (1, 2)], 1)
-        b = geq([(1, -1), (1, 2)], 2)
+            e = clause([2,3])
 
-        with self.assertRaises(NotImplementedError):
+        def test_resolve_2(self):
+            a = clause([1, 2])
+            b = clause([3])
             r = a.resolve(b, 1)
+
+            e = clause([3])
+
+        def test_resolve_3(self):
+            a = clause([2])
+            b = clause([-1, 3])
+            r = a.resolve(b, 1)
+
+            e = clause([2])
+
+        def test_resolve_fail_1(self):
+            a = geq([(2,  1), (1, 2)], 1)
+            b = geq([(1, -1), (1, 2)], 1)
+
+            with self.assertRaises(NotImplementedError):
+                r = a.resolve(b, 1)
+
+        def test_resolve_fail_2(self):
+            a = geq([(1,  1), (1, 2)], 1)
+            b = geq([(1, -1), (1, 2)], 2)
+
+            with self.assertRaises(NotImplementedError):
+                r = a.resolve(b, 1)

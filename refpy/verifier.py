@@ -279,7 +279,7 @@ class Verifier():
                 assert numInRule is not None
                 line.constraint = self.execRule(rule, ruleNum, lineNum, numInRule)
                 if self.settings.trace:
-                    print("%i (rule %i): %s"%(lineNum, ruleNum, str(line.constraint)))
+                    print("%i (step %i): %s"%(lineNum, ruleNum, str(line.constraint)))
                 if rule.isGoal():
                     self.decreaseUse(line)
 

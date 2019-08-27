@@ -159,13 +159,13 @@ class DeleteConstraints(Rule):
     def deleteConstraints(self):
         return self.toDelete
 
-class RUPWrapper(Rule):
+class RUPWrapper():
     def __init__(self, propEngine):
         self.propEngine = propEngine
         self.Id = ReverseUnitPropagation.Id
 
-    def getParser(self):
-        return ReverseUnitPropagation.getParser(self.propEngine)
+    def parse(self, line):
+        return ReverseUnitPropagation.parse(line, self.propEngine)
 
 class ReverseUnitPropagation(Rule):
     Id = "u"
@@ -174,7 +174,7 @@ class ReverseUnitPropagation(Rule):
     @classmethod
     def getParser(cls, propEngine):
         def f(constraint):
-            return cls.fromParsy(constraint, propEngine)
+            return cls(constraint[0], propEngine)
 
         space = parsy.regex(" +").desc("space")
 
@@ -186,8 +186,8 @@ class ReverseUnitPropagation(Rule):
         return (opb | cnf).map(f)
 
     @classmethod
-    def fromParsy(cls, constraint):
-        return cls(constraint[0])
+    def parse(cls, line, propEngine):
+        return cls.getParser(propEngine).parse(line.rstrip())
 
     def __init__(self, constraint, propEngine):
         self.constraint = constraint
@@ -206,7 +206,10 @@ class ReverseUnitPropagation(Rule):
         return False
 
     def compute(self, antecedents):
-        self.propEngine.attachTmp(self.constraint.copy().negated());
+        assumption = self.constraint.copy().negated()
+        self.propEngine.attachTmp(assumption)
+        if (assumption.isContradiction()):
+            print("hai")
         success = self.propEngine.isConflicting()
         self.propEngine.reset()
 

@@ -295,7 +295,7 @@ class Verifier():
                     not self.settings.lazy:
                 assert numInRule is not None
                 line.constraint = self.execRule(rule, ruleNum, lineNum, numInRule)
-                self.propEngine.attach(line.constraint, True)
+                self.propEngine.attach(line.constraint)
                 if self.settings.trace:
                     print("%i (step %i): %s"%(lineNum, ruleNum, str(line.constraint)))
                 if rule.isGoal():

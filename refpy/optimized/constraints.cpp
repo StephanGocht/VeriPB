@@ -1,6 +1,6 @@
 /*
 <%
-cfg['compiler_args'] = ['-std=c++14', '-g', '-DPY_BINDINGS']
+cfg['compiler_args'] = ['-std=c++14', '-g', '-DPY_BINDINGS', '-O0']
 setup_pybind11(cfg)
 %>
 */
@@ -22,8 +22,29 @@ setup_pybind11(cfg)
 #include <unordered_map>
 #include <memory>
 #include <chrono>
-#include <cassert>
 #include <algorithm>
+
+#include <cstdlib>
+
+#undef assert
+#ifdef NDEBUG
+#define assert(x) ((void)sizeof(x))
+#else
+#define assert(x) ((void)(!(x) && assert_handler(#x, __FILE__, __LINE__)))
+#endif
+
+class assertion_error: public std::runtime_error {
+public:
+    assertion_error(const std::string& what_arg):
+        std::runtime_error(what_arg){}
+};
+
+bool assert_handler(std::string condition, std::string file, int line) {
+    std::stringstream s;
+    s << std::endl << file << ":" << line << " Assertion failed: '" << condition << "'";
+    throw assertion_error(s.str());
+    return false;
+}
 
 class Timer {
 private:
@@ -229,6 +250,7 @@ struct PropState {
 template<typename T>
 class PropEngine {
 private:
+    size_t nVars;
     std::vector<std::vector<Inequality<T>*>> wl;
     std::vector<Inequality<T>*>* watchlist;
     std::vector<int> trail;
@@ -239,10 +261,11 @@ private:
 public:
     Assignment assignment;
 
-    PropEngine(int nVars)
-        : wl(2 * nVars + 1)
-        , watchlist(wl.data() + nVars)
-        , assignment(nVars)
+    PropEngine(size_t _nVars)
+        : nVars(_nVars)
+        , wl(2 * _nVars + 1)
+        , watchlist(wl.data() + _nVars)
+        , assignment(_nVars)
     {
 
     }
@@ -258,7 +281,7 @@ public:
             std::vector<Inequality<T>*>& ws = watchlist[falsifiedLit];
             std::vector<Inequality<T>*> wsTmp;
             wsTmp.reserve(ws.size());
-            // std::swap(ws, wsTmp);
+            std::swap(ws, wsTmp);
 
             for (auto ineq:wsTmp) {
                 ineq->updateWatch(*this, falsifiedLit);
@@ -270,13 +293,18 @@ public:
         }
     }
 
-    void attach(Inequality<T>* ineq, bool permanent = true) {
+    void _attach(Inequality<T>* ineq, bool permanent = true) {
+        ineq->freeze(this->nVars);
         ineq->updateWatch(*this);
         propagate(permanent);
     }
 
+    void attach(Inequality<T>* ineq) {
+        _attach(ineq, true);
+    }
+
     void attachTmp(Inequality<T>* ineq) {
-        attach(ineq, false);
+        _attach(ineq, false);
     }
 
     void reset() {
@@ -310,7 +338,8 @@ private:
     std::vector<T> coeffs;
     std::vector<int> lits;
     int degree;
-    bool loaded;
+    bool loaded = false;
+    bool frozen = false;
     FatInequalityPtr<T> expanded;
 
     size_t watchSize = 0;
@@ -366,14 +395,23 @@ public:
         contract();
     }
 
+    void freeze(size_t numVars) {
+        contract();
+        for (int lit: this->lits) {
+            assert(std::abs(lit) <= numVars);
+        }
+        frozen = true;
+    }
+
     void updateWatch(PropEngine<T>& prop, int falsifiedLit = 0) {
+        if (this->lits.size() != this->coeffs.size()) abort();
+        assert(this->lits.size() == this->coeffs.size());
         bool init = false;
         if (watchSize == 0) {
             init = true;
             computeWatchSize();
         }
 
-        this->contract();
         T slack = -this->degree;
 
         size_t j = this->watchSize;
@@ -411,15 +449,13 @@ public:
                     && value[this->lits[i]] == State::Unassigned)
                 {
                     prop.propagate(this->lits[i]);
-                } else {
-                    assert(this->coeffs[i] <= slack
-                        || value[this->lits[i]] == State::True);
                 }
             }
         }
     }
 
     Inequality* saturate(){
+        assert(!frozen);
         Timer t(addTimer);
         contract();
         for (T& coeff: coeffs) {
@@ -430,6 +466,7 @@ public:
     }
 
     Inequality* divide(T divisor){
+        assert(!frozen);
         Timer t(addTimer);
         contract();
         this->degree = divideAndRoundUp(this->degree, divisor);
@@ -440,6 +477,7 @@ public:
     }
 
     Inequality* multiply(T factor){
+        assert(!frozen);
         Timer t(addTimer);
         contract();
         this->degree *= factor;
@@ -450,6 +488,7 @@ public:
     }
 
     Inequality* add(Inequality* other){
+        assert(!frozen);
         Timer t(addTimer);
         expand();
         expanded->add(other->coeffs, other->lits, other->degree);
@@ -457,6 +496,7 @@ public:
     }
 
     void expand() {
+        assert(!frozen);
         if (!loaded) {
             loaded = true;
             if (pool.size() > 0) {
@@ -546,6 +586,7 @@ public:
     }
 
     Inequality* negated() {
+        assert(!frozen);
         this->contract();
         this->degree = -this->degree + 1;
         for (size_t i = 0; i < this->coeffs.size(); i++) {
@@ -553,6 +594,7 @@ public:
             this->lits[i] *= -1;
         }
 
+        assert(this->coeffs.size() == this->lits.size());
         return this;
     }
 

@@ -258,8 +258,8 @@ private:
     PropState base;
 
 public:
-    Assignment assignment;
     std::vector<Inequality<T>*>* watchlist;
+    Assignment assignment;
 
     PropEngine(size_t _nVars)
         : nVars(_nVars)
@@ -303,6 +303,10 @@ public:
 
     void attach(Inequality<T>* ineq) {
         _attach(ineq, true);
+    }
+
+    void detach(Inequality<T>* ineq) {
+        ineq->clearWatches(*this);
     }
 
     bool attachTmp(Inequality<T>* ineq) {
@@ -652,6 +656,8 @@ int main(int argc, char const *argv[])
 }
 
 
+
+
 #ifdef PY_BINDINGS
     PYBIND11_MODULE(constraints, m){
         m.doc() = "Efficient implementation for linear combinations of constraints.";
@@ -669,6 +675,7 @@ int main(int argc, char const *argv[])
         py::class_<PropEngine<int>>(m, "PropEngine")
             .def(py::init<int>())
             .def("attach", &PropEngine<int>::attach)
+            .def("detach", &PropEngine<int>::detach)
             .def("attachTmp", &PropEngine<int>::attachTmp)
             .def("reset", &PropEngine<int>::reset);
 

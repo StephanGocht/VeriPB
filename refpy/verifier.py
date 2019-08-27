@@ -13,6 +13,8 @@ Stats = structclass("Stats", "size space maxUsed")
 class DummyPropEngine():
     def attach(self, ineq):
         pass
+    def detach(self, ineq):
+        pass
     def attachTmp(self):
         raise RuntimeError()
     def isConflicting(self):
@@ -81,7 +83,7 @@ class Verifier():
         def defaults():
             return {
                 "isInvariantsOn": False,
-                "disableDeletion": True,
+                "disableDeletion": False,
                 "lazy": True,
                 "trace": False,
             }
@@ -237,6 +239,8 @@ class Verifier():
         if line.numUsed == 0:
             # free space of constraints that are no longer used
             if not self.settings.disableDeletion:
+                self.propEngine.detach(line.constraint)
+
                 line.constraint = None
 
     def execRule(self, rule, ruleNum, lineNum, numInRule = None):

@@ -81,7 +81,7 @@ class Verifier():
         def defaults():
             return {
                 "isInvariantsOn": False,
-                "disableDeletion": False,
+                "disableDeletion": True,
                 "lazy": True,
                 "trace": False,
             }
@@ -237,9 +237,7 @@ class Verifier():
         if line.numUsed == 0:
             # free space of constraints that are no longer used
             if not self.settings.disableDeletion:
-                # todo reenable deletion
-                # line.constraint = None
-                pass
+                line.constraint = None
 
     def execRule(self, rule, ruleNum, lineNum, numInRule = None):
         assert rule is not None

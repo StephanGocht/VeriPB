@@ -207,13 +207,9 @@ class ReverseUnitPropagation(Rule):
 
     def compute(self, antecedents):
         assumption = self.constraint.copy().negated()
-        self.propEngine.attachTmp(assumption)
-        if (assumption.isContradiction()):
-            print("hai")
-        success = self.propEngine.isConflicting()
-        self.propEngine.reset()
+        conflicting = self.propEngine.attachTmp(assumption)
 
-        if success:
+        if conflicting:
             return [self.constraint]
         else:
             raise ReverseUnitPropagationFailed("Failed to show '%s' by reverse unit propagation."%(str(self.constraint)))

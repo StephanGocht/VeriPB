@@ -252,7 +252,6 @@ class PropEngine {
 private:
     size_t nVars;
     std::vector<std::vector<Inequality<T>*>> wl;
-    std::vector<Inequality<T>*>* watchlist;
     std::vector<int> trail;
 
     PropState current;
@@ -260,6 +259,7 @@ private:
 
 public:
     Assignment assignment;
+    std::vector<Inequality<T>*>* watchlist;
 
     PropEngine(size_t _nVars)
         : nVars(_nVars)
@@ -284,7 +284,9 @@ public:
             std::swap(ws, wsTmp);
 
             for (auto ineq:wsTmp) {
-                ineq->updateWatch(*this, falsifiedLit);
+                if (ineq != nullptr) {
+                    ineq->updateWatch(*this, falsifiedLit);
+                }
             }
             current.qhead += 1;
         }
@@ -303,8 +305,12 @@ public:
         _attach(ineq, true);
     }
 
-    void attachTmp(Inequality<T>* ineq) {
+    bool attachTmp(Inequality<T>* ineq) {
         _attach(ineq, false);
+        bool result = isConflicting();
+        reset();
+        ineq->clearWatches(*this);
+        return result;
     }
 
     void reset() {
@@ -401,6 +407,16 @@ public:
             assert(std::abs(lit) <= numVars);
         }
         frozen = true;
+    }
+
+    void clearWatches(PropEngine<T>& prop) {
+        for (int lit: this->lits) {
+            for (auto& ineq: prop.watchlist[lit]) {
+                if (ineq == this) {
+                    ineq = nullptr;
+                }
+            }
+        }
     }
 
     void updateWatch(PropEngine<T>& prop, int falsifiedLit = 0) {
@@ -629,7 +645,7 @@ int main(int argc, char const *argv[])
     Inequality<int> baa({1,1,1},{-1,-1,-1},3);
     PropEngine<int> p(10);
     p.attach(&foo);
-    p.attach(&baa);
+    p.attachTmp(&baa);
 
     std::cout << foo.isContradiction() << std::endl;
     return 0;
@@ -654,7 +670,6 @@ int main(int argc, char const *argv[])
             .def(py::init<int>())
             .def("attach", &PropEngine<int>::attach)
             .def("attachTmp", &PropEngine<int>::attachTmp)
-            .def("isConflicting", &PropEngine<int>::isConflicting)
             .def("reset", &PropEngine<int>::reset);
 
 

@@ -10,6 +10,17 @@ import logging
 DBEntry = structclass("DBEntry","rule ruleNum constraint numUsed deleted")
 Stats = structclass("Stats", "size space maxUsed")
 
+class DummyPropEngine():
+    def attach(self, ineq):
+        pass
+    def attachTmp(self):
+        raise RuntimeError()
+    def isConflicting(self):
+        raise RuntimeError()
+    def reset(self):
+        raise RuntimeError()
+
+
 class Verifier():
     """
     Class to veryfi a complete proof.
@@ -126,11 +137,15 @@ class Verifier():
 
 
 
-    def __init__(self, settings = None):
+    def __init__(self, settings = None, propEngine = None):
         if settings is not None:
             self.settings = settings
         else:
             self.settings = Verifier.Settings()
+
+        if propEngine is None:
+            propEngine = DummyPropEngine()
+        self.propEngine = propEngine
 
     def __iter__(self):
         return Verifier.Iterator(self)
@@ -222,7 +237,9 @@ class Verifier():
         if line.numUsed == 0:
             # free space of constraints that are no longer used
             if not self.settings.disableDeletion:
-                line.constraint = None
+                # todo reenable deletion
+                # line.constraint = None
+                pass
 
     def execRule(self, rule, ruleNum, lineNum, numInRule = None):
         assert rule is not None
@@ -278,6 +295,7 @@ class Verifier():
                     not self.settings.lazy:
                 assert numInRule is not None
                 line.constraint = self.execRule(rule, ruleNum, lineNum, numInRule)
+                self.propEngine.attach(line.constraint, True)
                 if self.settings.trace:
                     print("%i (step %i): %s"%(lineNum, ruleNum, str(line.constraint)))
                 if rule.isGoal():

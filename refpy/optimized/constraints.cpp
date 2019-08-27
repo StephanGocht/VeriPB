@@ -5,6 +5,8 @@ setup_pybind11(cfg)
 %>
 */
 
+#undef NDEBUG
+
 #ifdef PY_BINDINGS
     #include <pybind11/pybind11.h>
     #include <pybind11/stl.h>
@@ -20,6 +22,8 @@ setup_pybind11(cfg)
 #include <unordered_map>
 #include <memory>
 #include <chrono>
+#include <cassert>
+#include <algorithm>
 
 class Timer {
 private:
@@ -169,7 +173,133 @@ bool orderByVar(std::pair<T, int> &a, std::pair<T, int> &b) {
 }
 
 template<typename T>
+bool orderByCoeff(std::pair<T, int> &a, std::pair<T, int> &b) {
+    return a.first < b.first;
+}
+
+template<typename T>
 using FatInequalityPtr = std::unique_ptr<FatInequality<T>>;
+
+
+
+enum class State {
+    False = 2, True = 3, Unassigned = 0
+};
+
+State operator!(State s) {
+    uint i = static_cast<uint>(s);
+    i = (i >> 1) ^ i;
+    // in case of unassigned (0b00) i >> 1 = 0b00 so nothing is flipped
+    // in case of false (0b10) or true (0b11) i >> 1 = 0b01 so the right
+    // most bit is flipped which changes true to false and vice versa
+    return static_cast<State>(i);
+}
+
+class Assignment {
+private:
+    std::vector<State> v;
+
+public:
+    State* value;
+
+    Assignment(int nVars)
+        : v(2 * nVars + 1)
+        , value(v.data() + nVars)
+    {}
+
+    void assign(int lit) {
+        value[lit] = State::True;
+        value[-lit] = State::False;
+    }
+
+    void unassign(int lit) {
+        value[lit] = State::Unassigned;
+        value[-lit] = State::Unassigned;
+    }
+};
+
+template<typename T>
+class Inequality;
+
+struct PropState {
+    size_t qhead = 0;
+    bool conflict = false;
+};
+
+template<typename T>
+class PropEngine {
+private:
+    std::vector<std::vector<Inequality<T>*>> wl;
+    std::vector<Inequality<T>*>* watchlist;
+    std::vector<int> trail;
+
+    PropState current;
+    PropState base;
+
+public:
+    Assignment assignment;
+
+    PropEngine(int nVars)
+        : wl(2 * nVars + 1)
+        , watchlist(wl.data() + nVars)
+        , assignment(nVars)
+    {
+
+    }
+
+    void propagate(int lit) {
+        assignment.assign(lit);
+        trail.push_back(lit);
+    }
+
+    void propagate(bool permanent = false) {
+        while (current.qhead < trail.size() and !current.conflict) {
+            int falsifiedLit = -trail[current.qhead];
+            std::vector<Inequality<T>*>& ws = watchlist[falsifiedLit];
+            std::vector<Inequality<T>*> wsTmp;
+            wsTmp.reserve(ws.size());
+            // std::swap(ws, wsTmp);
+
+            for (auto ineq:wsTmp) {
+                ineq->updateWatch(*this, falsifiedLit);
+            }
+            current.qhead += 1;
+        }
+        if (permanent) {
+            base = current;
+        }
+    }
+
+    void attach(Inequality<T>* ineq, bool permanent = true) {
+        ineq->updateWatch(*this);
+        propagate(permanent);
+    }
+
+    void attachTmp(Inequality<T>* ineq) {
+        attach(ineq, false);
+    }
+
+    void reset() {
+        while (trail.size() > base.qhead) {
+            assignment.unassign(trail.back());
+            trail.pop_back();
+        }
+        current = base;
+    }
+
+    bool isConflicting(){
+        return current.conflict;
+    }
+
+    void conflict() {
+        current.conflict = true;
+    }
+
+    void watch(int lit, Inequality<T>* ineq) {
+        watchlist[lit].push_back(ineq);
+    }
+
+};
 
 /**
  * stores constraint in (literal) normalized form
@@ -183,7 +313,45 @@ private:
     bool loaded;
     FatInequalityPtr<T> expanded;
 
+    size_t watchSize = 0;
+
     static std::vector<FatInequalityPtr<T>> pool;
+
+    void computeWatchSize() {
+        if (coeffs.size() == 0) {
+            return;
+        }
+
+        // improve: that is just lazy... we probably want to have
+        // pair<T, int> in general.
+        auto data = this->toPairs();
+        sort(data.begin(), data.end(), orderByCoeff<T>);
+
+        size_t i = 0;
+        for (auto pair: data) {
+            this->coeffs[i] = pair.first;
+            this->lits[i]  = pair.second;
+            i++;
+        }
+
+        // we propagate lit[i] if slack < coeff[i] so we
+        // need to make sure that if no watch is falsified we
+        // have always slack() >= maxCoeff
+        T maxCoeff = coeffs.back();
+        T value = -this->degree;
+
+        i = 0;
+        for (; i < coeffs.size(); i++) {
+            assert(coeffs[i] <= maxCoeff);
+            value += coeffs[i];
+            if (value >= maxCoeff) {
+                i++;
+                break;
+            }
+        }
+
+        watchSize = i;
+    }
 
 public:
     Inequality(std::vector<int>&& coeffs_, std::vector<int>&& lits_, int degree_):
@@ -196,6 +364,59 @@ public:
 
     ~Inequality(){
         contract();
+    }
+
+    void updateWatch(PropEngine<T>& prop, int falsifiedLit = 0) {
+        bool init = false;
+        if (watchSize == 0) {
+            init = true;
+            computeWatchSize();
+        }
+
+        this->contract();
+        T slack = -this->degree;
+
+        size_t j = this->watchSize;
+
+        auto& value = prop.assignment.value;
+
+        for (size_t i = 0; i < this->watchSize; i++) {
+            if (value[this->lits[i]] == State::False) {
+                for (;j < this->lits.size(); j++) {
+                    if (value[this->lits[j]] != State::False) {
+                        using namespace std;
+                        swap(this->lits[i], this->lits[j]);
+                        swap(this->coeffs[i], this->coeffs[j]);
+                        prop.watch(this->lits[i], this);
+                        j++;
+                        break;
+                    }
+                }
+            }
+
+            if (value[this->lits[i]] != State::False) {
+                slack += this->coeffs[i];
+            }
+            if (init || this->lits[i] == falsifiedLit) {
+                // we could not swap out watcher, renew watch
+                prop.watch(this->lits[i], this);
+            }
+        }
+
+        if (slack < 0) {
+            prop.conflict();
+        } else {
+            for (size_t i = 0; i < this->watchSize; i++) {
+                if (this->coeffs[i] > slack
+                    && value[this->lits[i]] == State::Unassigned)
+                {
+                    prop.propagate(this->lits[i]);
+                } else {
+                    assert(this->coeffs[i] <= slack
+                        || value[this->lits[i]] == State::True);
+                }
+            }
+        }
     }
 
     Inequality* saturate(){
@@ -327,7 +548,7 @@ public:
     Inequality* negated() {
         this->contract();
         this->degree = -this->degree + 1;
-        for (int i = 0; i < this->coeffs.size(); i++) {
+        for (size_t i = 0; i < this->coeffs.size(); i++) {
             this->degree += this->coeffs[i];
             this->lits[i] *= -1;
         }
@@ -362,7 +583,12 @@ std::vector<FatInequalityPtr<T>> Inequality<T>::pool;
 int main(int argc, char const *argv[])
 {
     /* code */
-    Inequality<int> foo({},{},1);
+    Inequality<int> foo({1,1,1},{1,1,1},1);
+    Inequality<int> baa({1,1,1},{-1,-1,-1},3);
+    PropEngine<int> p(10);
+    p.attach(&foo);
+    p.attach(&baa);
+
     std::cout << foo.isContradiction() << std::endl;
     return 0;
 }
@@ -381,6 +607,14 @@ int main(int argc, char const *argv[])
                     // std::cout << "add run " << addTimer.count() << "s" << std::endl;
                     delete static_cast<py::scoped_ostream_redirect *>(sor);
                 });
+
+        py::class_<PropEngine<int>>(m, "PropEngine")
+            .def(py::init<int>())
+            .def("attach", &PropEngine<int>::attach)
+            .def("attachTmp", &PropEngine<int>::attachTmp)
+            .def("isConflicting", &PropEngine<int>::isConflicting)
+            .def("reset", &PropEngine<int>::reset);
+
 
         py::class_<Inequality<int>>(m, "CppInequality")
             .def(py::init<std::vector<int>&&, std::vector<int>&&, int>())

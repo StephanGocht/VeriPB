@@ -159,15 +159,22 @@ class DeleteConstraints(Rule):
     def deleteConstraints(self):
         return self.toDelete
 
-@register_rule
+class RUPWrapper(Rule):
+    def __init__(self, propEngine):
+        self.propEngine = propEngine
+        self.Id = ReverseUnitPropagation.Id
+
+    def getParser(self):
+        return ReverseUnitPropagation.getParser(self.propEngine)
+
 class ReverseUnitPropagation(Rule):
     Id = "u"
     solverClass = RoundingSat
 
     @classmethod
-    def getParser(cls):
+    def getParser(cls, propEngine):
         def f(constraint):
-            return cls.fromParsy(constraint)
+            return cls.fromParsy(constraint, propEngine)
 
         space = parsy.regex(" +").desc("space")
 
@@ -182,8 +189,9 @@ class ReverseUnitPropagation(Rule):
     def fromParsy(cls, constraint):
         return cls(constraint[0])
 
-    def __init__(self, constraint):
+    def __init__(self, constraint, propEngine):
         self.constraint = constraint
+        self.propEngine = propEngine
 
     def numConstraints(self):
         return 1
@@ -198,9 +206,11 @@ class ReverseUnitPropagation(Rule):
         return False
 
     def compute(self, antecedents):
-        solver = self.solverClass()
+        self.propEngine.attachTmp(self.constraint.copy().negated());
+        success = self.propEngine.isConflicting()
+        self.propEngine.reset()
 
-        if solver.propagatesToConflict(Formula(antecedents + [self.constraint.copy().negated()])):
+        if success:
             return [self.constraint]
         else:
             raise ReverseUnitPropagationFailed("Failed to show '%s' by reverse unit propagation."%(str(self.constraint)))

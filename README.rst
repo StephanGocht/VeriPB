@@ -2,9 +2,16 @@ refpy Refutations in Python
 ====
 
 refpy is a tool for verifying refutations (proofs of unsatisfiability)
-in python. A description of the proof file format follows.
+in python and c++. A description of the proof file format follows.
 
 Currently it only supports pseudo-Boolean refutations.
+
+WARNING
+=======
+The current version only uses fixed bitwdith integers and does not
+contain code for catching overflows. This means that trying to verify
+proofs that contain or result in large numbers lead to undefined
+behaviour.
 
 Installation
 ============

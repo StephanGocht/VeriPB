@@ -258,6 +258,7 @@ class ConstraintEquals(CompareToConstraint):
     Id = "e"
 
     def compute(self, antecedents):
+        antecedents = list(antecedents)
         if self.constraint != antecedents[0]:
             raise EqualityCheckFailed(self.constraint, antecedents[0])
 
@@ -271,6 +272,7 @@ class ConstraintImplies(CompareToConstraint):
     Id = "i"
 
     def compute(self, antecedents):
+        antecedents = list(antecedents)
         if not antecedents[0].implies(self.constraint):
             raise ImpliesCheckFailed(self.constraint, antecedents[0])
 
@@ -319,6 +321,7 @@ class IsContradiction(Rule):
         self.constraintId = constraintId
 
     def compute(self, antecedents):
+        antecedents = list(antecedents)
         if not antecedents[0].isContradiction():
             raise ContradictionCheckFailed()
 
@@ -566,6 +569,7 @@ class ReversePolishNotation(Rule):
         self.instructions = instructions
 
     def compute(self, antecedents):
+        antecedents = list(antecedents)
         stack = list()
         antecedentIt = iter(antecedents)
 

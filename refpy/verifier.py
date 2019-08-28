@@ -179,9 +179,7 @@ class Verifier():
 
         ids = rule.antecedentIDs()
         if ids == "all":
-            return [i for i,e in enumerate(self.db) if isActive(e)]
-        else:
-            ids = list(ids)
+            return (i for i,e in enumerate(self.db) if isActive(e))
         return ids
 
     def mapRulesToDB(self):
@@ -238,6 +236,7 @@ class Verifier():
             if line.numUsed == 1:
                 antecedents = self.antecedentIds(line.rule, line.ruleNum)
                 self.checkAccess(antecedents, line.ruleNum)
+                antecedents = self.antecedentIds(line.rule, line.ruleNum)
                 todo.extend(antecedents)
 
         self.state = Verifier.State.MARKED_LINES
@@ -254,31 +253,30 @@ class Verifier():
                 line.constraint = None
 
     def execRule(self, rule, ruleNum, lineNum, numInRule = None):
+        def get(otherLineNum):
+            constraint = self.db[otherLineNum].constraint
+            deleted = self.db[otherLineNum].deleted
+            if constraint is None:
+                if lineNum <= otherLineNum:
+                    raise InvalidProof("Rule %i is trying to access constraint "\
+                        "(constraintId %i), which is not derived, yet."%(ruleNum, otherLineNum))
+                elif deleted is not False and deleted < ruleNum:
+                    raise InvalidProof("Rule %i is trying to access constraint "\
+                        "(constraintId %i), that was marked as save to delete by rule %i."\
+                        %(ruleNum, otherLineNum, deleted))
+                else:
+                    # seeems like we did something wrong...
+                    raise RuntimeError("Rule %i tried to access constraint (constraintId %i) "\
+                        "that should be available, but is not."%(ruleNum, otherLineNum))
+
+            return constraint
+
         assert rule is not None
         if self._execCacheRule is not rule:
             # logging.info("running rule: %s" %(rule))
             self._execCacheRule = rule
             antecedentIDs = self.antecedentIds(rule, ruleNum)
-            antecedents = list()
-
-            for otherLineNum in antecedentIDs:
-                constraint = self.db[otherLineNum].constraint
-                deleted = self.db[otherLineNum].deleted
-                if constraint is None:
-                    if lineNum <= otherLineNum:
-                        raise InvalidProof("Rule %i is trying to access constraint "\
-                            "(constraintId %i), which is not derived, yet."%(ruleNum, otherLineNum))
-                    elif deleted is not False and deleted < ruleNum:
-                        raise InvalidProof("Rule %i is trying to access constraint "\
-                            "(constraintId %i), that was marked as save to delete by rule %i."\
-                            %(ruleNum, otherLineNum, deleted))
-                    else:
-                        # seeems like we did something wrong...
-                        raise RuntimeError("Rule %i tried to access constraint (constraintId %i) "\
-                            "that should be available, but is not."%(ruleNum, otherLineNum))
-
-                antecedents.append(constraint)
-
+            antecedents = (get(i) for i in antecedentIDs)
             self._execCache = rule.compute(antecedents)
 
         if numInRule is not None:

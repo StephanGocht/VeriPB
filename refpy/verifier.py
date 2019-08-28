@@ -5,7 +5,11 @@ from time import perf_counter
 from refpy import InvalidProof
 
 import logging
-# import cProfile
+
+profile = False
+
+if profile:
+    import cProfile
 
 DBEntry = structclass("DBEntry","rule ruleNum constraint numUsed deleted")
 Stats = structclass("Stats", "size space maxUsed")
@@ -83,10 +87,13 @@ class Verifier():
         def defaults():
             return {
                 "isInvariantsOn": False,
-                "disableDeletion": False,
-                "lazy": True,
+                "disableDeletion": True,
+                "lazy": False,
                 "trace": False,
             }
+
+        def computeNumUse(self):
+            return self.lazy or not self.disableDeletion
 
         @classmethod
         def addArgParser(cls, parser, name = "verifier"):
@@ -214,6 +221,8 @@ class Verifier():
                     "(constraintId %i) which is not (yet?) created."%(ruleNum, goal))
 
     def markUsed(self):
+        if not self.settings.computeNumUse():
+            return
 
         todo = list()
         for goals, ruleNum in self.goals:
@@ -234,13 +243,14 @@ class Verifier():
         self.state = Verifier.State.MARKED_LINES
 
     def decreaseUse(self, line):
+        if not self.settings.computeNumUse():
+            return
         line.numUsed -= 1
         assert line.numUsed >= 0
         if line.numUsed == 0:
             # free space of constraints that are no longer used
             if not self.settings.disableDeletion:
                 self.propEngine.detach(line.constraint)
-
                 line.constraint = None
 
     def execRule(self, rule, ruleNum, lineNum, numInRule = None):
@@ -272,7 +282,8 @@ class Verifier():
             self._execCache = rule.compute(antecedents)
 
         if numInRule is not None:
-            if self.db[lineNum].numUsed > 0:
+            if self.settings.computeNumUse() \
+                    and self.db[lineNum].numUsed > 0:
                 # only decrease others use if we are used our selfs
                 for i in self.antecedentIds(rule, ruleNum):
                     self.decreaseUse(self.db[i])
@@ -291,8 +302,11 @@ class Verifier():
             lineNum, line = line
             if line is None:
                 if rule.isGoal() or \
-                        self.settings.lazy == False:
+                        not self.settings.lazy:
                     self.execRule(rule, ruleNum, lineNum)
+                    if self.settings.trace:
+                        print("- (step %i)"%(ruleNum))
+
             elif line.numUsed > 0 or \
                     not self.settings.lazy:
                 assert numInRule is not None
@@ -303,6 +317,9 @@ class Verifier():
                 if rule.isGoal():
                     self.decreaseUse(line)
 
+            for i in rule.deleteConstraints():
+                self.propEngine.detach(db[i].constraint)
+                db[i].constraint = None
 
         self.state = Verifier.State.DONE
 
@@ -311,8 +328,9 @@ class Verifier():
             pass
 
     def __call__(self, rules):
-        # pr = cProfile.Profile()
-        # pr.enable()
+        if profile:
+            pr = cProfile.Profile()
+            pr.enable()
 
         self.init(rules)
         self.checkInvariants()
@@ -335,5 +353,6 @@ class Verifier():
         if not self.foundContradiction:
             logging.warn("The provided proof did not claim contradiction.")
 
-        # pr.disable()
-        # pr.print_stats()
+        if profile:
+            pr.disable()
+            pr.print_stats()

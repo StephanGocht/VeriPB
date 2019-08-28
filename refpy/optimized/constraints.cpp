@@ -306,7 +306,9 @@ public:
     }
 
     void detach(Inequality<T>* ineq) {
-        ineq->clearWatches(*this);
+        if (ineq != nullptr) {
+            ineq->clearWatches(*this);
+        }
     }
 
     bool attachTmp(Inequality<T>* ineq) {

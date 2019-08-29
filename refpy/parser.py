@@ -99,22 +99,22 @@ def getOPBConstraintParser(allowEq = True):
         else:
             return int(num)
 
-    space    = parsy.regex(r" +").desc("space").optional()
+    space    = parsy.regex(r" +").desc("space")
     coeff    = parsy.regex(r"[+-]?[0-9]+").map(int).desc("integer for the coefficient (make sure to not have spaces between the sign and the degree value)")
     variable = parsy.seq(parsy.regex(r"~").optional(), parsy.regex(r"x") >> parsy.regex(r"[1-9][0-9]*")).combine(lit2int).desc("variable in the form '~?x[1-9][0-9]*'")
-    term     = parsy.seq(space >> coeff, space >> variable).map(tuple)
+    term     = parsy.seq(coeff << space, variable << space).map(tuple)
 
     if allowEq:
-        equality = space >> parsy.regex(r"(=|>=)").desc("= or >=")
+        equality = parsy.regex(r"(=|>=)").desc("= or >=")
     else:
-        equality = space >> parsy.regex(r">=").desc(">=")
+        equality = parsy.regex(r">=").desc(">=")
 
     degree   = space >> parsy.regex(r"[+-]?[0-9]+").map(int).desc("integer for the degree")
 
     end      = parsy.regex(r";").desc("termination of rhs with ';'")
-    finish   = space >> end
+    finish   = space.optional() >> end
 
-    return parsy.seq(term.many(), equality, degree << finish).map(tuple)
+    return parsy.seq(space.optional() >> term.many(), equality, degree << finish).map(tuple)
 
 
 def flatten(constraintList):
@@ -124,28 +124,92 @@ def flatten(constraintList):
             result.append(c)
     return result
 
-def getOPBParser(ineqFactory = None):
-    if ineqFactory is None:
-        ineqFactory = refpy.constraints.defaultFactory
+class OPBParser():
+    def __init__(self, ineqFactory = None, allowEq = True):
+        if ineqFactory is None:
+            self.ineqFactory = refpy.constraints.defaultFactory
 
-    numVar = (parsy.regex(r" *#variable *= *") >> parsy.regex(r"[0-9]+")) \
-                    .map(int) \
-                    .desc("Number of variables in the form '#variable = [0-9]+'")
-    numC = (parsy.regex(r" *#constraint *= *") >> parsy.regex(r"[0-9]+")) \
-                    .map(int) \
-                    .desc("Number of constraints in the form '#constraint = [0-9]+'")
+        self.allowEq = allowEq
+        self.slowParser = self.ineqFactory.getOPBParser(allowEq)
 
-    eol = parsy.regex(" *\n").desc("return at end of line").many()
-    emptyLine = parsy.regex(r"(\s+)").desc("empty line")
-    commentLine = parsy.regex(r"(\s*\*.*)").desc("comment line starting with '*'")
-    header = (parsy.regex(r"\* ") >> parsy.seq(numVar, numC) << eol) \
-                    .desc("header line in form of '* #variable = [0-9]+ #constraint = [0-9]+'")
+    def parse(self, formulaFile):
+        numVar = (parsy.regex(r" *#variable *= *") >> parsy.regex(r"[0-9]+")) \
+                        .map(int) \
+                        .desc("Number of variables in the form '#variable = [0-9]+'")
+        numC = (parsy.regex(r" *#constraint *= *") >> parsy.regex(r"[0-9]+")) \
+                        .map(int) \
+                        .desc("Number of constraints in the form '#constraint = [0-9]+'")
 
-    nothing = (emptyLine << eol | commentLine << eol).map(lambda x: [])
+        eol = parsy.regex(" *\n").desc("return at end of line").many()
+        emptyLine = parsy.regex(r"(\s+)").desc("empty line")
+        commentLine = parsy.regex(r"(\s*\*.*)").desc("comment line starting with '*'")
+        header = (parsy.regex(r"\* ") >> parsy.seq(numVar, numC) << eol) \
+                        .desc("header line in form of '* #variable = [0-9]+ #constraint = [0-9]+'")
 
-    constraint = ineqFactory.getOPBParser() << eol
+        nothing = (emptyLine << eol | commentLine << eol).map(lambda x: [])
 
-    return parsy.seq(
-            header,
-            (nothing | constraint).many().map(flatten)
-        )
+        lines = iter(enumerate(formulaFile, start = 1))
+
+        lineNum, line = next(lines)
+        try:
+            numVar, numC = header.parse(line)
+        except parsy.ParseError as e:
+            raise ParseError(e, line = lineNum)
+
+        constraints = list()
+        for lineNum, line in lines:
+            line = line.rstrip()
+            try:
+                constraints.extend(self.parseLine(line))
+            except parsy.ParseError as e:
+                raise ParseError(e, line = lineNum)
+            except ValueError as e:
+                raise ParseError(e, line = lineNum)
+
+        return ((numVar, numC), constraints)
+
+    def parseLine(self, line):
+        try:
+            return self.parseLineQuick(line)
+        except ValueError as valueError:
+            try:
+                self.slowParser.parse(line)
+            except parsy.ParseError as e:
+                raise e
+            else:
+                # if the parsy parser can parse it we do not want to
+                # silenty work as this means that the parsy
+                # specification is not precise enough
+                raise valueError
+
+    def parseLineQuick(self, line):
+        def parseVar(s):
+            if s[0] == "x":
+                return int(s[1:])
+            elif s[0:2] == "~x":
+                return -int(s[2:])
+            else:
+                raise ValueError("expecting literal, got '%s'" % s)
+
+        if len(line) == 0 or line[0] == "*":
+            return []
+
+        terms = list()
+        it = iter(line.split())
+        nxt = next(it)
+        while (nxt not in [">=","="]):
+            terms.append((int(nxt), parseVar(next(it))))
+            nxt = next(it)
+
+        op = nxt
+        degree = next(it)
+        if degree[-1] == ";":
+            degree = degree[:-1]
+        degree = int(degree)
+
+        result = [self.ineqFactory.fromTerms(terms, degree)]
+        if op == "=":
+            if not self.allowEq:
+                return ValueError()
+            result.append(self.ineqFactory.fromTerms([(-a,l) for a,l in terms], -degree))
+        return result

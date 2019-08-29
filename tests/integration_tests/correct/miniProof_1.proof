@@ -1,11 +1,11 @@
 refutation using f d s c 0
 f 0
 s 1 3 1 4 0
-e 6 opb 1x1 +1x3 >= 1;
+e 6 opb 1 x1 +1 x3 >= 1;
 a 1 1 1 2 1 6 0
-e 7 opb +2x1 +2x2 +2x3 >= 3;
+e 7 opb +2 x1 +2 x2 +2 x3 >= 3;
 d 2 1 1 1 2 1 6 0
-e 8 opb 1x1 1x2 1x3 >= 2;
+e 8 opb 1 x1 1 x2 1 x3 >= 2;
 s 2 5 2 8 0
 e 9 opb >= 2;
 c 9 0

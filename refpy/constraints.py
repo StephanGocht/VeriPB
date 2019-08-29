@@ -277,7 +277,7 @@ CppInequality = optimized.CppInequality
 
 class IneqFactory():
     def fromTerms(self, terms, degree):
-        return PyInequality(terms, degree)
+        return PyInequality([Term(a,l) for a,l in terms], degree)
 
     def fromParsy(self, t):
         result = list()
@@ -308,7 +308,7 @@ class IneqFactory():
         return getCNFConstraintParser().bind(f)
 
 def terms2lists(terms):
-    return zip(*[(t.coefficient, t.variable) for t in terms]) \
+    return zip(*[(a,l) for a,l in terms]) \
         if len(terms) > 0 else ([],[])
 
 class CppIneqFactory(IneqFactory):

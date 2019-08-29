@@ -1,4 +1,4 @@
 refutation using f e u 0
 f 3 0
 u cnf 1 2 0
-e 4 opb 1x1 1x2 >= 1;
+e 4 opb 1 x1 1 x2 >= 1;

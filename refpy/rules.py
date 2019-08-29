@@ -34,7 +34,7 @@ def fallback_on_error(parse):
                     args = args[1:]
                 else:
                     line = kwargs["line"]
-                    del kwargs["cls"]
+                    del kwargs["line"]
 
                 cls.getParser(*args, **kwargs).parse(line)
             except parsy.ParseError as parseError:

@@ -5,7 +5,7 @@ import parsy
 from refpy import InvalidProof
 from refpy import ParseError
 from refpy.verifier import Verifier
-from refpy.parser import getOPBParser
+from refpy.parser import OPBParser
 from refpy.rules import registered_rules
 from refpy.rules import LoadFormulaWrapper, RUPWrapper
 from refpy.parser import RuleParser
@@ -18,11 +18,12 @@ def run(formulaFile, rulesFile, settings = None):
 
     start_parse = perf_counter()
     try:
-        formula = getOPBParser().parse(formulaFile.read())
+        formula = OPBParser().parse(formulaFile)
         numVars, numConstraints = formula[0]
         constraints = formula[1]
-    except parsy.ParseError as e:
-        raise ParseError(e, formulaFile.name)
+    except ParseError as e:
+        e.fileName = formulaFile.name
+        raise e
 
     propEngine = PropEngine(numVars)
 

@@ -12,11 +12,11 @@ class TestParsing():
         print(parser.parse(registered_rules, ["refutation using e 0"]))
 
     def test_OPB_line_1(self):
-        res = getOPBConstraintParser().parse("3x1 >= 2;")
+        res = getOPBConstraintParser().parse("3 x1 >= 2;")
         assert res == ([(3,1)], ">=", 2)
 
     def test_OPB_line_2(self):
-        res = getOPBConstraintParser().parse("-4x2 +2x1 = -42;")
+        res = getOPBConstraintParser().parse("-4 x2 +2 x1 = -42;")
         assert res == ([(-4,2),(2,1)], "=", -42)
 
     def test_CNF_line(self):
@@ -62,7 +62,7 @@ class TestCheckConstraintParsing():
 class TestInequalityParsing():
     def test_eq(self):
         parser = ineqFactory.getOPBParser()
-        result = parser.parse("1x2 -2x1 = 2;")
+        result = parser.parse("1 x2 -2 x1 = 2;")
 
         ineq1 = ineqFactory.fromTerms([Term(-2,1), Term(1,2)], 2)
         ineq2 = ineqFactory.fromTerms([Term(2,1), Term(-1,2)], -2)

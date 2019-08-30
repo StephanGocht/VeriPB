@@ -296,6 +296,9 @@ class ConstraintImpliesGetImplied(ConstraintImplies):
 class ContradictionCheckFailed(InvalidProof):
     pass
 
+class SolutionCheckFailed(InvalidProof):
+    pass
+
 @register_rule
 class Solution(Rule):
     Id = "v"
@@ -313,9 +316,9 @@ class Solution(Rule):
 
         return parser.map(f)
 
-    @fallback_on_error
     @classmethod
-    def parse(self, line):
+    @fallback_on_error
+    def parse(cls, line):
         result = list(map(int, line.split()))
         if result[-1] != 0:
             raise ValueError("Expected 0 at EOL")
@@ -324,13 +327,15 @@ class Solution(Rule):
     def __init__(self, partialAssignment):
         self.partialAssignment = partialAssignment
 
-    def compute(self, antecedents):
-        assert(False)
+    def compute(self, antecedents, propEngine):
+        if not propEngine.checkSat(self.partialAssignment):
+            raise SolutionCheckFailed()
+
         # implement check
         return [ineqFactory.fromTerms([Term(1, -lit) for lit in self.partialAssignment], 1)]
 
     def numConstraints(self):
-        return 0
+        return 1
 
     def antecedentIDs(self):
         return []

@@ -266,11 +266,15 @@ configure the path to the roundingsat binary.
 
     w [constraintId1] [constraintId2] [constraintId3] ... 0
 
-Delete constraints with given constrain ids. They can no longer be
-used after deletion and verification fails if they are accessed after
-deletion.
+Delete constraints with given constrain ids. They should longer be
+used after deletion and verification can fail if they are accessed
+after deletion. However, the verifier is not required to delete
+constraints. Especially, they might still be used during unit
+propagation. The goal of the current implementation of this rule is
+purely for performance benefits during verification.
 
-Note that this rule is not compatible with the DRAT deletion rule.
+Note that this rule has not the same syntax/ semantic as the DRAT
+deletion rule.
 
 Example
 ----
@@ -282,3 +286,17 @@ Example
     f 10 0              # IDs 11-20 now contain the formula constraints
     p 11 1 3 * + 42 d 0 # Take the first constraint from the formula,
                           weaken with 3 x_1 >= 0 and then divide by 42
+
+(v) solution
+---
+
+::
+
+    v [literal] [literal] ... 0
+
+Given a partial assignment in form of a list of ``[literal]``, i.e.
+negative integers, check that after unit propagation we are left with
+a full assignment that does not violate any constraint. If the check
+is successful then the clause consisting of the negation of all
+literals is added, i.e. the solution is ruled out. If the check is not
+successful then verification fails.

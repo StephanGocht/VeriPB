@@ -452,6 +452,36 @@ public:
         }
     }
 
+    bool checkSat(std::vector<int>& lits) {
+        for (int lit: lits) {
+            auto val = assignment.value[lit];
+
+            if (val == State::Unassigned) {
+                propagate(lit);
+            } else if (val == State::False) {
+                conflict();
+                break;
+            }
+        }
+
+        propagate();
+
+        bool success = false;
+        if (!current.conflict) {
+            success = true;
+            for (uint var = 1; var <= nVars; var++) {
+                auto val = assignment.value[var];
+                if (val == State::Unassigned) {
+                    success = false;
+                    break;
+                }
+            }
+        }
+
+        reset();
+        return success;
+    }
+
     void _attach(Inequality<T>* ineq, bool permanent = true) {
         ineq->freeze(this->nVars);
         ineq->updateWatch(*this);
@@ -759,7 +789,8 @@ int main(int argc, char const *argv[])
             .def("attach", &PropEngine<int>::attach)
             .def("detach", &PropEngine<int>::detach)
             .def("attachTmp", &PropEngine<int>::attachTmp)
-            .def("reset", &PropEngine<int>::reset);
+            .def("reset", &PropEngine<int>::reset)
+            .def("checkSat", &PropEngine<int>::checkSat);
 
 
         py::class_<Inequality<int>>(m, "CppInequality")

@@ -1,0 +1,6 @@
+refutation using f v 0
+f 1 0
+v 1 2 0
+v -1 0
+v -2 0
+u cnf 0

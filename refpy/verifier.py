@@ -272,7 +272,11 @@ class Verifier():
             self._execCacheRule = rule
             antecedentIDs = self.antecedentIds(rule, ruleNum)
             antecedents = (get(i) for i in antecedentIDs)
-            self._execCache = rule.compute(antecedents)
+            try:
+                self._execCache = rule.compute(antecedents)
+            except TypeError:
+                # todo, that feels like a hacky way of passing the propEngine
+                self._execCache = rule.compute(antecedents, self.propEngine)
 
         if numInRule is not None:
             if self.settings.computeNumUse() \

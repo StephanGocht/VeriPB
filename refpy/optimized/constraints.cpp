@@ -63,8 +63,6 @@ public:
     }
 };
 
-std::chrono::duration<double> addTimer;
-
 bool nonzero(std::vector<int> aList){
     for (auto &item: aList)
         if (item == 0)
@@ -294,7 +292,7 @@ private:
         T maxCoeff = terms[size() - 1].coeff;
         T value = -this->degree;
 
-        int i = 0;
+        size_t i = 0;
         for (; i < size(); i++) {
             assert(terms[i].coeff <= maxCoeff);
             value += terms[i].coeff;
@@ -541,7 +539,7 @@ public:
         contract();
 
         for (int lit: this->lits) {
-            assert(std::abs(lit) <= numVars);
+            assert(static_cast<uint>(std::abs(lit)) <= numVars);
         }
 
         size_t memSize = sizeof(FixedSizeInequality<T>) + lits.size() * sizeof(Term<T>);
@@ -566,7 +564,6 @@ public:
 
     Inequality* saturate(){
         assert(!frozen);
-        Timer t(addTimer);
         contract();
         for (T& coeff: coeffs) {
             using namespace std;
@@ -577,7 +574,6 @@ public:
 
     Inequality* divide(T divisor){
         assert(!frozen);
-        Timer t(addTimer);
         contract();
         this->degree = divideAndRoundUp(this->degree, divisor);
         for (T& coeff: coeffs) {
@@ -588,7 +584,6 @@ public:
 
     Inequality* multiply(T factor){
         assert(!frozen);
-        Timer t(addTimer);
         contract();
         this->degree *= factor;
         for (T& coeff: coeffs) {
@@ -599,7 +594,6 @@ public:
 
     Inequality* add(Inequality* other){
         assert(!frozen);
-        Timer t(addTimer);
         expand();
         expanded->add(other->coeffs, other->lits, other->degree);
         return this;
@@ -620,7 +614,6 @@ public:
     }
 
     void contract() {
-        Timer t(addTimer);
         if (loaded) {
             expanded->unload(coeffs, lits, degree);
             pool.push_back(std::move(expanded));
@@ -709,7 +702,6 @@ public:
     }
 
     Inequality* copy(){
-        Timer t(addTimer);
         contract();
         return new Inequality(
             std::vector<T>(coeffs),
@@ -757,7 +749,7 @@ int main(int argc, char const *argv[])
         m.attr("redirect_output") =
             py::capsule(
                 new py::scoped_ostream_redirect(),
-                [&addTimer](void *sor) {
+                [](void *sor) {
                     // std::cout << "add run " << addTimer.count() << "s" << std::endl;
                     delete static_cast<py::scoped_ostream_redirect *>(sor);
                 });

@@ -1,8 +1,8 @@
 import refpy.constraints
 from refpy.constraints import Term
 from refpy.constraints import defaultFactory as ineqFactory
-
 from refpy.pbsolver import RoundingSat, Formula
+from refpy.parser import OPBParser
 
 import parsy
 
@@ -187,6 +187,15 @@ class ReverseUnitPropagation(Rule):
 
     @classmethod
     def parse(cls, line, propEngine):
+        striped = line.strip()
+        if (line.strip()[:3]) == "opb":
+            try:
+                ineq = OPBParser(allowEq = False).parseLineQuick(striped[3:])
+            except ValueError as e:
+                pass
+            else:
+                return cls(ineq[0], propEngine)
+
         return cls.getParser(propEngine).parse(line.rstrip())
 
     def __init__(self, constraint, propEngine):

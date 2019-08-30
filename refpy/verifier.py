@@ -6,11 +6,6 @@ from refpy import InvalidProof
 
 import logging
 
-profile = False
-
-if profile:
-    import cProfile
-
 DBEntry = structclass("DBEntry","rule ruleNum constraint numUsed deleted")
 Stats = structclass("Stats", "size space maxUsed")
 
@@ -326,10 +321,6 @@ class Verifier():
             pass
 
     def __call__(self, rules):
-        if profile:
-            pr = cProfile.Profile()
-            pr.enable()
-
         self.init(rules)
         self.checkInvariants()
 
@@ -350,7 +341,3 @@ class Verifier():
 
         if not self.foundContradiction:
             logging.warn("The provided proof did not claim contradiction.")
-
-        if profile:
-            pr.disable()
-            pr.print_stats()

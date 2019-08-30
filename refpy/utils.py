@@ -13,7 +13,17 @@ from refpy.exceptions import ParseError
 from refpy.optimized.constraints import PropEngine
 from time import perf_counter
 
+profile = False
+
+if profile:
+    import cProfile
+
 def run(formulaFile, rulesFile, settings = None):
+    if profile:
+        pr = cProfile.Profile()
+        pr.enable()
+
+
     rules = list(registered_rules)
 
     start_parse = perf_counter()
@@ -39,6 +49,10 @@ def run(formulaFile, rulesFile, settings = None):
     logging.info("Parsing Time: %.2f" % (perf_counter() - start_parse))
     verify = Verifier(settings, propEngine)
     verify(rules)
+
+    if profile:
+        pr.disable()
+        pr.print_stats()
 
 def runUI(*args):
     try:

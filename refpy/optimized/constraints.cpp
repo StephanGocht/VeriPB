@@ -1,6 +1,6 @@
 /*
 <%
-cfg['compiler_args'] = ['-std=c++14', '-g', '-DPY_BINDINGS', '-O0']
+cfg['compiler_args'] = ['-std=c++14', '-g', '-DPY_BINDINGS']
 setup_pybind11(cfg)
 %>
 */

@@ -127,7 +127,7 @@ class DeleteConstraints(Rule):
     @classmethod
     def getParser(cls):
         def f(toDelete):
-            return cls.fromParsy(toDelete)
+            return cls(toDelete)
 
         space = parsy.regex(" +").desc("space")
         constraintId = parsy.regex(r"[1-9][0-9]*").map(int).desc("constraintId")
@@ -136,10 +136,6 @@ class DeleteConstraints(Rule):
         parser = space.optional() >> (constraintId << space).many() << zero
 
         return parser.map(f)
-
-    @classmethod
-    def fromParsy(cls, toDelete):
-        return cls(toDelete)
 
     def __init__(self, toDelete):
         self.toDelete = toDelete
@@ -299,6 +295,52 @@ class ConstraintImpliesGetImplied(ConstraintImplies):
 
 class ContradictionCheckFailed(InvalidProof):
     pass
+
+@register_rule
+class Solution(Rule):
+    Id = "v"
+
+    @classmethod
+    def getParser(cls):
+        def f(partialAssignment):
+            return cls(partialAssignment)
+
+        space = parsy.regex(" +").desc("space")
+        constraintId = parsy.regex(r"[+-]?[1-9][0-9]*").map(int).desc("literal")
+        zero  = parsy.regex("0").desc("0 to end number sequence")
+
+        parser = space.optional() >> (constraintId << space).many() << zero
+
+        return parser.map(f)
+
+    @fallback_on_error
+    @classmethod
+    def parse(self, line):
+        result = list(map(int, line.split()))
+        if result[-1] != 0:
+            raise ValueError("Expected 0 at EOL")
+        return cls([:-1])
+
+    def __init__(self, partialAssignment):
+        self.partialAssignment = partialAssignment
+
+    def compute(self, antecedents):
+        assert(False)
+        # implement check
+        return [ineqFactory.fromTerms([Term(1, -lit) for lit in self.partialAssignment], 1)]
+
+    def numConstraints(self):
+        return 0
+
+    def antecedentIDs(self):
+        return []
+
+    def isGoal(self):
+        return True
+
+    def deleteConstraints(self):
+        return []
+
 
 @register_rule
 class IsContradiction(Rule):

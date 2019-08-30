@@ -319,7 +319,7 @@ class Solution(Rule):
         result = list(map(int, line.split()))
         if result[-1] != 0:
             raise ValueError("Expected 0 at EOL")
-        return cls([:-1])
+        return cls(result[:-1])
 
     def __init__(self, partialAssignment):
         self.partialAssignment = partialAssignment

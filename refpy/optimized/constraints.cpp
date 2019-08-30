@@ -199,6 +199,11 @@ bool orderByCoeff(std::pair<T, int> &a, std::pair<T, int> &b) {
 }
 
 template<typename T>
+bool orderByCoeff2(T& a, T& b) {
+    return a.coeff < b.coeff;
+}
+
+template<typename T>
 using FatInequalityPtr = std::unique_ptr<FatInequality<T>>;
 
 
@@ -242,23 +247,171 @@ public:
 template<typename T>
 class Inequality;
 
+template<typename T>
+class PropEngine;
+
+template<typename T>
+struct Term {
+    T coeff;
+    int lit;
+};
+
+template<typename T>
+class FixedSizeInequality {
+private:
+    int _size;
+    size_t watchSize = 0;
+
+public:
+    T degree;
+    Term<T> terms[];
+
+private:
+    friend Inequality<T>;
+
+    FixedSizeInequality(std::vector<T>& coeffs, std::vector<int>& lits, T _degree)
+        : _size(coeffs.size())
+        , degree(_degree)
+    {
+        for (size_t i = 0; i < coeffs.size(); i++) {
+            terms[i].coeff = coeffs[i];
+            terms[i].lit = lits[i];
+        }
+    }
+
+    void computeWatchSize() {
+        if (size() == 0) {
+            return;
+        }
+
+        // improve: that is just lazy... we probably want to have
+        // pair<T, int> in general.
+        std::sort(begin(), end(), orderByCoeff2<Term<T>>);
+
+        // we propagate lit[i] if slack < coeff[i] so we
+        // need to make sure that if no watch is falsified we
+        // have always slack() >= maxCoeff
+        T maxCoeff = terms[size() - 1].coeff;
+        T value = -this->degree;
+
+        int i = 0;
+        for (; i < size(); i++) {
+            assert(terms[i].coeff <= maxCoeff);
+            value += terms[i].coeff;
+            if (value >= maxCoeff) {
+                i++;
+                break;
+            }
+        }
+
+        watchSize = i;
+    }
+
+
+public:
+    void clearWatches(PropEngine<T>& prop) {
+        for (Term<T>& term: *this) {
+            for (auto& ineq: prop.watchlist[term.lit]) {
+                if (ineq == this) {
+                    ineq = nullptr;
+                }
+            }
+        }
+    }
+
+    void updateWatch(PropEngine<T>& prop, int falsifiedLit = 0) {
+        bool init = false;
+        if (watchSize == 0) {
+            init = true;
+            computeWatchSize();
+        }
+
+        T slack = -this->degree;
+
+        size_t j = this->watchSize;
+
+        auto& value = prop.assignment.value;
+
+        for (size_t i = 0; i < this->watchSize; i++) {
+            if (value[terms[i].lit] == State::False) {
+                for (;j < size(); j++) {
+                    if (value[terms[j].lit] != State::False) {
+                        using namespace std;
+                        swap(terms[i], terms[j]);
+                        prop.watch(terms[i].lit, this);
+                        j++;
+                        break;
+                    }
+                }
+            }
+
+            if (value[terms[i].lit] != State::False) {
+                slack += terms[i].coeff;
+            }
+            if (init || terms[i].lit == falsifiedLit) {
+                // we could not swap out watcher, renew watch
+                prop.watch(terms[i].lit, this);
+            }
+        }
+
+        if (slack < 0) {
+            prop.conflict();
+        } else {
+            for (size_t i = 0; i < this->watchSize; i++) {
+                if (terms[i].coeff > slack
+                    && value[terms[i].lit] == State::Unassigned)
+                {
+                    prop.propagate(terms[i].lit);
+                }
+            }
+        }
+    }
+
+    size_t size() const {
+        return _size;
+    }
+
+    const Term<T>* begin() const {
+        return terms;
+    }
+
+    const Term<T>* end() const {
+        return terms + size();
+    }
+
+    Term<T>* begin() {
+        return terms;
+    }
+
+    Term<T>* end() {
+        return terms + size();
+    }
+};
+
 struct PropState {
     size_t qhead = 0;
     bool conflict = false;
 };
 
+
+// todo: can we type this with a template parameter?
+typedef FixedSizeInequality<int> WatchedType;
+
+typedef std::vector<WatchedType*> WatchList;
+
+
 template<typename T>
 class PropEngine {
 private:
     size_t nVars;
-    std::vector<std::vector<Inequality<T>*>> wl;
+    std::vector<WatchList> wl;
     std::vector<int> trail;
 
     PropState current;
     PropState base;
 
 public:
-    std::vector<Inequality<T>*>* watchlist;
+    WatchList* watchlist;
     Assignment assignment;
 
     PropEngine(size_t _nVars)
@@ -278,8 +431,8 @@ public:
     void propagate(bool permanent = false) {
         while (current.qhead < trail.size() and !current.conflict) {
             int falsifiedLit = -trail[current.qhead];
-            std::vector<Inequality<T>*>& ws = watchlist[falsifiedLit];
-            std::vector<Inequality<T>*> wsTmp;
+            WatchList& ws = watchlist[falsifiedLit];
+            WatchList wsTmp;
             wsTmp.reserve(ws.size());
             std::swap(ws, wsTmp);
 
@@ -335,14 +488,20 @@ public:
         current.conflict = true;
     }
 
-    void watch(int lit, Inequality<T>* ineq) {
+    void watch(int lit, WatchedType* ineq) {
         watchlist[lit].push_back(ineq);
     }
 
 };
 
+
 /**
  * stores constraint in (literal) normalized form
+ *
+ * The inequality can have three states: normal, expanded, frozen it
+ * switches automatically between normal and expanded as needed. Once
+ * the inequality is frozen it can not switch back and all operations
+ * that would modify the inequality are disallowed.
  */
 template<typename T>
 class Inequality {
@@ -353,46 +512,8 @@ private:
     bool loaded = false;
     bool frozen = false;
     FatInequalityPtr<T> expanded;
-
-    size_t watchSize = 0;
-
+    FixedSizeInequality<T>* fixedSize = nullptr;
     static std::vector<FatInequalityPtr<T>> pool;
-
-    void computeWatchSize() {
-        if (coeffs.size() == 0) {
-            return;
-        }
-
-        // improve: that is just lazy... we probably want to have
-        // pair<T, int> in general.
-        auto data = this->toPairs();
-        sort(data.begin(), data.end(), orderByCoeff<T>);
-
-        size_t i = 0;
-        for (auto pair: data) {
-            this->coeffs[i] = pair.first;
-            this->lits[i]  = pair.second;
-            i++;
-        }
-
-        // we propagate lit[i] if slack < coeff[i] so we
-        // need to make sure that if no watch is falsified we
-        // have always slack() >= maxCoeff
-        T maxCoeff = coeffs.back();
-        T value = -this->degree;
-
-        i = 0;
-        for (; i < coeffs.size(); i++) {
-            assert(coeffs[i] <= maxCoeff);
-            value += coeffs[i];
-            if (value >= maxCoeff) {
-                i++;
-                break;
-            }
-        }
-
-        watchSize = i;
-    }
 
 public:
     Inequality(std::vector<int>&& coeffs_, std::vector<int>&& lits_, int degree_):
@@ -405,75 +526,36 @@ public:
 
     ~Inequality(){
         contract();
+        if (fixedSize != nullptr) {
+            std::free(fixedSize);
+        }
     }
 
     void freeze(size_t numVars) {
         contract();
+
         for (int lit: this->lits) {
             assert(std::abs(lit) <= numVars);
         }
+
+        size_t memSize = sizeof(FixedSizeInequality<T>) + lits.size() * sizeof(Term<T>);
+        void* addr = std::malloc(memSize);
+        // void* addr = std::aligned_alloc(64, memSize);
+        fixedSize = new (addr) FixedSizeInequality<T>(coeffs, lits, degree);
+
+        // todo we are currently using twice the memory neccessary, we would want to
+        // switch computation of eq and so on to the fixed size inequality as well.
         frozen = true;
     }
 
     void clearWatches(PropEngine<T>& prop) {
-        for (int lit: this->lits) {
-            for (auto& ineq: prop.watchlist[lit]) {
-                if (ineq == this) {
-                    ineq = nullptr;
-                }
-            }
-        }
+        assert(fixedSize != nullptr);
+        fixedSize->clearWatches(prop);
     }
 
-    void updateWatch(PropEngine<T>& prop, int falsifiedLit = 0) {
-        if (this->lits.size() != this->coeffs.size()) abort();
-        assert(this->lits.size() == this->coeffs.size());
-        bool init = false;
-        if (watchSize == 0) {
-            init = true;
-            computeWatchSize();
-        }
-
-        T slack = -this->degree;
-
-        size_t j = this->watchSize;
-
-        auto& value = prop.assignment.value;
-
-        for (size_t i = 0; i < this->watchSize; i++) {
-            if (value[this->lits[i]] == State::False) {
-                for (;j < this->lits.size(); j++) {
-                    if (value[this->lits[j]] != State::False) {
-                        using namespace std;
-                        swap(this->lits[i], this->lits[j]);
-                        swap(this->coeffs[i], this->coeffs[j]);
-                        prop.watch(this->lits[i], this);
-                        j++;
-                        break;
-                    }
-                }
-            }
-
-            if (value[this->lits[i]] != State::False) {
-                slack += this->coeffs[i];
-            }
-            if (init || this->lits[i] == falsifiedLit) {
-                // we could not swap out watcher, renew watch
-                prop.watch(this->lits[i], this);
-            }
-        }
-
-        if (slack < 0) {
-            prop.conflict();
-        } else {
-            for (size_t i = 0; i < this->watchSize; i++) {
-                if (this->coeffs[i] > slack
-                    && value[this->lits[i]] == State::Unassigned)
-                {
-                    prop.propagate(this->lits[i]);
-                }
-            }
-        }
+    void updateWatch(PropEngine<T>& prop) {
+        assert(fixedSize != nullptr && "Call freeze() first.");
+        fixedSize->updateWatch(prop);
     }
 
     Inequality* saturate(){

@@ -436,9 +436,15 @@ public:
             wsTmp.reserve(ws.size());
             std::swap(ws, wsTmp);
 
-            for (auto ineq:wsTmp) {
-                if (ineq != nullptr) {
-                    ineq->updateWatch(*this, falsifiedLit);
+            const uint lookAhead = 6;
+            WatchedType** end = wsTmp.data() + wsTmp.size();
+            for (WatchedType** next = wsTmp.data(); next != end; next++) {
+                auto fetch = next + lookAhead;
+                if (fetch < end) {
+                    __builtin_prefetch(*fetch);
+                }
+                if (*next != nullptr) {
+                    (*next)->updateWatch(*this, falsifiedLit);
                 }
             }
             current.qhead += 1;

@@ -579,7 +579,7 @@ private:
 
     void free(){
         if (ineq != nullptr) {
-            delete ineq;
+            ineq->~FixedSizeInequality<T>();
             std::free(ineq);
             ineq = nullptr;
         }

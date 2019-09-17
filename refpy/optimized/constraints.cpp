@@ -117,102 +117,6 @@ struct Term {
     }
 };
 
-/**
- * stores constraint in (literal) normalized form, the sign of the
- * literal is stored in the coefficient
- */
-template<typename T>
-class FatInequality {
-private:
-    std::vector<T> coeffs;
-    std::vector<uint8_t> used;
-    std::vector<int> usedList;
-    T degree;
-    bool bussy;
-
-    void setCoeff(uint var, T value) {
-        if (value != 0) {
-            use(var);
-            coeffs[var] = value;
-        }
-    }
-
-    void use(uint var) {
-        if (this->coeffs.size() <= var) {
-            this->coeffs.resize(var + 1, 0);
-            this->used.resize(var + 1, false);
-        }
-
-        if (!used[var]) {
-            used[var] = true;
-            usedList.push_back(var);
-        }
-    }
-
-public:
-    FatInequality(){
-        degree = 0;
-        bussy = false;
-    }
-
-    void load(std::vector<Term<T>>& terms, T degree) {
-        if (bussy) {
-            std::cout << "critical error: I am too bussy for this!" << std::endl;
-            exit(1);
-        }
-        bussy = true;
-
-        this->degree = degree;
-        for (Term<T>& term: terms) {
-            T coeff = cpsign(term.coeff, term.lit);
-            using namespace std;
-            int var = abs(term.lit);
-
-            setCoeff(var, coeff);
-        }
-    }
-
-    void unload(std::vector<Term<T>>& terms, T& degree) {
-        bussy = false;
-        terms.clear();
-        coeffs.reserve(this->usedList.size());
-
-        for (int var: this->usedList) {
-            T coeff = this->coeffs[var];
-            T lit = cpsign(var, coeff);
-            using namespace std;
-            coeff = abs(coeff);
-
-            if (coeff > 0) {
-                terms.emplace_back(coeff, lit);
-            }
-
-            this->coeffs[var] = 0;
-            this->used[var] = false;
-        }
-        this->usedList.clear();
-
-        degree = this->degree;
-        this->degree = 0;
-    }
-
-
-    void add(const std::vector<Term<T>>& terms, const T degree) {
-        for (const Term<T> &term:terms) {
-            using namespace std;
-            T b = cpsign(term.coeff, term.lit);
-            int var = abs(term.lit);
-            this->use(var);
-            T a = this->coeffs[var];
-            this->coeffs[var] = a + b;
-            T cancellation = max(0, max(abs(a), abs(b)) - abs(this->coeffs[var]));
-            this->degree -= cancellation;
-        }
-
-        this->degree += degree;
-    }
-};
-
 template<typename T>
 bool orderByVar(T &a, T &b) {
     return a.lit > b.lit;
@@ -222,11 +126,6 @@ template<typename T>
 bool orderByCoeff(T &a, T &b) {
     return a.coeff < b.coeff;
 }
-
-template<typename T>
-using FatInequalityPtr = std::unique_ptr<FatInequality<T>>;
-
-
 
 enum class State {
     False = 2, True = 3, Unassigned = 0
@@ -268,6 +167,9 @@ template<typename T>
 class Inequality;
 
 template<typename T>
+class FixedSizeInequalityHandler;
+
+template<typename T>
 class PropEngine;
 
 template<typename T>
@@ -281,7 +183,19 @@ public:
     Term<T> terms[];
 
 private:
-    friend Inequality<T>;
+    friend FixedSizeInequalityHandler<T>;
+
+    FixedSizeInequality(size_t size)
+        :_size(size) {
+    }
+
+    FixedSizeInequality(FixedSizeInequality& other)
+        : _size(other.size())
+    {
+        using namespace std;
+        copy(other.begin(), other.end(), this->begin());
+        this->degree = other.degree;
+    }
 
     FixedSizeInequality(std::vector<Term<T>>& terms, T _degree)
         : _size(terms.size())
@@ -542,6 +456,164 @@ public:
 };
 
 /**
+ * stores constraint in (literal) normalized form, the sign of the
+ * literal is stored in the coefficient
+ */
+template<typename T>
+class FatInequality {
+private:
+    std::vector<T> coeffs;
+    std::vector<uint8_t> used;
+    std::vector<int> usedList;
+    T degree;
+    bool bussy;
+
+    void setCoeff(uint var, T value) {
+        if (value != 0) {
+            use(var);
+            coeffs[var] = value;
+        }
+    }
+
+    void use(uint var) {
+        if (this->coeffs.size() <= var) {
+            this->coeffs.resize(var + 1, 0);
+            this->used.resize(var + 1, false);
+        }
+
+        if (!used[var]) {
+            used[var] = true;
+            usedList.push_back(var);
+        }
+    }
+
+public:
+    FatInequality(){
+        degree = 0;
+        bussy = false;
+    }
+
+    void load(FixedSizeInequality<T>& ineq) {
+        if (bussy) {
+            std::cout << "critical error: I am too bussy for this!" << std::endl;
+            exit(1);
+        }
+        bussy = true;
+
+        this->degree = ineq.degree;
+        for (Term<T>& term: ineq) {
+            T coeff = cpsign(term.coeff, term.lit);
+            using namespace std;
+            int var = abs(term.lit);
+
+            setCoeff(var, coeff);
+        }
+    }
+
+    void unload(FixedSizeInequality<T>& ineq) {
+        bussy = false;
+
+        Term<T>* pos = ineq.begin();
+        for (int var: this->usedList) {
+            T coeff = this->coeffs[var];
+            T lit = cpsign(var, coeff);
+            using namespace std;
+            coeff = abs(coeff);
+
+            if (coeff > 0) {
+                assert(pos != ineq.end());
+                pos->coeff = coeff;
+                pos->lit = lit;
+                pos += 1;
+            }
+
+            this->coeffs[var] = 0;
+            this->used[var] = false;
+        }
+        assert(pos == ineq.end());
+        this->usedList.clear();
+
+        ineq.degree = this->degree;
+        this->degree = 0;
+    }
+
+    size_t size() {
+        size_t result = 0;
+        for (int var: this->usedList) {
+            if (this->coeffs[var] != 0) {
+                result += 1;
+            }
+        }
+        return result;
+    }
+
+
+    void add(const FixedSizeInequality<T>& other) {
+        for (const Term<T> &term:other) {
+            using namespace std;
+            T b = cpsign(term.coeff, term.lit);
+            int var = abs(term.lit);
+            this->use(var);
+            T a = this->coeffs[var];
+            this->coeffs[var] = a + b;
+            T cancellation = max(0, max(abs(a), abs(b)) - abs(this->coeffs[var]));
+            this->degree -= cancellation;
+        }
+
+        this->degree += other.degree;
+    }
+};
+
+template<typename T>
+using FatInequalityPtr = std::unique_ptr<FatInequality<T>>;
+
+template<typename T>
+class FixedSizeInequalityHandler {
+private:
+    void* malloc(size_t size) {
+        capacity = size;
+        size_t memSize = sizeof(FixedSizeInequality<T>) + size * sizeof(Term<T>);
+        // return std::aligned_alloc(64, memSize);
+        return std::malloc(memSize);
+    }
+
+    void free(){
+        if (ineq != nullptr) {
+            delete ineq;
+            std::free(ineq);
+            ineq = nullptr;
+        }
+    }
+
+public:
+    FixedSizeInequality<T>* ineq = nullptr;
+    size_t capacity = 0;
+
+    FixedSizeInequalityHandler(FixedSizeInequalityHandler& other) {
+        void* addr = malloc(other.ineq->size());
+        ineq = new (addr) FixedSizeInequality<T>(*other.ineq);
+    }
+
+    FixedSizeInequalityHandler(std::vector<Term<T>>& terms, int degree) {
+        void* addr = malloc(terms.size());
+        ineq = new (addr) FixedSizeInequality<T>(terms, degree);
+    }
+
+    void resize(size_t size) {
+        if (ineq != nullptr && size == capacity) {
+            return;
+        }
+        free();
+        void* addr = malloc(size);
+        ineq = new (addr) FixedSizeInequality<T>(size);
+    }
+
+    ~FixedSizeInequalityHandler(){
+        free();
+    }
+};
+
+/**
  * stores constraint in (literal) normalized form
  *
  * The inequality can have three states: normal, expanded, frozen it
@@ -552,18 +624,23 @@ public:
 template<typename T>
 class Inequality {
 private:
-    std::vector<Term<T>> terms;
-    int degree;
     bool loaded = false;
     bool frozen = false;
     FatInequalityPtr<T> expanded;
-    FixedSizeInequality<T>* fixedSize = nullptr;
+
+    FixedSizeInequalityHandler<T> handler;
+    FixedSizeInequality<T>* &ineq = handler.ineq;
+
     static std::vector<FatInequalityPtr<T>> pool;
 
 public:
+    Inequality(Inequality& other)
+        : handler(other.handler) {
+            assert(other.loaded == false);
+    }
+
     Inequality(std::vector<Term<T>>&& terms_, int degree_)
-        : terms(terms_)
-        , degree(degree_)
+        : handler(terms_, degree_)
     {}
 
     Inequality(
@@ -584,22 +661,14 @@ public:
 
     ~Inequality(){
         contract();
-        if (fixedSize != nullptr) {
-            std::free(fixedSize);
-        }
     }
 
     void freeze(size_t numVars) {
         contract();
 
-        for (Term<T> term: terms) {
+        for (Term<T> term: *ineq) {
             assert(static_cast<uint>(std::abs(term.lit)) <= numVars);
         }
-
-        size_t memSize = sizeof(FixedSizeInequality<T>) + terms.size() * sizeof(Term<T>);
-        void* addr = std::malloc(memSize);
-        // void* addr = std::aligned_alloc(64, memSize);
-        fixedSize = new (addr) FixedSizeInequality<T>(terms, degree);
 
         // todo we are currently using twice the memory neccessary, we would want to
         // switch computation of eq and so on to the fixed size inequality as well.
@@ -607,21 +676,21 @@ public:
     }
 
     void clearWatches(PropEngine<T>& prop) {
-        assert(fixedSize != nullptr);
-        fixedSize->clearWatches(prop);
+        assert(frozen);
+        ineq->clearWatches(prop);
     }
 
     void updateWatch(PropEngine<T>& prop) {
-        assert(fixedSize != nullptr && "Call freeze() first.");
-        fixedSize->updateWatch(prop);
+        assert(frozen && "Call freeze() first.");
+        ineq->updateWatch(prop);
     }
 
     Inequality* saturate(){
         assert(!frozen);
         contract();
-        for (Term<T>& term: terms) {
+        for (Term<T>& term: *ineq) {
             using namespace std;
-            term.coeff = min(term.coeff, this->degree);
+            term.coeff = min(term.coeff, ineq->degree);
         }
         return this;
     }
@@ -629,8 +698,8 @@ public:
     Inequality* divide(T divisor){
         assert(!frozen);
         contract();
-        this->degree = divideAndRoundUp(this->degree, divisor);
-        for (Term<T>& term: terms) {
+        ineq->degree = divideAndRoundUp(ineq->degree, divisor);
+        for (Term<T>& term: *ineq) {
             term.coeff = divideAndRoundUp(term.coeff, divisor);
         }
         return this;
@@ -639,8 +708,8 @@ public:
     Inequality* multiply(T factor){
         assert(!frozen);
         contract();
-        this->degree *= factor;
-        for (Term<T>& term: terms) {
+        ineq->degree *= factor;
+        for (Term<T>& term: *ineq) {
             term.coeff *= factor;
         }
         return this;
@@ -649,7 +718,8 @@ public:
     Inequality* add(Inequality* other){
         assert(!frozen);
         expand();
-        expanded->add(other->terms, other->degree);
+        other->contract();
+        expanded->add(*other->ineq);
         return this;
     }
 
@@ -663,14 +733,15 @@ public:
             } else {
                 expanded = std::make_unique<FatInequality<T>>();
             }
-            expanded->load(terms, degree);
+            expanded->load(*ineq);
         }
     }
 
     void contract() {
         if (loaded) {
             assert(!frozen);
-            expanded->unload(terms, degree);
+            handler.resize(expanded->size());
+            expanded->unload(*ineq);
             pool.push_back(std::move(expanded));
             loaded = false;
         }
@@ -679,17 +750,17 @@ public:
     bool eq(Inequality* other) {
         contract();
         other->contract();
-        std::vector<Term<T>> mine(this->terms);
+        std::vector<Term<T>> mine(ineq->begin(), ineq->end());
         sort(mine.begin(), mine.end(), orderByVar<Term<T>>);
-        std::vector<Term<T>> theirs(other->terms);
+        std::vector<Term<T>> theirs(other->ineq->begin(), other->ineq->end());
         sort(theirs.begin(), theirs.end(), orderByVar<Term<T>>);
-        return (mine == theirs) && (this->degree == other->degree);
+        return (mine == theirs) && (ineq->degree == other->ineq->degree);
     }
 
     std::string repr() {
         contract();
         std::stringstream s;
-        for (Term<T> &term: this->terms) {
+        for (Term<T> &term: *ineq) {
             using namespace std;
             s << term.coeff << " ";
             if (term.lit < 0) {
@@ -697,7 +768,7 @@ public:
             }
             s << "x" << abs(term.lit) << " ";
         }
-        s << ">= " << this->degree;
+        s << ">= " << ineq->degree;
         return s.str();
     }
 
@@ -705,13 +776,13 @@ public:
         this->contract();
         other->contract();
         std::unordered_map<int, Term<T>> lookup;
-        for (Term<T>& term:other->terms) {
+        for (Term<T>& term:*other->ineq) {
             using namespace std;
             lookup.insert(make_pair(abs(term.lit), term));
         }
 
         T weakenCost = 0;
-        for (Term<T>& mine:this->terms) {
+        for (Term<T>& mine:*ineq) {
             using namespace std;
             int var = abs(mine.lit);
 
@@ -728,15 +799,15 @@ public:
             }
         }
 
-        return this->degree - weakenCost >= other->degree;
+        return ineq->degree - weakenCost >= other->ineq->degree;
     }
 
     Inequality* negated() {
         assert(!frozen);
         this->contract();
-        this->degree = -this->degree + 1;
-        for (Term<T>& term:this->terms) {
-            this->degree += term.coeff;
+        ineq->degree = -ineq->degree + 1;
+        for (Term<T>& term:*ineq) {
+            ineq->degree += term.coeff;
             term.lit *= -1;
         }
 
@@ -745,15 +816,13 @@ public:
 
     Inequality* copy(){
         contract();
-        return new Inequality(
-            std::vector<Term<T>>(terms),
-            degree);
+        return new Inequality(*this);
     }
 
     bool isContradiction(){
         contract();
-        int slack = -degree;
-        for (Term<T> term: terms) {
+        int slack = -ineq->degree;
+        for (Term<T> term: *ineq) {
             slack += term.coeff;
         }
         return slack < 0;
@@ -768,14 +837,18 @@ std::vector<FatInequalityPtr<T>> Inequality<T>::pool;
 int main(int argc, char const *argv[])
 {
     /* code */
+    {
     Inequality<int> foo({1,1,1},{1,1,1},1);
     Inequality<int> baa({1,1,1},{-1,-1,-1},3);
     PropEngine<int> p(10);
     foo.eq(&baa);
     foo.implies(&baa);
     foo.negated();
+    Inequality<int> test(baa);
     p.attach(&foo);
     p.attachTmp(&baa);
+    }
+    Inequality<int> foo({1,1,1},{1,1,1},1);
 
     std::cout << foo.isContradiction() << std::endl;
     return 0;

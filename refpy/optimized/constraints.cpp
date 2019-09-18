@@ -180,6 +180,7 @@ private:
 
 public:
     T degree;
+    T maxCoeff;
     Term<T> terms[];
 
 private:
@@ -216,7 +217,7 @@ private:
         // we propagate lit[i] if slack < coeff[i] so we
         // need to make sure that if no watch is falsified we
         // have always slack() >= maxCoeff
-        T maxCoeff = terms[size() - 1].coeff;
+        maxCoeff = terms[size() - 1].coeff;
         T value = -this->degree;
 
         size_t i = 0;
@@ -280,7 +281,7 @@ public:
 
         if (slack < 0) {
             prop.conflict();
-        } else {
+        } else if (slack < maxCoeff) {
             for (size_t i = 0; i < this->watchSize; i++) {
                 if (terms[i].coeff > slack
                     && value[terms[i].lit] == State::Unassigned)

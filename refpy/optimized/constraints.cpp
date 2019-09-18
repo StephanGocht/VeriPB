@@ -167,10 +167,18 @@ template<typename T>
 class Inequality;
 
 template<typename T>
+class FixedSizeInequality;
+
+template<typename T>
 class FixedSizeInequalityHandler;
 
 template<typename T>
 class PropEngine;
+
+template<typename T>
+struct WatchInfo {
+    FixedSizeInequality<T>* ineq;
+};
 
 template<typename T>
 class FixedSizeInequality {
@@ -237,9 +245,9 @@ private:
 public:
     void clearWatches(PropEngine<T>& prop) {
         for (Term<T>& term: *this) {
-            for (auto& ineq: prop.watchlist[term.lit]) {
-                if (ineq == this) {
-                    ineq = nullptr;
+            for (auto& w: prop.watchlist[term.lit]) {
+                if (w.ineq == this) {
+                    w.ineq = nullptr;
                 }
             }
         }
@@ -263,7 +271,9 @@ public:
                     if (value[terms[j].lit] != State::False) {
                         using namespace std;
                         swap(terms[i], terms[j]);
-                        prop.watch(terms[i].lit, this);
+                        WatchInfo<T> w;
+                        w.ineq = this;
+                        prop.watch(terms[i].lit, w);
                         j++;
                         break;
                     }
@@ -275,7 +285,9 @@ public:
             }
             if (init || terms[i].lit == falsifiedLit) {
                 // we could not swap out watcher, renew watch
-                prop.watch(terms[i].lit, this);
+                WatchInfo<T> w;
+                w.ineq = this;
+                prop.watch(terms[i].lit, w);
             }
         }
 
@@ -319,15 +331,12 @@ struct PropState {
 };
 
 
-// todo: can we type this with a template parameter?
-typedef FixedSizeInequality<int> WatchedType;
-
-typedef std::vector<WatchedType*> WatchList;
-
-
 template<typename T>
 class PropEngine {
 private:
+    typedef WatchInfo<T> WatchedType;
+    typedef std::vector<WatchedType> WatchList;
+
     size_t nVars;
     std::vector<WatchList> wl;
     std::vector<int> trail;
@@ -362,14 +371,14 @@ public:
             std::swap(ws, wsTmp);
 
             const uint lookAhead = 6;
-            WatchedType** end = wsTmp.data() + wsTmp.size();
-            for (WatchedType** next = wsTmp.data(); next != end; next++) {
+            WatchedType* end = wsTmp.data() + wsTmp.size();
+            for (WatchedType* next = wsTmp.data(); next != end; next++) {
                 auto fetch = next + lookAhead;
                 if (fetch < end) {
-                    __builtin_prefetch(*fetch);
+                    __builtin_prefetch(fetch->ineq);
                 }
-                if (*next != nullptr) {
-                    (*next)->template updateWatch<false>(*this, falsifiedLit);
+                if (next->ineq != nullptr) {
+                    next->ineq->template updateWatch<false>(*this, falsifiedLit);
                 }
             }
             current.qhead += 1;
@@ -449,8 +458,8 @@ public:
         current.conflict = true;
     }
 
-    void watch(int lit, WatchedType* ineq) {
-        watchlist[lit].push_back(ineq);
+    void watch(int lit, WatchInfo<T>& w) {
+        watchlist[lit].push_back(w);
     }
 
 };

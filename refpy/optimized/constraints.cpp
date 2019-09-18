@@ -127,7 +127,7 @@ bool orderByCoeff(T &a, T &b) {
     return a.coeff < b.coeff;
 }
 
-enum class State {
+enum class State : uint8_t {
     False = 2, True = 3, Unassigned = 0
 };
 
@@ -244,10 +244,9 @@ public:
         }
     }
 
+    template<bool init>
     void updateWatch(PropEngine<T>& prop, int falsifiedLit = 0) {
-        bool init = false;
-        if (watchSize == 0) {
-            init = true;
+        if (init) {
             computeWatchSize();
         }
 
@@ -369,7 +368,7 @@ public:
                     __builtin_prefetch(*fetch);
                 }
                 if (*next != nullptr) {
-                    (*next)->updateWatch(*this, falsifiedLit);
+                    (*next)->template updateWatch<false>(*this, falsifiedLit);
                 }
             }
             current.qhead += 1;
@@ -682,7 +681,8 @@ public:
 
     void updateWatch(PropEngine<T>& prop) {
         assert(frozen && "Call freeze() first.");
-        ineq->updateWatch(prop);
+        // ineq->updateWatch<true>(prop);
+        ineq->template updateWatch<true>(prop);
     }
 
     Inequality* saturate(){

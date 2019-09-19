@@ -64,7 +64,7 @@ class Rule():
     def parse(cls, line):
         return cls.getParser().parse(line.rstrip())
 
-    def compute(self, antecedents):
+    def compute(self, antecedents, context = None):
         """
         Performs the action of the rule, e.g. compute new constraints or perform
         checks on the current proof.
@@ -103,7 +103,7 @@ class Rule():
         return type(self).__name__
 
 class DummyRule(Rule):
-    def compute(self, db):
+    def compute(self, antecednets, context = None):
         return [defaultFactory.fromTerms([], 0)]
 
     def numConstraints(self):
@@ -142,7 +142,7 @@ class DeleteConstraints(Rule):
     def __init__(self, toDelete):
         self.toDelete = toDelete
 
-    def compute(self, antecedents):
+    def compute(self, antecedents, context = None):
         return []
 
     def numConstraints(self):
@@ -157,22 +157,15 @@ class DeleteConstraints(Rule):
     def deleteConstraints(self):
         return self.toDelete
 
-class RUPWrapper():
-    def __init__(self, propEngine):
-        self.propEngine = propEngine
-        self.Id = ReverseUnitPropagation.Id
-
-    def parse(self, line):
-        return ReverseUnitPropagation.parse(line, self.propEngine)
-
+@register_rule
 class ReverseUnitPropagation(Rule):
     Id = "u"
     solverClass = RoundingSat
 
     @classmethod
-    def getParser(cls, propEngine):
+    def getParser(cls):
         def f(constraint):
-            return cls(constraint[0], propEngine)
+            return cls(constraint[0])
 
         space = parsy.regex(" +").desc("space")
 
@@ -184,7 +177,7 @@ class ReverseUnitPropagation(Rule):
         return (opb | cnf).map(f)
 
     @classmethod
-    def parse(cls, line, propEngine):
+    def parse(cls, line):
         striped = line.strip()
         if (line.strip()[:3]) == "opb":
             try:
@@ -192,13 +185,12 @@ class ReverseUnitPropagation(Rule):
             except ValueError as e:
                 pass
             else:
-                return cls(ineq[0], propEngine)
+                return cls(ineq[0])
 
-        return cls.getParser(propEngine).parse(line.rstrip())
+        return cls.getParser().parse(line.rstrip())
 
-    def __init__(self, constraint, propEngine):
+    def __init__(self, constraint):
         self.constraint = constraint
-        self.propEngine = propEngine
 
     def numConstraints(self):
         return 1
@@ -212,9 +204,9 @@ class ReverseUnitPropagation(Rule):
     def isGoal(self):
         return False
 
-    def compute(self, antecedents):
+    def compute(self, antecedents, context):
         assumption = self.constraint.copy().negated()
-        conflicting = self.propEngine.attachTmp(assumption)
+        conflicting = context.propEngine.attachTmp(assumption)
 
         if conflicting:
             return [self.constraint]
@@ -264,7 +256,7 @@ class CompareToConstraint(Rule):
 class ConstraintEquals(CompareToConstraint):
     Id = "e"
 
-    def compute(self, antecedents):
+    def compute(self, antecedents, context = None):
         antecedents = list(antecedents)
         if self.constraint != antecedents[0]:
             raise EqualityCheckFailed(self.constraint, antecedents[0])
@@ -278,7 +270,7 @@ class ImpliesCheckFailed(InvalidProof):
 class ConstraintImplies(CompareToConstraint):
     Id = "i"
 
-    def compute(self, antecedents):
+    def compute(self, antecedents, context = None):
         antecedents = list(antecedents)
         if not antecedents[0].implies(self.constraint):
             raise ImpliesCheckFailed(self.constraint, antecedents[0])
@@ -287,7 +279,7 @@ class ConstraintImplies(CompareToConstraint):
 class ConstraintImpliesGetImplied(ConstraintImplies):
     Id = "j"
 
-    def compute(self, antecedents):
+    def compute(self, antecedents, context = None):
         super().compute(antecedents)
         return [self.constraint]
 
@@ -329,8 +321,8 @@ class Solution(Rule):
     def __init__(self, partialAssignment):
         self.partialAssignment = partialAssignment
 
-    def compute(self, antecedents, propEngine):
-        if not propEngine.checkSat(self.partialAssignment):
+    def compute(self, antecedents, context):
+        if not context.propEngine.checkSat(self.partialAssignment):
             raise SolutionCheckFailed()
 
         # implement check
@@ -378,7 +370,7 @@ class IsContradiction(Rule):
     def __init__(self, constraintId):
         self.constraintId = constraintId
 
-    def compute(self, antecedents):
+    def compute(self, antecedents, context = None):
         antecedents = list(antecedents)
         if not antecedents[0].isContradiction():
             raise ContradictionCheckFailed()
@@ -424,7 +416,7 @@ class LinearCombination(Rule):
         self.antecedentIds = antecedentIds
         self.factors = factors
 
-    def compute(self, antecedents):
+    def compute(self, antecedents, context = None):
         it = zip(self.factors, antecedents)
         factor, constraint = next(it)
         result = constraint.copy()
@@ -475,7 +467,7 @@ class Division(LinearCombination):
         super().__init__(factors, antecedentIds)
         self.divisor = divisor
 
-    def compute(self, antecedents):
+    def compute(self, antecedents, context = None):
         constraint = super().compute(antecedents)[0]
         constraint.divide(self.divisor)
         return [constraint]
@@ -496,7 +488,7 @@ class Saturation(LinearCombination):
         factors, antecedentIds = zip(*sequence)
         return Saturation(factors, antecedentIds)
 
-    def compute(self, antecedents):
+    def compute(self, antecedents, context = None):
         constraint = super().compute(antecedents)[0]
         constraint.saturate()
         return [constraint]
@@ -527,7 +519,7 @@ class LoadLitteralAxioms(Rule):
     def __init__(self, numLiterals):
         self.numLiterals = numLiterals
 
-    def compute(self, antecedents):
+    def compute(self, antecedents, context = None):
         result = list()
         for i in range(1, self.numLiterals + 1):
             result.append(defaultFactory.fromTerms([Term(1, i)], 0))
@@ -626,7 +618,7 @@ class ReversePolishNotation(Rule):
 
         self.instructions = instructions
 
-    def compute(self, antecedents):
+    def compute(self, antecedents, context = None):
         antecedents = list(antecedents)
         stack = list()
         antecedentIt = iter(antecedents)
@@ -669,62 +661,41 @@ class ReversePolishNotation(Rule):
     def antecedentIDs(self):
         return ReversePolishNotation.AntecedentIterator(self.instructions)
 
+@register_rule
 class LoadFormula(Rule):
     Id = "f"
 
-    @staticmethod
-    def getParser(formula):
-        def f(numVars):
-            if numVars is not None and len(formula) != numVars:
-                return parsy.fail("Number of constraints does not match.")
-            else:
-                return parsy.success(LoadFormula(formula, numVars))
-
+    @classmethod
+    def getParser(cls):
+        def f(numConstraints):
+            return cls(numConstraints)
 
         return parsy.regex(r" *[1-9][0-9]*") \
                 .map(int)\
                 .desc("number of constraints")\
-                .optional()\
-                .bind(f)\
+                .map(f)\
                 << parsy.regex(r" 0") \
 
     @classmethod
-    def parse(cls, line, formula):
+    def parse(cls, line):
         values = line.strip().split()
         if len(values) == 2:
-            return cls(formula, int(values[0]))
+            return cls(int(values[0]))
         elif len(values) == 1:
-            return cls(formula)
+            return cls()
         else:
             raise ValueError()
 
-    def __init__(self, formula, numVars = None):
-        self.formula = formula
+    def __init__(self, numConstraints):
+        self._numConstraints = numConstraints
 
-    def compute(self, antecedents):
-        return self.formula
+    def compute(self, antecedents, context = None):
+        if (len(context.formula) != self._numConstraints):
+            raise InvalidProof("Wrong number of constraints")
+        return context.formula
 
     def numConstraints(self):
-        return len(self.formula)
+        return self._numConstraints
 
     def antecedentIDs(self):
         return []
-
-
-class LoadFormulaWrapper():
-    def __init__(self, formula):
-        self.formula = formula
-        self.Id = LoadFormula.Id
-
-    def getParser(self):
-        if self.formula is None:
-            # for memory efficincy reasons
-            raise RuntimeError("Can not call load Formula twice.")
-
-        result = LoadFormula.getParser(self.formula)
-        self.formula = None
-        return result
-
-    @fallback_on_error
-    def parse(self, line):
-        return LoadFormula.parse(line, self.formula)

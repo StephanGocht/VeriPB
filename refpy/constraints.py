@@ -274,8 +274,33 @@ CppInequality = optimized.CppInequality
 
 
 class IneqFactory():
+    def __init__(self):
+        self.names = list()
+        self.num = dict()
+
     def fromTerms(self, terms, degree):
         return PyInequality([Term(a,l) for a,l in terms], degree)
+
+    def name2Num(self, name):
+        if ord(name[0]) not in range(ord("A"), ord("Z")) \
+                and ord(name[0]) not in range(ord("a"), ord("z")):
+            raise ValueError("Expected variablename, got %s"%(name))
+        try:
+            return self.num[name]
+        except KeyError:
+            self.names.append(name)
+            num = len(self.names)
+            self.num[name] = num
+            return num
+
+    def num2Name(self, num):
+        return self.names[num - 1]
+
+    def toString(self, constraint):
+        def f(num):
+            return self.num2Name(num)
+
+        return constraint.toString(f)
 
 def terms2lists(terms):
     return zip(*[(a,l) for a,l in terms]) \

@@ -12,15 +12,15 @@ class TestParsing():
         print(parser.parse(registered_rules, ["refutation using e 0"]))
 
     def test_OPB_line_1(self):
-        res = getOPBConstraintParser().parse("3 x1 >= 2;")
+        res = OPBParser().getOPBConstraintParser().parse("3 x1 >= 2;")
         assert res == ([(3,1)], ">=", 2)
 
     def test_OPB_line_2(self):
-        res = getOPBConstraintParser().parse("-4 x2 +2 x1 = -42;")
+        res = OPBParser().getOPBConstraintParser().parse("-4 x2 +2 x1 = -42;")
         assert res == ([(-4,2),(2,1)], "=", -42)
 
     def test_CNF_line(self):
-        res = getCNFConstraintParser().parse("2 -1 0")
+        res = OPBParser().getCNFConstraintParser().parse("2 -1 0")
         assert res == [2, -1]
 
     def test_equals(self):

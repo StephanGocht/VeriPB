@@ -3,11 +3,18 @@ from enum import Enum
 from refpy.rules import DummyRule, IsContradiction
 from time import perf_counter
 from refpy import InvalidProof
+from refpy.constraints import defaultFactory
 
 import logging
 
 DBEntry = structclass("DBEntry","rule ruleNum constraint numUsed deleted")
 Stats = structclass("Stats", "size space maxUsed")
+
+class Context():
+    def __init__(self):
+        self.propEngine = None
+        self.formula = None
+        self.ineqFactory = None
 
 class DummyPropEngine():
     def attach(self, ineq):
@@ -141,15 +148,16 @@ class Verifier():
 
 
 
-    def __init__(self, settings = None, propEngine = None):
+    def __init__(self, settings = None, context = None):
         if settings is not None:
             self.settings = settings
         else:
             self.settings = Verifier.Settings()
 
-        if propEngine is None:
-            propEngine = DummyPropEngine()
-        self.propEngine = propEngine
+        if context is None:
+            context = Context()
+            context.propEngine = DummyPropEngine()
+        self.context = context
 
     def __iter__(self):
         return Verifier.Iterator(self)
@@ -272,11 +280,7 @@ class Verifier():
             self._execCacheRule = rule
             antecedentIDs = self.antecedentIds(rule, ruleNum)
             antecedents = (get(i) for i in antecedentIDs)
-            try:
-                self._execCache = rule.compute(antecedents)
-            except TypeError:
-                # todo, that feels like a hacky way of passing the propEngine
-                self._execCache = rule.compute(antecedents, self.propEngine)
+            self._execCache = rule.compute(antecedents, self.context)
 
         if numInRule is not None:
             if self.settings.computeNumUse() \
@@ -308,14 +312,14 @@ class Verifier():
                     not self.settings.lazy:
                 assert numInRule is not None
                 line.constraint = self.execRule(rule, ruleNum, lineNum, numInRule)
-                self.propEngine.attach(line.constraint)
+                self.context.propEngine.attach(line.constraint)
                 if self.settings.trace:
-                    print("%i (step %i): %s"%(lineNum, ruleNum, str(line.constraint)))
+                    print("%i (step %i): %s"%(lineNum, ruleNum, defaultFactory.toString(line.constraint)))
                 if rule.isGoal():
                     self.decreaseUse(line)
 
             for i in rule.deleteConstraints():
-                self.propEngine.detach(db[i].constraint)
+                self.context.propEngine.detach(db[i].constraint)
                 db[i].constraint = None
 
         self.state = Verifier.State.DONE

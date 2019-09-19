@@ -85,40 +85,6 @@ class RuleParser():
 
         return result
 
-
-
-def getCNFConstraintParser():
-    space    = parsy.regex(r" +").desc("space")
-    literal  = parsy.regex(r"[+-]?[1-9][0-9]*").desc("literal").map(int)
-    eol      = parsy.regex(r"0").desc("end of line zero")
-
-    return (literal << space).many() << eol
-
-def getOPBConstraintParser(allowEq = True):
-    def lit2int(sign, num):
-        if sign == "~":
-            return -int(num)
-        else:
-            return int(num)
-
-    space    = parsy.regex(r" +").desc("space")
-    coeff    = parsy.regex(r"[+-]?[0-9]+").map(int).desc("integer for the coefficient (make sure to not have spaces between the sign and the degree value)")
-    variable = parsy.seq(parsy.regex(r"~").optional(), parsy.regex(r"x") >> parsy.regex(r"[1-9][0-9]*")).combine(lit2int).desc("variable in the form '~?x[1-9][0-9]*'")
-    term     = parsy.seq(coeff << space, variable << space).map(tuple)
-
-    if allowEq:
-        equality = parsy.regex(r"(=|>=)").desc("= or >=")
-    else:
-        equality = parsy.regex(r">=").desc(">=")
-
-    degree   = space >> parsy.regex(r"[+-]?[0-9]+").map(int).desc("integer for the degree")
-
-    end      = parsy.regex(r";").desc("termination of rhs with ';'")
-    finish   = space.optional() >> end
-
-    return parsy.seq(space.optional() >> term.many(), equality, degree << finish).map(tuple)
-
-
 def flatten(constraintList):
     result = list()
     for oneOrTwo in constraintList:
@@ -190,12 +156,10 @@ class OPBParser():
 
     def parseLineQuick(self, line):
         def parseVar(s):
-            if s[0] == "x":
-                return int(s[1:])
-            elif s[0:2] == "~x":
-                return -int(s[2:])
+            if s[0] == "~":
+                return -self.ineqFactory.name2Num(s[1:])
             else:
-                raise ValueError("expecting literal, got '%s'" % s)
+                return self.ineqFactory.name2Num(s)
 
         if len(line) == 0 or line[0] == "*":
             return []
@@ -220,6 +184,44 @@ class OPBParser():
             result.append(self.ineqFactory.fromTerms([(-a,l) for a,l in terms], -degree))
         return result
 
+    def getOPBConstraintParser(self, allowEq = True):
+        def lit2int(sign, num):
+            if sign == "~":
+                return -self.ineqFactory.name2Num(num)
+            else:
+                return self.ineqFactory.name2Num(num)
+
+        space    = parsy.regex(r" +").desc("space")
+        coeff    = parsy.regex(r"[+-]?[0-9]+").map(int).desc("integer for the coefficient (make sure to not have spaces between the sign and the degree value)")
+        variable = parsy.seq(parsy.regex(r"~").optional(), parsy.regex(r"[a-zA-Z][\w\^\{\}\[\]-]*")).combine(lit2int).desc("variable in the form '~?x[1-9][0-9]*'")
+        term     = parsy.seq(coeff << space, variable << space).map(tuple)
+
+        if allowEq:
+            equality = parsy.regex(r"(=|>=)").desc("= or >=")
+        else:
+            equality = parsy.regex(r">=").desc(">=")
+
+        degree   = space >> parsy.regex(r"[+-]?[0-9]+").map(int).desc("integer for the degree")
+
+        end      = parsy.regex(r";").desc("termination of rhs with ';'")
+        finish   = space.optional() >> end
+
+        return parsy.seq(space.optional() >> term.many(), equality, degree << finish).map(tuple)
+
+    def getCNFConstraintParser(self):
+        def f(lit):
+            var = self.ineqFactory.name2Num("x%i"%abs(lit))
+            if lit < 0:
+                return -var
+            else:
+                return var
+
+        space    = parsy.regex(r" +").desc("space")
+        literal  = parsy.regex(r"[+-]?[1-9][0-9]*").desc("literal").map(int)
+        eol      = parsy.regex(r"0").desc("end of line zero")
+
+        return (literal << space).many() << eol
+
     def fromParsy(self, t):
         result = list()
 
@@ -240,10 +242,10 @@ class OPBParser():
         def f(t):
             return self.fromParsy(t)
 
-        return getOPBConstraintParser(allowEq).bind(f)
+        return self.getOPBConstraintParser(allowEq).bind(f)
 
     def getCNFParser(self):
         def f(t):
             return self.fromParsy(t)
 
-        return getCNFConstraintParser().bind(f)
+        return self.getCNFConstraintParser().bind(f)

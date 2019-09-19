@@ -4,13 +4,13 @@ import parsy
 
 from refpy import InvalidProof
 from refpy import ParseError
-from refpy.verifier import Verifier
+from refpy.verifier import Verifier, Context
 from refpy.parser import OPBParser
 from refpy.rules import registered_rules
-from refpy.rules import LoadFormulaWrapper, RUPWrapper
 from refpy.parser import RuleParser
 from refpy.exceptions import ParseError
 from refpy.optimized.constraints import PropEngine
+from refpy.constraints import defaultFactory
 from time import perf_counter
 
 profile = False
@@ -27,18 +27,19 @@ def run(formulaFile, rulesFile, settings = None):
     rules = list(registered_rules)
 
     start_parse = perf_counter()
+
+    context = Context()
+
     try:
         formula = OPBParser().parse(formulaFile)
         numVars, numConstraints = formula[0]
-        constraints = formula[1]
+        context.formula = formula[1]
     except ParseError as e:
         e.fileName = formulaFile.name
         raise e
 
-    propEngine = PropEngine(numVars)
-
-    rules.append(LoadFormulaWrapper(constraints))
-    rules.append(RUPWrapper(propEngine))
+    context.propEngine = PropEngine(numVars)
+    context.ineqFactory =  defaultFactory
 
     try:
         rules = RuleParser().parse(rules, rulesFile)
@@ -47,7 +48,7 @@ def run(formulaFile, rulesFile, settings = None):
         raise e
 
     logging.info("Parsing Time: %.2f" % (perf_counter() - start_parse))
-    verify = Verifier(settings, propEngine)
+    verify = Verifier(settings, context)
     verify(rules)
 
     if profile:

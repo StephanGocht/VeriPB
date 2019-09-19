@@ -23,6 +23,7 @@ setup_pybind11(cfg)
 #include <memory>
 #include <chrono>
 #include <algorithm>
+#include <functional>
 
 #include <cstdlib>
 
@@ -767,7 +768,7 @@ public:
         return (mine == theirs) && (ineq->degree == other->ineq->degree);
     }
 
-    std::string repr() {
+    std::string toString(std::function<std::string(int)> varName) {
         contract();
         std::stringstream s;
         for (Term<T> &term: *ineq) {
@@ -776,10 +777,18 @@ public:
             if (term.lit < 0) {
                 s << "~";
             }
-            s << "x" << abs(term.lit) << " ";
+            s << varName(abs(term.lit)) << " ";
         }
         s << ">= " << ineq->degree;
         return s.str();
+    }
+
+    std::string repr(){
+        return toString([](int i){
+            std::stringstream s;
+            s << "x" << i;
+            return s.str();
+        });
     }
 
     bool implies(Inequality* other) {
@@ -904,6 +913,7 @@ int main(int argc, char const *argv[])
             .def("negated", &Inequality<int>::negated)
             .def("__eq__", &Inequality<int>::eq)
             .def("__repr__", &Inequality<int>::repr)
+            .def("toString", &Inequality<int>::toString)
             .def("toOPB", &Inequality<int>::repr)
             .def("isContradiction", &Inequality<int>::isContradiction);
 

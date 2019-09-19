@@ -61,7 +61,7 @@ class TestCheckConstraintParsing():
 
 class TestInequalityParsing():
     def test_eq(self):
-        parser = ineqFactory.getOPBParser()
+        parser = OPBParser(ineqFactory).getOPBParser()
         result = parser.parse("1 x2 -2 x1 = 2;")
 
         ineq1 = ineqFactory.fromTerms([Term(-2,1), Term(1,2)], 2)

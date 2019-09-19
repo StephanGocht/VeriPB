@@ -1,12 +1,14 @@
 import refpy.constraints
 from refpy.constraints import Term
-from refpy.constraints import defaultFactory as ineqFactory
+from refpy.constraints import defaultFactory
 from refpy.pbsolver import RoundingSat, Formula
 from refpy.parser import OPBParser
 
 import parsy
 
 from refpy import InvalidProof
+
+ineqFactory = OPBParser(defaultFactory)
 
 registered_rules = []
 def register_rule(rule):
@@ -102,7 +104,7 @@ class Rule():
 
 class DummyRule(Rule):
     def compute(self, db):
-        return [ineqFactory.fromTerms([], 0)]
+        return [defaultFactory.fromTerms([], 0)]
 
     def numConstraints(self):
         return 1
@@ -332,7 +334,7 @@ class Solution(Rule):
             raise SolutionCheckFailed()
 
         # implement check
-        return [ineqFactory.fromTerms([Term(1, -lit) for lit in self.partialAssignment], 1)]
+        return [defaultFactory.fromTerms([Term(1, -lit) for lit in self.partialAssignment], 1)]
 
     def numConstraints(self):
         return 1
@@ -528,8 +530,8 @@ class LoadLitteralAxioms(Rule):
     def compute(self, antecedents):
         result = list()
         for i in range(1, self.numLiterals + 1):
-            result.append(ineqFactory.fromTerms([Term(1, i)], 0))
-            result.append(ineqFactory.fromTerms([Term(1,-i)], 0))
+            result.append(defaultFactory.fromTerms([Term(1, i)], 0))
+            result.append(defaultFactory.fromTerms([Term(1,-i)], 0))
 
         return result
 

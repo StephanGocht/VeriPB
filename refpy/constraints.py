@@ -8,8 +8,6 @@ def copysign(a, b):
     else:
         return -abs(a)
 
-from refpy.parser import getOPBConstraintParser, getCNFConstraintParser
-
 Term = structclass("Term","coefficient variable")
 
 class AllBooleanUpperBound():
@@ -278,34 +276,6 @@ CppInequality = optimized.CppInequality
 class IneqFactory():
     def fromTerms(self, terms, degree):
         return PyInequality([Term(a,l) for a,l in terms], degree)
-
-    def fromParsy(self, t):
-        result = list()
-
-        if isinstance(t, list):
-            # we got a clause from getCNFParser
-            result.append(self.fromTerms([Term(1,l) for l in t], 1))
-        else:
-            # we got a tuple containing a constraint
-            terms, eq, degree = t
-
-            result.append(self.fromTerms([Term(a,x) for a,x in terms], degree))
-            if eq == "=":
-                result.append(self.fromTerms([Term(-a,x) for a,x in terms], -degree))
-
-        return parsy.success(result)
-
-    def getOPBParser(self, allowEq = True):
-        def f(t):
-            return self.fromParsy(t)
-
-        return getOPBConstraintParser(allowEq = True).bind(f)
-
-    def getCNFParser(self):
-        def f(t):
-            return self.fromParsy(t)
-
-        return getCNFConstraintParser().bind(f)
 
 def terms2lists(terms):
     return zip(*[(a,l) for a,l in terms]) \

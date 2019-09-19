@@ -3,6 +3,8 @@ import logging
 import refpy.constraints
 import mmap
 
+from refpy.constraints import Term
+
 from functools import partial
 from refpy.exceptions import ParseError
 
@@ -128,9 +130,13 @@ class OPBParser():
     def __init__(self, ineqFactory = None, allowEq = True):
         if ineqFactory is None:
             self.ineqFactory = refpy.constraints.defaultFactory
+        else:
+            self.ineqFactory = ineqFactory
 
         self.allowEq = allowEq
-        self.slowParser = self.ineqFactory.getOPBParser(allowEq)
+
+
+        self.slowParser = self.getOPBParser(allowEq)
 
     def parse(self, formulaFile):
         numVar = (parsy.regex(r" *#variable *= *") >> parsy.regex(r"[0-9]+")) \
@@ -213,3 +219,31 @@ class OPBParser():
                 return ValueError()
             result.append(self.ineqFactory.fromTerms([(-a,l) for a,l in terms], -degree))
         return result
+
+    def fromParsy(self, t):
+        result = list()
+
+        if isinstance(t, list):
+            # we got a clause from getCNFParser
+            result.append(self.ineqFactory.fromTerms([Term(1,l) for l in t], 1))
+        else:
+            # we got a tuple containing a constraint
+            terms, eq, degree = t
+
+            result.append(self.ineqFactory.fromTerms([Term(a,x) for a,x in terms], degree))
+            if eq == "=":
+                result.append(self.ineqFactory.fromTerms([Term(-a,x) for a,x in terms], -degree))
+
+        return parsy.success(result)
+
+    def getOPBParser(self, allowEq = True):
+        def f(t):
+            return self.fromParsy(t)
+
+        return getOPBConstraintParser(allowEq).bind(f)
+
+    def getCNFParser(self):
+        def f(t):
+            return self.fromParsy(t)
+
+        return getCNFConstraintParser().bind(f)

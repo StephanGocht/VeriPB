@@ -3,7 +3,6 @@ from enum import Enum
 from refpy.rules import DummyRule, IsContradiction
 from time import perf_counter
 from refpy import InvalidProof
-from refpy.constraints import defaultFactory
 
 import logging
 
@@ -11,10 +10,7 @@ DBEntry = structclass("DBEntry","rule ruleNum constraint numUsed deleted")
 Stats = structclass("Stats", "size space maxUsed")
 
 class Context():
-    def __init__(self):
-        self.propEngine = None
-        self.formula = None
-        self.ineqFactory = None
+    pass
 
 class DummyPropEngine():
     def attach(self, ineq):
@@ -148,7 +144,7 @@ class Verifier():
 
 
 
-    def __init__(self, settings = None, context = None):
+    def __init__(self, context, settings = None):
         if settings is not None:
             self.settings = settings
         else:
@@ -252,7 +248,7 @@ class Verifier():
         if line.numUsed == 0:
             # free space of constraints that are no longer used
             if not self.settings.disableDeletion:
-                self.propEngine.detach(line.constraint)
+                self.context.propEngine.detach(line.constraint)
                 line.constraint = None
 
     def execRule(self, rule, ruleNum, lineNum, numInRule = None):
@@ -314,7 +310,7 @@ class Verifier():
                 line.constraint = self.execRule(rule, ruleNum, lineNum, numInRule)
                 self.context.propEngine.attach(line.constraint)
                 if self.settings.trace:
-                    print("%i (step %i): %s"%(lineNum, ruleNum, defaultFactory.toString(line.constraint)))
+                    print("%i (step %i): %s"%(lineNum, ruleNum, self.context.ineqFactory.toString(line.constraint)))
                 if rule.isGoal():
                     self.decreaseUse(line)
 

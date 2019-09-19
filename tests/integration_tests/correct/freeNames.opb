@@ -1,0 +1,4 @@
+* #variable= 4 #constraint= 3
+1 a 1 fancy_{1}^[-42] 1 x3 >= 1;
+-1 x3 1 x4 >= 1;
+-1 x4 -1 x3 >= 1;

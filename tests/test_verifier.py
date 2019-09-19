@@ -2,7 +2,7 @@ import unittest
 
 
 from env import refpy
-from refpy.verifier import Verifier
+from refpy.verifier import Verifier, Context, DummyPropEngine
 from refpy.rules import *
 from refpy import InvalidProof
 from unittest.mock import MagicMock
@@ -14,7 +14,7 @@ class MockRule(Rule):
         self._antecedentIDs = antecedentIDs
         self._isGoal = isGoal
 
-    def compute(self, antecedents):
+    def compute(self, antecedents, context):
         self._antecedents = antecedents
         return [(self._id, i) for i in range(self._numConstraints)]
 
@@ -27,9 +27,18 @@ class MockRule(Rule):
     def isGoal(self):
         return self._isGoal
 
+class MockFactory():
+    def fromTerms(self, terms, degree):
+        return None
+
 class TestVerifierImpl(unittest.TestCase):
+    def setUp(self):
+        self.context = Context()
+        self.context.ineqFactory = MockFactory()
+        self.context.propEngine = DummyPropEngine()
+
     def test_empty(self):
-        verify = Verifier();
+        verify = Verifier(self.context);
         verify([])
 
     def test_findGoal_single_self(self):
@@ -38,7 +47,7 @@ class TestVerifierImpl(unittest.TestCase):
         settings.disableDeletion = True
         settings.lazy            = False
 
-        verify = Verifier(settings)
+        verify = Verifier(self.context, settings)
 
         proof = [
             MockRule(1, 1, isGoal = True)
@@ -60,7 +69,7 @@ class TestVerifierImpl(unittest.TestCase):
         settings.disableDeletion = True
         settings.lazy            = False
 
-        verify = Verifier(settings)
+        verify = Verifier(self.context, settings)
 
         proof = [
             MockRule(1, 1, isGoal = False),
@@ -82,7 +91,7 @@ class TestVerifierImpl(unittest.TestCase):
         settings.checkInvariants = True
         settings.setPreset(option)
 
-        verify = Verifier(settings)
+        verify = Verifier(self.context, settings)
 
         proof = [
             MockRule("r1", 2, isGoal = False),

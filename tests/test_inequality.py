@@ -5,7 +5,9 @@ from math import copysign
 from env import refpy
 
 from refpy.constraints import Term
-from refpy.constraints import defaultFactory as ineqFactory
+from refpy.constraints import newDefaultFactory
+
+ineqFactory = newDefaultFactory()
 
 def toTerms(terms):
     return list(map(lambda x: Term(x[0], x[1]), terms))

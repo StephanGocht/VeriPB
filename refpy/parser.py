@@ -9,25 +9,14 @@ from functools import partial
 from refpy.exceptions import ParseError
 
 class RuleParser():
+    def __init__(self, context):
+        self.context = context
+
     def checkIdentifier(self, Id):
         if not Id in self.rules:
             return parsy.fail("Unsuported rule.")
 
         return parsy.success(Id)
-
-
-    def _parse(self, rules, stream):
-        logging.info("Available Rules: %s"%(", ".join(["%s"%(rule.Id) for rule in rules])))
-
-        self.identifier = set([rule.Id for rule in rules])
-
-        skipBlankLines = parsy.regex(r"\s*")
-        singleRules = [skipBlankLines >> parsy.regex(rule.Id).desc("rule identifier") >> rule.getParser() << skipBlankLines for rule in rules]
-        anyRuleParser = parsy.alt(*singleRules)
-
-        parser = header >> anyRuleParser.many()
-
-        return parser.parse(stream)
 
     def parseHeader(self, line, lineNum):
         headerParser = parsy.regex(r"refutation using").\
@@ -77,7 +66,7 @@ class RuleParser():
                     raise ParseError("Unsupported rule '%s'"%(line[0]), line = lineNum)
 
                 try:
-                    result.append(rule.parse(line[1:]))
+                    result.append(rule.parse(line[1:], self.context))
                 except parsy.ParseError as e:
                     raise ParseError(e, line = lineNum)
                 except ValueError as e:
@@ -93,12 +82,8 @@ def flatten(constraintList):
     return result
 
 class OPBParser():
-    def __init__(self, ineqFactory = None, allowEq = True):
-        if ineqFactory is None:
-            self.ineqFactory = refpy.constraints.defaultFactory
-        else:
-            self.ineqFactory = ineqFactory
-
+    def __init__(self, ineqFactory, allowEq = True):
+        self.ineqFactory = ineqFactory
         self.allowEq = allowEq
 
 

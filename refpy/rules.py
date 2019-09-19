@@ -1,14 +1,11 @@
 import refpy.constraints
 from refpy.constraints import Term
-from refpy.constraints import defaultFactory
 from refpy.pbsolver import RoundingSat, Formula
 from refpy.parser import OPBParser
 
 import parsy
 
 from refpy import InvalidProof
-
-ineqFactory = OPBParser(defaultFactory)
 
 registered_rules = []
 def register_rule(rule):
@@ -17,7 +14,7 @@ def register_rule(rule):
 
 def fallback_on_error(parse):
     """
-    Call the getParser() method of the class to get a
+    Call the getParser(context) method of the class to get a
     proper error message from the parser.
     """
     def f(*args, **kwargs):
@@ -53,7 +50,7 @@ def fallback_on_error(parse):
 
 class Rule():
     @staticmethod
-    def getParser():
+    def getParser(context):
         """
         Returns:
             A parser that creates this rule from the string following the Id
@@ -61,8 +58,8 @@ class Rule():
         raise NotImplementedError()
 
     @classmethod
-    def parse(cls, line):
-        return cls.getParser().parse(line.rstrip())
+    def parse(cls, line, context):
+        return cls.getParser(context).parse(line.rstrip())
 
     def compute(self, antecedents, context = None):
         """
@@ -103,8 +100,8 @@ class Rule():
         return type(self).__name__
 
 class DummyRule(Rule):
-    def compute(self, antecednets, context = None):
-        return [defaultFactory.fromTerms([], 0)]
+    def compute(self, antecednets, context):
+        return [context.ineqFactory.fromTerms([], 0)]
 
     def numConstraints(self):
         return 1
@@ -127,7 +124,7 @@ class DeleteConstraints(Rule):
     Id = "w" #(w)ithdraw
 
     @classmethod
-    def getParser(cls):
+    def getParser(cls, context):
         def f(toDelete):
             return cls(toDelete)
 
@@ -163,9 +160,10 @@ class ReverseUnitPropagation(Rule):
     solverClass = RoundingSat
 
     @classmethod
-    def getParser(cls):
+    def getParser(cls, context):
         def f(constraint):
             return cls(constraint[0])
+        ineqFactory = OPBParser(context.ineqFactory)
 
         space = parsy.regex(" +").desc("space")
 
@@ -177,17 +175,19 @@ class ReverseUnitPropagation(Rule):
         return (opb | cnf).map(f)
 
     @classmethod
-    def parse(cls, line):
+    def parse(cls, line, context):
         striped = line.strip()
         if (line.strip()[:3]) == "opb":
             try:
-                ineq = OPBParser(allowEq = False).parseLineQuick(striped[3:])
+                ineq = OPBParser(
+                    ineqFactory = context.ineqFactory,
+                    allowEq = False).parseLineQuick(striped[3:])
             except ValueError as e:
                 pass
             else:
                 return cls(ineq[0])
 
-        return cls.getParser().parse(line.rstrip())
+        return cls.getParser(context).parse(line.rstrip())
 
     def __init__(self, constraint):
         self.constraint = constraint
@@ -215,9 +215,11 @@ class ReverseUnitPropagation(Rule):
 
 class CompareToConstraint(Rule):
     @classmethod
-    def getParser(cls):
+    def getParser(cls, context):
         def f(constraintId, constraint):
             return cls.fromParsy(constraintId, constraint)
+
+        ineqFactory = OPBParser(context.ineqFactory)
 
         space = parsy.regex(" +").desc("space")
 
@@ -298,7 +300,7 @@ class Solution(Rule):
     Id = "v"
 
     @classmethod
-    def getParser(cls):
+    def getParser(cls, context):
         def f(partialAssignment):
             return cls(partialAssignment)
 
@@ -312,7 +314,7 @@ class Solution(Rule):
 
     @classmethod
     @fallback_on_error
-    def parse(cls, line):
+    def parse(cls, line, context):
         result = list(map(int, line.split()))
         if result[-1] != 0:
             raise ValueError("Expected 0 at EOL")
@@ -326,7 +328,7 @@ class Solution(Rule):
             raise SolutionCheckFailed()
 
         # implement check
-        return [defaultFactory.fromTerms([Term(1, -lit) for lit in self.partialAssignment], 1)]
+        return [context.ineqFactory.fromTerms([Term(1, -lit) for lit in self.partialAssignment], 1)]
 
     def numConstraints(self):
         return 1
@@ -346,7 +348,7 @@ class IsContradiction(Rule):
     Id = "c"
 
     @staticmethod
-    def getParser():
+    def getParser(context):
         space = parsy.regex(" +").desc("space")
         constraintId = space.optional() \
             >> parsy.regex(r"[+-]?[0-9]+") \
@@ -360,7 +362,7 @@ class IsContradiction(Rule):
         return IsContradiction(constraintId)
 
     @classmethod
-    def parse(cls, line):
+    def parse(cls, line, context):
         values = line.strip().split()
         if len(values) != 2:
             raise ValueError()
@@ -448,7 +450,7 @@ class Division(LinearCombination):
     Id = "d"
 
     @staticmethod
-    def getParser():
+    def getParser(context):
         space = parsy.regex(" +").desc("space")
         divisor = parsy.regex(r"[1-9][0-9]*").map(int).desc("positive divisor")
 
@@ -480,7 +482,7 @@ class Saturation(LinearCombination):
     Id = "s"
 
     @staticmethod
-    def getParser():
+    def getParser(context):
         return LinearCombination.getParser(create = False).map(Saturation.fromParsy)
 
     @staticmethod
@@ -498,7 +500,7 @@ class LoadLitteralAxioms(Rule):
     Id = "l"
 
     @staticmethod
-    def getParser():
+    def getParser(context):
         return parsy.regex(r" *[1-9][0-9]*") \
                 .map(int)\
                 .map(LoadLitteralAxioms.fromParsy)\
@@ -509,7 +511,7 @@ class LoadLitteralAxioms(Rule):
         return LoadLitteralAxioms(numLiterals)
 
     # @classmethod
-    # def parse(cls, line):
+    # def parse(cls, line, context):
     #     values = line.strip().split()
     #     if len(values) != 2:
     #         raise ValueError()
@@ -522,8 +524,8 @@ class LoadLitteralAxioms(Rule):
     def compute(self, antecedents, context = None):
         result = list()
         for i in range(1, self.numLiterals + 1):
-            result.append(defaultFactory.fromTerms([Term(1, i)], 0))
-            result.append(defaultFactory.fromTerms([Term(1,-i)], 0))
+            result.append(context.ineqFactory.fromTerms([Term(1, i)], 0))
+            result.append(context.ineqFactory.fromTerms([Term(1,-i)], 0))
 
         return result
 
@@ -538,7 +540,7 @@ class ReversePolishNotation(Rule):
     Id = "p"
 
     @staticmethod
-    def getParser():
+    def getParser(context):
         stackSize = 0
         def check(thing):
             nonlocal stackSize
@@ -577,7 +579,7 @@ class ReversePolishNotation(Rule):
 
     @classmethod
     @fallback_on_error
-    def parse(cls, line):
+    def parse(cls, line, context):
         def f(word):
             if word in ["+", "*", "d", "s", "r"]:
                 return word
@@ -666,7 +668,7 @@ class LoadFormula(Rule):
     Id = "f"
 
     @classmethod
-    def getParser(cls):
+    def getParser(cls, context):
         def f(numConstraints):
             return cls(numConstraints)
 
@@ -677,12 +679,12 @@ class LoadFormula(Rule):
                 << parsy.regex(r" 0") \
 
     @classmethod
-    def parse(cls, line):
+    def parse(cls, line, context):
         values = line.strip().split()
         if len(values) == 2:
             return cls(int(values[0]))
         elif len(values) == 1:
-            return cls()
+            return cls(len(context.formula))
         else:
             raise ValueError()
 

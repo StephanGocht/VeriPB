@@ -311,4 +311,4 @@ class CppIneqFactory(IneqFactory):
         ineq = super().fromTerms(terms, degree)
         return CppInequality(*terms2lists(ineq.terms), ineq.degree)
 
-defaultFactory = CppIneqFactory()
+newDefaultFactory = CppIneqFactory

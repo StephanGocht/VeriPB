@@ -1,0 +1,5 @@
+refutation using f e u 0
+f 3 0
+u opb 1 a 1 fancy_{1}^[-42] >= 1;
+e 4 opb 1 fancy_{1}^[-42] 1 a >= 1;
+* v fancy_{1}^[-42] a x3 ~x4

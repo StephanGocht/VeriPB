@@ -292,11 +292,12 @@ Example
 
 ::
 
-    v [literal] [literal] ... 0
+    v [literal] [literal] ...
+    v x1 ~x2
 
 Given a partial assignment in form of a list of ``[literal]``, i.e.
-integers, check that after unit propagation we are left with a full
-assignment that does not violate any constraint. If the check is
-successful then the clause consisting of the negation of all literals
-is added, i.e. the solution is ruled out. If the check is not
-successful then verification fails.
+variable names with ``~`` as prefix to indicate negation, check that
+after unit propagation we are left with a full assignment that does
+not violate any constraint. If the check is successful then the clause
+consisting of the negation of all literals is added, i.e. the solution
+is ruled out. If the check is not successful then verification fails.

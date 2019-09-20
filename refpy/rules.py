@@ -304,21 +304,30 @@ class Solution(Rule):
         def f(partialAssignment):
             return cls(partialAssignment)
 
-        space = parsy.regex(" +").desc("space")
-        constraintId = parsy.regex(r"[+-]?[1-9][0-9]*").map(int).desc("literal")
-        zero  = parsy.regex("0").desc("0 to end number sequence")
+        def lit2int(sign, name):
+            if sign == "~":
+                return -context.ineqFactory.name2Num(name)
+            else:
+                return context.ineqFactory.name2Num(name)
 
-        parser = space.optional() >> (constraintId << space).many() << zero
+        space = parsy.regex(" +").desc("space")
+        literal = parsy.seq(parsy.regex(r"~").optional(), parsy.regex(r"[a-zA-Z][\w\^\{\}\[\]-]*")).combine(lit2int).desc("variable in the form '~?x[1-9][0-9]*'")
+
+        parser = space.optional() >> (literal << space).many()
 
         return parser.map(f)
 
     @classmethod
     @fallback_on_error
     def parse(cls, line, context):
-        result = list(map(int, line.split()))
-        if result[-1] != 0:
-            raise ValueError("Expected 0 at EOL")
-        return cls(result[:-1])
+        def lit2int(name):
+            if name[0] == "~":
+                return -context.ineqFactory.name2Num(name[1:])
+            else:
+                return context.ineqFactory.name2Num(name)
+
+        result = list(map(lit2int, line.split()))
+        return cls(result)
 
     def __init__(self, partialAssignment):
         self.partialAssignment = partialAssignment

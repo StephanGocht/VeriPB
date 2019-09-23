@@ -1,4 +1,3 @@
-import parsy
 import logging
 import refpy.constraints
 import mmap
@@ -19,27 +18,22 @@ class RuleParser():
 
     def checkIdentifier(self, Id):
         if not Id in self.rules:
-            return parsy.fail("Unsuported rule.")
-
-        return parsy.success(Id)
+            raise ValueError("Unsuported rule '%s'."%(Id))
 
     def parseHeader(self, line, lineNum):
-        headerParser = parsy.regex(r"refutation using").\
-            then(
-                parsy.regex(r" +").desc("space").\
-                    then(
-                        parsy.regex(r"[^0 ]+").desc("rule identifier").\
-                        bind(partial(RuleParser.checkIdentifier, self))
-                    ).\
-                    many()
-            ).skip(
-                parsy.regex(r" *0 *\n?").desc("0 at end of line")
-            )
+        with WordParser(line) as words:
+            words.expectExact("refutation")
+            words.expectExact("using")
 
-        try:
-            headerParser.parse(line)
-        except parsy.ParseError as e:
-            raise ParseError(e, line = lineNum)
+            try:
+                nxt = next(words)
+                while (nxt != "0"):
+                    self.checkIdentifier(nxt)
+                    nxt = next(words)
+            except StopIteration:
+                raise ValueError("Expected 0 at end of constraint.")
+
+            words.expectEnd()
 
     def isEmpty(self, line):
         if  len(line) == 0 \
@@ -81,10 +75,6 @@ class RuleParser():
                         listener(range(ineqId, ineqId + numConstraints), self.context)
                     ineqId += numConstraints
 
-                except parsy.ParseError as e:
-                    raise ParseError(e, line = lineNum)
-                except ValueError as e:
-                    raise ParseError(e, line = lineNum)
                 except refpy.ParseError as e:
                     e.line = lineNum
                     e.column += idSize
@@ -104,44 +94,40 @@ class OPBParser():
         self.ineqFactory = ineqFactory
         self.allowEq = allowEq
 
-
-        self.slowParser = self.getOPBParser(allowEq)
-
     def parse(self, formulaFile):
-        numVar = (parsy.regex(r" *#variable *= *") >> parsy.regex(r"[0-9]+")) \
-                        .map(int) \
-                        .desc("Number of variables in the form '#variable = [0-9]+'")
-        numC = (parsy.regex(r" *#constraint *= *") >> parsy.regex(r"[0-9]+")) \
-                        .map(int) \
-                        .desc("Number of constraints in the form '#constraint = [0-9]+'")
-
-        eol = parsy.regex(" *\n").desc("return at end of line").many()
-        emptyLine = parsy.regex(r"(\s+)").desc("empty line")
-        commentLine = parsy.regex(r"(\s*\*.*)").desc("comment line starting with '*'")
-        header = (parsy.regex(r"\* ") >> parsy.seq(numVar, numC) << eol) \
-                        .desc("header line in form of '* #variable = [0-9]+ #constraint = [0-9]+'")
-
-        nothing = (emptyLine << eol | commentLine << eol).map(lambda x: [])
-
         lines = iter(enumerate(formulaFile, start = 1))
 
-        lineNum, line = next(lines)
         try:
-            numVar, numC = header.parse(line)
-        except parsy.ParseError as e:
-            raise ParseError(e, line = lineNum)
+            lineNum, line = next(lines)
+        except StopIteration:
+            raise ParseError("Expected header." ,line = 1)
+
+        try:
+            numVar, numC = self.parseHeader(line)
+        except ParseError as e:
+            e.line = lineNum
+            raise e
 
         constraints = list()
         for lineNum, line in lines:
-            line = line.rstrip()
             try:
-                constraints.extend(self.parseLine(line))
-            except parsy.ParseError as e:
-                raise ParseError(e, line = lineNum)
-            except ValueError as e:
-                raise ParseError(e, line = lineNum)
+                constraints.extend(self.parseLine(line.rstrip()))
+            except ParseError as e:
+                e.line = lineNum
+                raise e
 
         return ((numVar, numC), constraints)
+
+    def parseHeader(self, line):
+        with WordParser(line) as words:
+            words.expectExact("*")
+            words.expectExact("#variable=")
+            numVar = words.nextInt()
+
+            words.expectExact("#constraint=")
+            numC = words.nextInt()
+
+            return (numVar, numC)
 
     def parseLine(self, line):
         if len(line) == 0 or line[0] == "*":
@@ -163,26 +149,26 @@ class OPBParser():
         return ineq
 
     def parseCNF(self, words):
+        words = iter(words)
         lits = list()
         try:
-            nxt = words.nextInt()
+            nxt = int(next(words))
             while (nxt != 0):
                 lits.append(nxt)
-                nxt = words.nextInt()
+                nxt = int(next(words))
         except StopIteration:
             raise ValueError("Expected 0 at end of constraint.")
 
         return [self.ineqFactory.fromTerms([Term(1,l) for l in lits], 1)]
 
-    def parseOPB(self, wordParser):
+    def parseOPB(self, words):
         def parseVar(s):
             if s[0] == "~":
                 return -self.ineqFactory.name2Num(s[1:])
             else:
                 return self.ineqFactory.name2Num(s)
-
+        it = iter(words)
         terms = list()
-        it = wordParser
         nxt = next(it)
         while (nxt not in [">=","="]):
             terms.append((int(nxt), parseVar(next(it))))
@@ -205,71 +191,6 @@ class OPBParser():
             result.append(self.ineqFactory.fromTerms([(-a,l) for a,l in terms], -degree))
         return result
 
-    def getOPBConstraintParser(self, allowEq = True):
-        def lit2int(sign, num):
-            if sign == "~":
-                return -self.ineqFactory.name2Num(num)
-            else:
-                return self.ineqFactory.name2Num(num)
-
-        space    = parsy.regex(r" +").desc("space")
-        coeff    = parsy.regex(r"[+-]?[0-9]+").map(int).desc("integer for the coefficient (make sure to not have spaces between the sign and the degree value)")
-        variable = parsy.seq(parsy.regex(r"~").optional(), parsy.regex(r"[a-zA-Z][\w\^\{\}\[\]-]*")).combine(lit2int).desc("variable in the form '~?x[1-9][0-9]*'")
-        term     = parsy.seq(coeff << space, variable << space).map(tuple)
-
-        if allowEq:
-            equality = parsy.regex(r"(=|>=)").desc("= or >=")
-        else:
-            equality = parsy.regex(r">=").desc(">=")
-
-        degree   = space >> parsy.regex(r"[+-]?[0-9]+").map(int).desc("integer for the degree")
-
-        end      = parsy.regex(r";").desc("termination of rhs with ';'")
-        finish   = space.optional() >> end
-
-        return parsy.seq(space.optional() >> term.many(), equality, degree << finish).map(tuple)
-
-    def getCNFConstraintParser(self):
-        def f(lit):
-            var = self.ineqFactory.name2Num("x%i"%abs(lit))
-            if lit < 0:
-                return -var
-            else:
-                return var
-
-        space    = parsy.regex(r" +").desc("space")
-        literal  = parsy.regex(r"[+-]?[1-9][0-9]*").desc("literal").map(int)
-        eol      = parsy.regex(r"0").desc("end of line zero")
-
-        return (literal << space).many() << eol
-
-    def fromParsy(self, t):
-        result = list()
-
-        if isinstance(t, list):
-            # we got a clause from getCNFParser
-            result.append(self.ineqFactory.fromTerms([Term(1,l) for l in t], 1))
-        else:
-            # we got a tuple containing a constraint
-            terms, eq, degree = t
-
-            result.append(self.ineqFactory.fromTerms([Term(a,x) for a,x in terms], degree))
-            if eq == "=":
-                result.append(self.ineqFactory.fromTerms([Term(-a,x) for a,x in terms], -degree))
-
-        return parsy.success(result)
-
-    def getOPBParser(self, allowEq = True):
-        def f(t):
-            return self.fromParsy(t)
-
-        return self.getOPBConstraintParser(allowEq).bind(f)
-
-    def getCNFParser(self):
-        def f(t):
-            return self.fromParsy(t)
-
-        return self.getCNFConstraintParser().bind(f)
 
 class WordParser():
     def __init__(self, line):
@@ -325,6 +246,11 @@ class WordParser():
 
     def nextInt(self):
         return int(self.next("Expected integer, got nothing."))
+
+    def expectExact(self, what):
+        nxt = next(self)
+        if (nxt != what):
+            raise ValueError("Expected %s, got %s."%(what, nxt))
 
     def expectZero(self):
         if (next(self) != "0"):

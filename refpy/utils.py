@@ -1,6 +1,5 @@
 import argparse
 import logging
-import parsy
 
 from refpy import InvalidProof
 from refpy import ParseError

@@ -21,16 +21,26 @@ class TestParsing(unittest.TestCase):
         print(parser.parse(registered_rules, ["refutation using e 0"]))
 
     def test_OPB_line_1(self):
-        res = OPBParser(self.ineqFactory).getOPBConstraintParser().parse("3 x1 >= 2;")
-        assert res == ([(3,1)], ">=", 2)
+        res = OPBParser(self.ineqFactory).parseOPB("3 x1 >= 2;".split())
+        assert res == [self.ineqFactory.fromTerms([Term(3,1)], 2)]
 
     def test_OPB_line_2(self):
-        res = OPBParser(self.ineqFactory).getOPBConstraintParser().parse("-4 x2 +2 x1 = -42;")
-        assert res == ([(-4,1),(2,2)], "=", -42)
+        res = OPBParser(self.ineqFactory).parseOPB("+2 x1 -4 x2 = -42;".split())
+        assert res == [
+            self.ineqFactory.fromTerms([Term(2,1), Term(-4,2)], -42),
+            self.ineqFactory.fromTerms([Term(-2,1), Term(4,2)], 42)]
+
+    def test_eq(self):
+        res = OPBParser(self.ineqFactory).parseOPB("1 x2 -2 x1 = 2;".split())
+
+        ineq1 = self.ineqFactory.fromTerms([Term(-2,2), Term(1,1)], 2)
+        ineq2 = self.ineqFactory.fromTerms([Term(2,2), Term(-1,1)], -2)
+
+        assert res == [ineq1, ineq2]
 
     def test_CNF_line(self):
-        res = OPBParser(self.ineqFactory).getCNFConstraintParser().parse("2 -1 0")
-        assert res == [2, -1]
+        res = OPBParser(self.ineqFactory).parseCNF("2 -1 0".split())
+        assert res == [self.ineqFactory.fromTerms([Term(1,2), Term(1,-1)], 1)]
 
     def test_equals(self):
         rule = ConstraintEquals.parse("42 opb 3 x1 >= 2;", self.context)
@@ -43,22 +53,6 @@ class TestParsing(unittest.TestCase):
     def test_contradiction(self):
         rule = IsContradiction.parse("42 0", self.context)
         assert rule == IsContradiction(42)
-
-class TestInequalityParsing(unittest.TestCase):
-    def setUp(self):
-        self.ineqFactory = newDefaultFactory()
-
-    def test_eq(self):
-        parser = OPBParser(self.ineqFactory).getOPBParser()
-        result = parser.parse("1 x2 -2 x1 = 2;")
-
-        ineq1 = self.ineqFactory.fromTerms([Term(-2,2), Term(1,1)], 2)
-        ineq2 = self.ineqFactory.fromTerms([Term(2,2), Term(-1,1)], -2)
-
-        assert len(result) == 2
-        print(result)
-        assert (result[0] == ineq1 and result[1] == ineq2) \
-            or (result[0] == ineq2 and result[1] == ineq1)
 
 class TestWordParser(unittest.TestCase):
     def test_working_1(self):

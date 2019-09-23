@@ -1,5 +1,4 @@
 from recordclass import structclass
-import parsy
 import cppimport
 
 def copysign(a, b):

@@ -11,7 +11,6 @@ setup(
     packages=['refpy'],
     install_requires=[
         "recordclass",
-        "parsy",
         "cppimport"
     ],
     entry_points={

@@ -301,3 +301,11 @@ after unit propagation we are left with a full assignment that does
 not violate any constraint. If the check is successful then the clause
 consisting of the negation of all literals is added, i.e. the solution
 is ruled out. If the check is not successful then verification fails.
+
+# set level
+----
+
+
+
+(w)ipeout level
+----

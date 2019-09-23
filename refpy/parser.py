@@ -11,6 +11,10 @@ from refpy.exceptions import ParseError
 class RuleParser():
     def __init__(self, context):
         self.context = context
+        try:
+            self.context.addIneqListener
+        except AttributeError:
+            self.context.addIneqListener = list()
 
     def checkIdentifier(self, Id):
         if not Id in self.rules:
@@ -52,6 +56,7 @@ class RuleParser():
         result = list()
 
         lineNum = 1
+        ineqId = 1
         lines = iter(file)
         # the first line is not allowed to be comment line or empty but must be the header
         self.parseHeader(next(lines), lineNum)
@@ -66,7 +71,13 @@ class RuleParser():
                     raise ParseError("Unsupported rule '%s'"%(line[0]), line = lineNum)
 
                 try:
-                    result.append(rule.parse(line[1:], self.context))
+                    step = rule.parse(line[1:], self.context)
+                    numConstraints = step.numConstraints()
+                    result.append(step)
+                    for listener in self.context.addIneqListener:
+                        listener(range(ineqId, ineqId + numConstraints), self.context)
+                    ineqId += numConstraints
+
                 except parsy.ParseError as e:
                     raise ParseError(e, line = lineNum)
                 except ValueError as e:

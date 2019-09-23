@@ -99,6 +99,16 @@ class Rule():
     def __str__(self):
         return type(self).__name__
 
+class EmptyRule():
+    def compute(self, antecednets, context):
+        return []
+
+    def numConstraints(self):
+        return 0
+
+    def antecedentIDs(self):
+        return []
+
 class DummyRule(Rule):
     def compute(self, antecednets, context):
         return [context.ineqFactory.fromTerms([], 0)]
@@ -710,3 +720,68 @@ class LoadFormula(Rule):
 
     def antecedentIDs(self):
         return []
+
+class LevelStack():
+    @staticmethod
+    def addIneqCallback(ineqs, context):
+        self = context.levelStack
+        self.addToCurrentLevel(ineqs)
+
+    @classmethod
+    def setup(cls, context):
+        try:
+            return context.levelStack
+        except AttributeError:
+            context.levelStack = LevelStack()
+            context.addIneqCallback.append(cls.addIneqCallback)
+            return context.levelStack
+
+    def __init__(self):
+        self.currentLevel = 0
+        self.levels = list()
+
+    def setLevel(self, level):
+        while len(self.levels) <= level:
+            self.levels.append(list())
+
+    def addToCurrentLevel(self, ineqs):
+        self.levels[self.currentLevel].extend(ineqs)
+
+    def wipeLevel(self, level):
+        if level >= len(self.levels):
+            raise ValueError("Tried to wipe level %i that was never set."%(level))
+
+        result = list()
+        for i in range(level, len(self.levels)):
+            result.extend(self.levels[i])
+            self.levels[i].clear()
+
+        return result
+
+
+@register_rule
+class SetLevel(EmptyRule):
+    Id = "#"
+
+    @classmethod
+    def parse(cls, line, context):
+        levelStack = LevelStack.setup(context)
+        level = int(line)
+        levelSTack.setLevel(level)
+
+
+@register_rule
+class WipeLevel(EmptyRule):
+    Id = "w2"
+
+    @classmethod
+    def parse(cls, line, context):
+        levelStack = LevelStack.setup(context)
+        level = int(line)
+        return cls(levelStack.wipeLevel(level))
+
+    def __init__(self, deleteConstraints):
+        self._deleteConstraints = deleteConstraints
+
+    def deleteConstraints():
+        return self._deleteConstraints

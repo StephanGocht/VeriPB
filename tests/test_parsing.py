@@ -17,7 +17,7 @@ class TestParsing(unittest.TestCase):
         self.context.ineqFactory = self.ineqFactory
 
     def test_header(self):
-        parser = RuleParser(None)
+        parser = RuleParser(DummyContext())
         print(parser.parse(registered_rules, ["refutation using e 0"]))
 
     def test_OPB_line_1(self):

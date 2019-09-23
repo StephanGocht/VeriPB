@@ -1,9 +1,7 @@
 import refpy.constraints
 from refpy.constraints import Term
 from refpy.pbsolver import RoundingSat, Formula
-from refpy.parser import OPBParser
-
-import parsy
+from refpy.parser import OPBParser, WordParser
 
 from refpy import InvalidProof
 
@@ -11,42 +9,6 @@ registered_rules = []
 def register_rule(rule):
     registered_rules.append(rule)
     return rule
-
-def fallback_on_error(parse):
-    """
-    Call the getParser(context) method of the class to get a
-    proper error message from the parser.
-    """
-    def f(*args, **kwargs):
-        try:
-            return parse(*args, **kwargs)
-        except ValueError as e:
-            try:
-                if len(args) >= 1:
-                    cls = args[0]
-                    args = args[1:]
-                else:
-                    cls = kwargs["cls"]
-                    del kwargs["cls"]
-                if len(args) >= 1:
-                    line = args[0]
-                    args = args[1:]
-                else:
-                    line = kwargs["line"]
-                    del kwargs["line"]
-
-                cls.getParser(*args, **kwargs).parse(line)
-            except parsy.ParseError as parseError:
-                # the id is not supposed to be passed in line
-                # so we need to fix the position
-                parseError.index += len(cls.Id)
-                raise parseError
-            except AttributeError:
-                raise e
-            else:
-                raise e
-
-    return f
 
 class Rule():
     @staticmethod
@@ -134,17 +96,14 @@ class DeleteConstraints(Rule):
     Id = "w" #(w)ithdraw
 
     @classmethod
-    def getParser(cls, context):
-        def f(toDelete):
-            return cls(toDelete)
+    def parse(cls, line, context):
+        with WordParser(line) as words:
+            which = list(map(int, words))
 
-        space = parsy.regex(" +").desc("space")
-        constraintId = parsy.regex(r"[1-9][0-9]*").map(int).desc("constraintId")
-        zero  = parsy.regex("0").desc("0 to end number sequence")
+            if (which[-1] == 0):
+                which = which[:-1]
 
-        parser = space.optional() >> (constraintId << space).many() << zero
-
-        return parser.map(f)
+        return cls(which)
 
     def __init__(self, toDelete):
         self.toDelete = toDelete
@@ -167,37 +126,16 @@ class DeleteConstraints(Rule):
 @register_rule
 class ReverseUnitPropagation(Rule):
     Id = "u"
-    solverClass = RoundingSat
-
-    @classmethod
-    def getParser(cls, context):
-        def f(constraint):
-            return cls(constraint[0])
-        ineqFactory = OPBParser(context.ineqFactory)
-
-        space = parsy.regex(" +").desc("space")
-
-        opb = space.optional() >> parsy.regex(r"opb") \
-                >> space >> ineqFactory.getOPBParser(allowEq = False)
-        cnf = space.optional() >> parsy.regex(r"cnf") \
-                >> space >> ineqFactory.getCNFParser()
-
-        return (opb | cnf).map(f)
 
     @classmethod
     def parse(cls, line, context):
-        striped = line.strip()
-        if (line.strip()[:3]) == "opb":
-            try:
-                ineq = OPBParser(
+        with WordParser(line) as words:
+            parser = OPBParser(
                     ineqFactory = context.ineqFactory,
-                    allowEq = False).parseLineQuick(striped[3:])
-            except ValueError as e:
-                pass
-            else:
-                return cls(ineq[0])
+                    allowEq = False)
+            ineq = parser.parseConstraint(words)
 
-        return cls.getParser(context).parse(line.rstrip())
+        return cls(ineq[0])
 
     def __init__(self, constraint):
         self.constraint = constraint
@@ -225,27 +163,17 @@ class ReverseUnitPropagation(Rule):
 
 class CompareToConstraint(Rule):
     @classmethod
-    def getParser(cls, context):
-        def f(constraintId, constraint):
-            return cls.fromParsy(constraintId, constraint)
+    def parse(cls, line, context = None):
+        with WordParser(line) as words:
+            which = words.nextInt()
 
-        ineqFactory = OPBParser(context.ineqFactory)
+            parser = OPBParser(
+                    ineqFactory = context.ineqFactory,
+                    allowEq = False)
+            ineq = parser.parseConstraint(words)
+            words.expectEnd()
 
-        space = parsy.regex(" +").desc("space")
-
-        opb = space.optional() >> parsy.regex(r"opb") \
-                >> space >> ineqFactory.getOPBParser(allowEq = False)
-        cnf = space.optional() >> parsy.regex(r"cnf") \
-                >> space >> ineqFactory.getCNFParser()
-
-        constraintId = space.optional() >> parsy.regex(r"[+-]?[0-9]+ ") \
-            .map(int).desc("constraintId")
-
-        return parsy.seq(constraintId, opb | cnf).combine(f)
-
-    @classmethod
-    def fromParsy(cls,constraintId, constraint):
-        return cls(constraintId, constraint[0])
+        return cls(which, ineq[0])
 
     def __init__(self, constraintId, constraint):
         self.constraintId = constraintId
@@ -310,25 +238,6 @@ class Solution(Rule):
     Id = "v"
 
     @classmethod
-    def getParser(cls, context):
-        def f(partialAssignment):
-            return cls(partialAssignment)
-
-        def lit2int(sign, name):
-            if sign == "~":
-                return -context.ineqFactory.name2Num(name)
-            else:
-                return context.ineqFactory.name2Num(name)
-
-        space = parsy.regex(" +").desc("space")
-        literal = parsy.seq(parsy.regex(r"~").optional(), parsy.regex(r"[a-zA-Z][\w\^\{\}\[\]-]*")).combine(lit2int).desc("variable in the form '~?x[1-9][0-9]*'")
-
-        parser = space.optional() >> (literal << space).many()
-
-        return parser.map(f)
-
-    @classmethod
-    @fallback_on_error
     def parse(cls, line, context):
         def lit2int(name):
             if name[0] == "~":
@@ -336,7 +245,9 @@ class Solution(Rule):
             else:
                 return context.ineqFactory.name2Num(name)
 
-        result = list(map(lit2int, line.split()))
+        with WordParser(line) as words:
+            result = list(map(lit2int, words))
+
         return cls(result)
 
     def __init__(self, partialAssignment):
@@ -366,27 +277,14 @@ class Solution(Rule):
 class IsContradiction(Rule):
     Id = "c"
 
-    @staticmethod
-    def getParser(context):
-        space = parsy.regex(" +").desc("space")
-        constraintId = space.optional() \
-            >> parsy.regex(r"[+-]?[0-9]+") \
-                .map(int).map(IsContradiction.fromParsy)
-        zero  = parsy.regex("0").desc("0 to end number sequence")
-
-        return constraintId << space << zero
-
-    @staticmethod
-    def fromParsy(constraintId):
-        return IsContradiction(constraintId)
-
     @classmethod
     def parse(cls, line, context):
-        values = line.strip().split()
-        if len(values) != 2:
-            raise ValueError()
+        with WordParser(line) as words:
+            which = words.nextInt()
+            words.expectZero()
+            words.expectEnd()
 
-        return cls(int(values[0]))
+        return cls(which)
 
     def __init__(self, constraintId):
         self.constraintId = constraintId
@@ -409,133 +307,17 @@ class IsContradiction(Rule):
         return True
 
 @register_rule
-class LinearCombination(Rule):
-    Id = "a"
-
-    @staticmethod
-    def getParser(create = True):
-        space = parsy.regex(" +").desc("space")
-        factor = parsy.regex(r"[0-9]+").map(int).desc("factor")
-        constraintId = parsy.regex(r"[1-9][0-9]*").map(int).desc("constraintId")
-        zero  = parsy.regex("0").desc("0 to end number sequence")
-
-        summand = parsy.seq(factor << space, constraintId << space).map(tuple)
-        parser = space.optional() >> summand.many() << zero
-
-        if create:
-            return parser.map(LinearCombination.fromParsy)
-        else:
-            return parser
-
-    @staticmethod
-    def fromParsy(sequence):
-        factors, antecedentIds = zip(*sequence)
-        return LinearCombination(factors, antecedentIds)
-
-    def __init__(self, factors, antecedentIds):
-        assert len(factors) == len(antecedentIds)
-        self.antecedentIds = antecedentIds
-        self.factors = factors
-
-    def compute(self, antecedents, context = None):
-        it = zip(self.factors, antecedents)
-        factor, constraint = next(it)
-        result = constraint.copy()
-        result.multiply(factor)
-
-        for factor, constraint in it:
-            constraint = constraint.copy()
-            constraint = constraint.multiply(factor)
-            result = result.add(constraint)
-
-        return [result]
-
-    def numConstraints(self):
-        return 1
-
-    def antecedentIDs(self):
-        return self.antecedentIds
-
-    def __eq__(self, other):
-        print(self.antecedentIds)
-        print(other.antecedentIds)
-        return self.antecedentIds == other.antecedentIds
-
-    def isGoal(self):
-        return False
-
-@register_rule
-class Division(LinearCombination):
-    Id = "d"
-
-    @staticmethod
-    def getParser(context):
-        space = parsy.regex(" +").desc("space")
-        divisor = parsy.regex(r"[1-9][0-9]*").map(int).desc("positive divisor")
-
-        return parsy.seq(
-                space.optional() >> divisor,
-                LinearCombination.getParser(create = False)
-            ).combine(Division.fromParsy)
-
-    @staticmethod
-    def fromParsy(divisor, sequence):
-        factors, antecedentIds = zip(*sequence)
-        return Division(divisor, factors, antecedentIds)
-
-    def __init__(self, divisor, factors, antecedentIds):
-        assert len(factors) == len(antecedentIds)
-        super().__init__(factors, antecedentIds)
-        self.divisor = divisor
-
-    def compute(self, antecedents, context = None):
-        constraint = super().compute(antecedents)[0]
-        constraint.divide(self.divisor)
-        return [constraint]
-
-    def __eq__(self, other):
-        return super().__eq__(other) and self.divisor == other.divisor
-
-@register_rule
-class Saturation(LinearCombination):
-    Id = "s"
-
-    @staticmethod
-    def getParser(context):
-        return LinearCombination.getParser(create = False).map(Saturation.fromParsy)
-
-    @staticmethod
-    def fromParsy(sequence):
-        factors, antecedentIds = zip(*sequence)
-        return Saturation(factors, antecedentIds)
-
-    def compute(self, antecedents, context = None):
-        constraint = super().compute(antecedents)[0]
-        constraint.saturate()
-        return [constraint]
-
-@register_rule
 class LoadLitteralAxioms(Rule):
     Id = "l"
 
-    @staticmethod
-    def getParser(context):
-        return parsy.regex(r" *[1-9][0-9]*") \
-                .map(int)\
-                .map(LoadLitteralAxioms.fromParsy)\
-                .desc("number of literals") << parsy.regex(r" 0")
+    @classmethod
+    def parse(cls, line, context):
+        with WordParser(line) as words:
+            numLiterals = words.nextInt()
+            words.expectZero()
+            words.expectEnd()
 
-    @staticmethod
-    def fromParsy(numLiterals):
-        return LoadLitteralAxioms(numLiterals)
-
-    # @classmethod
-    # def parse(cls, line, context):
-    #     values = line.strip().split()
-    #     if len(values) != 2:
-    #         raise ValueError()
-
-    #     return cls(int(values[0]))
+        return cls(numLiterals)
 
     def __init__(self, numLiterals):
         self.numLiterals = numLiterals
@@ -558,58 +340,35 @@ class LoadLitteralAxioms(Rule):
 class ReversePolishNotation(Rule):
     Id = "p"
 
-    @staticmethod
-    def getParser(context):
+    @classmethod
+    def parse(cls, line, context):
         stackSize = 0
-        def check(thing):
+        def f(word):
             nonlocal stackSize
 
-            if isinstance(thing, int):
-                stackSize += 1
-            elif thing in ["+", "*", "d"]:
+            if word in ["+", "*", "d"]:
                 stackSize -= 1
-            elif thing == "r":
+            elif word == "r":
                 stackSize -= 2
-            elif thing == "s":
+            elif word == "s":
                 stackSize += 0
+            else:
+                try:
+                    word = int(word)
+                    stackSize += 1
+                except ValueError:
+                    raise ValueError("Expected integer or one of +, *, d, s, r.")
 
             if stackSize < 0:
-                return parsy.fail("Trying to pop from empty stack in reverse polish notation.")
-            else:
-                return parsy.success(thing)
+                raise ValueError("Trying to pop from empty stack in reverse polish notation.")
 
-        def finalCheck(instructions):
-            nonlocal stackSize
+            return word
 
-            failed = stackSize != 1
-            stackSize = 0
-            if failed:
-                return parsy.fail("Non empty stack at end of polish notation")
-            else:
-                return parsy.success(ReversePolishNotation(instructions))
-
-        space = parsy.regex(r" +").desc("space")
-        number = parsy.regex(r"[0-9]+").map(int).desc("number")
-        operator = parsy.regex(r"[+*dsr]").desc("operator +,*,d,s,r")
-
-        return (space.optional() >> (number | operator).bind(check)).many().bind(finalCheck) \
-            << space << parsy.regex(r"0").desc("0 to terminate sequence").optional()
-
-
-    @classmethod
-    @fallback_on_error
-    def parse(cls, line, context):
-        def f(word):
-            if word in ["+", "*", "d", "s", "r"]:
-                return word
-            else:
-                return int(word)
-
-        sequence = list(map(f, line.strip().split()))
+        with WordParser(line) as words:
+            sequence = list(map(f, words))
         if sequence[-1] == 0:
             sequence.pop()
         return cls(sequence)
-
 
     class AntecedentIterator():
         def __init__(self, instructions):
@@ -687,25 +446,24 @@ class LoadFormula(Rule):
     Id = "f"
 
     @classmethod
-    def getParser(cls, context):
-        def f(numConstraints):
-            return cls(numConstraints)
-
-        return parsy.regex(r" *[1-9][0-9]*") \
-                .map(int)\
-                .desc("number of constraints")\
-                .map(f)\
-                << parsy.regex(r" 0") \
-
-    @classmethod
     def parse(cls, line, context):
-        values = line.strip().split()
-        if len(values) == 2:
-            return cls(int(values[0]))
-        elif len(values) == 1:
-            return cls(len(context.formula))
-        else:
-            raise ValueError()
+        numConstraints = len(context.formula)
+        with WordParser(line) as words:
+            num = words.nextInt()
+            if num == 0:
+                words.expectEnd()
+                return cls(numConstraints)
+            else:
+                if num != numConstraints:
+                    raise ValueError(
+                        "Number of constraints does not match, got %i but "\
+                        "there are %i constraints."%(num, numConstraints))
+
+                if (words.nextInt() != 0):
+                    raise ValueError("Expected 0.")
+                words.expectEnd()
+
+                return cls(numConstraints)
 
     def __init__(self, numConstraints):
         self._numConstraints = numConstraints
@@ -766,7 +524,9 @@ class SetLevel(EmptyRule):
     @classmethod
     def parse(cls, line, context):
         levelStack = LevelStack.setup(context)
-        level = int(line)
+        with WordParser(line) as words:
+            level = words.nextInt()
+            words.expectEnd()
         levelSTack.setLevel(level)
 
 
@@ -777,7 +537,10 @@ class WipeLevel(EmptyRule):
     @classmethod
     def parse(cls, line, context):
         levelStack = LevelStack.setup(context)
-        level = int(line)
+        with WordParser(line) as words:
+            level = words.nextInt()
+            words.expectEnd()
+
         return cls(levelStack.wipeLevel(level))
 
     def __init__(self, deleteConstraints):

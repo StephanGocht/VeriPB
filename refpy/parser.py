@@ -2,6 +2,7 @@ import parsy
 import logging
 import refpy.constraints
 import mmap
+import re
 
 from refpy.constraints import Term
 
@@ -58,6 +59,8 @@ class RuleParser():
         lineNum = 1
         ineqId = 1
         lines = iter(file)
+
+        idSize = 1
         # the first line is not allowed to be comment line or empty but must be the header
         self.parseHeader(next(lines), lineNum)
 
@@ -66,12 +69,12 @@ class RuleParser():
 
             if not self.isEmpty(line):
                 try:
-                    rule = self.rules[line[0]]
+                    rule = self.rules[line[0:idSize]]
                 except KeyError as e:
                     raise ParseError("Unsupported rule '%s'"%(line[0]), line = lineNum)
 
                 try:
-                    step = rule.parse(line[1:], self.context)
+                    step = rule.parse(line[idSize:], self.context)
                     numConstraints = step.numConstraints()
                     result.append(step)
                     for listener in self.context.addIneqListener:
@@ -82,6 +85,10 @@ class RuleParser():
                     raise ParseError(e, line = lineNum)
                 except ValueError as e:
                     raise ParseError(e, line = lineNum)
+                except refpy.ParseError as e:
+                    e.line = lineNum
+                    e.column += idSize
+                    raise e
 
         return result
 
@@ -137,46 +144,64 @@ class OPBParser():
         return ((numVar, numC), constraints)
 
     def parseLine(self, line):
-        try:
-            return self.parseLineQuick(line)
-        except ValueError as valueError:
-            try:
-                self.slowParser.parse(line)
-            except parsy.ParseError as e:
-                raise e
-            else:
-                # if the parsy parser can parse it we do not want to
-                # silenty work as this means that the parsy
-                # specification is not precise enough
-                raise valueError
+        if len(line) == 0 or line[0] == "*":
+            return []
+        else:
+            with WordParser(line) as words:
+                result = self.parseOPB(words)
+                words.expectEnd()
+                return result
 
-    def parseLineQuick(self, line):
+    def parseConstraint(self, words):
+        constraintType = next(words)
+        if constraintType == "opb":
+            ineq = self.parseOPB(words)
+        elif constraintType == "cnf":
+            ineq = self.parseCNF(words)
+        else:
+            raise ValueError("Unnown constraint type.")
+        return ineq
+
+    def parseCNF(self, words):
+        lits = list()
+        try:
+            nxt = words.nextInt()
+            while (nxt != 0):
+                lits.append(nxt)
+                nxt = words.nextInt()
+        except StopIteration:
+            raise ValueError("Expected 0 at end of constraint.")
+
+        return [self.ineqFactory.fromTerms([Term(1,l) for l in lits], 1)]
+
+    def parseOPB(self, wordParser):
         def parseVar(s):
             if s[0] == "~":
                 return -self.ineqFactory.name2Num(s[1:])
             else:
                 return self.ineqFactory.name2Num(s)
 
-        if len(line) == 0 or line[0] == "*":
-            return []
-
         terms = list()
-        it = iter(line.split())
+        it = wordParser
         nxt = next(it)
         while (nxt not in [">=","="]):
             terms.append((int(nxt), parseVar(next(it))))
             nxt = next(it)
 
         op = nxt
+        if op == "=" and not self.allowEq:
+            return ValueError("Equality not allowed, only >= is allowed here.")
+
         degree = next(it)
         if degree[-1] == ";":
-            degree = degree[:-1]
-        degree = int(degree)
+            degree = int(degree[:-1])
+        else:
+            degree = int(degree)
+            if (next(it) != ";"):
+                raise ValueError("Expecting ; at the end of the constraint.")
 
         result = [self.ineqFactory.fromTerms(terms, degree)]
         if op == "=":
-            if not self.allowEq:
-                return ValueError()
             result.append(self.ineqFactory.fromTerms([(-a,l) for a,l in terms], -degree))
         return result
 
@@ -245,3 +270,70 @@ class OPBParser():
             return self.fromParsy(t)
 
         return self.getCNFConstraintParser().bind(f)
+
+class WordParser():
+    def __init__(self, line):
+        self.line = line
+        self.words = line.split()
+        self.pos = -1
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        self.pos += 1
+        if (self.pos >= len(self.words)):
+            raise StopIteration(self)
+        return self.words[self.pos]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exec_type, exec_value, exec_traceback):
+        if exec_type is not None:
+            if issubclass(exec_type, ValueError):
+                self.raiseParseError(self.pos, exec_value)
+            if issubclass(exec_type, StopIteration) \
+                    and exec_value.value is self:
+                self.expectedWord()
+
+    def raiseParseError(self, word, error):
+        column = None
+        if self.pos >= len(self.words):
+            column = len(self.line)
+        else:
+            for idx, match in enumerate(re.finditer(r" *(?P<word>[^ ]+)", self.line)):
+                if idx == self.pos:
+                    column = match.start("word")
+
+        assert(column is not None)
+
+        column += 1
+        raise ParseError(error, column = column)
+
+    def expectedWord(self):
+        self.raiseParseError(self.pos, "Expected another word.")
+
+    def next(self, what = None):
+        try:
+            return next(self)
+        except StopIteration:
+            if what is None:
+                self.expectedWord()
+            else:
+                raise ValueError(what)
+
+    def nextInt(self):
+        return int(self.next("Expected integer, got nothing."))
+
+    def expectZero(self):
+        if (next(self) != "0"):
+            raise ValueError("Expected 0.")
+
+    def expectEnd(self):
+        try:
+            next(self)
+        except StopIteration:
+            pass
+        else:
+            raise ValueError("Expected end of line!")

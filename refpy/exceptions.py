@@ -1,16 +1,24 @@
 import parsy
 
 class ParseError(Exception):
-    def __init__(self, error, fileName = None, line = None):
+    def __init__(self, error, fileName = None, line = None, column = None):
         self.error = error
         self.line  = line
+        self.column = column
         self.fileName  = fileName
 
     def __str__(self):
         if isinstance(self.error, parsy.ParseError):
             return str(ParsyErrorAdapter(self.error, self.fileName, self.line))
         else:
-            return "%s:%s: %s"%(self.fileName, self.line, str(self.error))
+            s = ""
+            for l in [self.fileName, self.line, self.column]:
+                if l is not None:
+                    s += "%s:"%str(l)
+                else:
+                    s += "?:"
+            s += str(self.error)
+            return s
 
 class ParsyErrorAdapter(parsy.ParseError):
     def __init__(self, orig, fileName, line = None):

@@ -1,4 +1,4 @@
-refutation using f a e 0
+refutation using f e 0
 f 4 0
 e 1 opb  2 x1 +1 x2 +1 x3 >= 2;
 e 2 opb -2 x1 -1 x2 -1 x3 >= -2;

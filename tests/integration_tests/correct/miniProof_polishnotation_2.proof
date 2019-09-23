@@ -1,4 +1,4 @@
-refutation using f d s c 0
+refutation using f p e j c 0
 f 0
 p 3 1 * 4 1 * + s
 e 6 opb +1 x3 >= 1;

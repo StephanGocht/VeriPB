@@ -33,45 +33,16 @@ class TestParsing(unittest.TestCase):
         assert res == [2, -1]
 
     def test_equals(self):
-        parser = ConstraintEquals.getParser(self.context)
-        rule = parser.parse("42 opb 3 x1 >= 2;")
+        rule = ConstraintEquals.parse("42 opb 3 x1 >= 2;", self.context)
         assert rule == ConstraintEquals(42, self.ineqFactory.fromTerms([Term(3,1)], 2))
 
     def test_implies(self):
-        parser = ConstraintImplies.getParser(self.context)
-        rule = parser.parse("42 opb 3 x1 >= 2;")
+        rule = ConstraintImplies.parse("42 opb 3 x1 >= 2;", self.context)
         assert rule == ConstraintImplies(42, self.ineqFactory.fromTerms([Term(3,1)], 2))
 
     def test_contradiction(self):
-        parser = IsContradiction.getParser(self.context)
-        rule = parser.parse("42 0")
+        rule = IsContradiction.parse("42 0", self.context)
         assert rule == IsContradiction(42)
-
-    def test_linear_combination(self):
-        parser = LinearCombination.getParser(self.context)
-        rule = parser.parse(" 2 4 3 5 6 7 0")
-        assert rule == LinearCombination((2,3,6), (4,5,7))
-
-    def test_division(self):
-        parser = Division.getParser(self.context)
-        rule = parser.parse(" 3 2 4 3 5 6 7 0")
-        assert rule == Division(3, (2,3,6), (4,5,7))
-
-    def test_saturation(self):
-        parser = Saturation.getParser(self.context)
-        rule = parser.parse(" 2 4 3 5 6 7 0")
-        assert rule == Saturation((2,3,6), (4,5,7))
-
-class TestCheckConstraintParsing(unittest.TestCase):
-    def setUp(self):
-        self.ineqFactory = newDefaultFactory()
-        self.context = DummyContext()
-        self.context.ineqFactory = self.ineqFactory
-
-    def test_1(self):
-        parser = ConstraintEquals.getParser(self.context)
-        res = parser.parse("1 opb 3 x1 >= 2;")
-        assert res == ConstraintEquals(1, self.ineqFactory.fromTerms([Term(3,1)], 2))
 
 class TestInequalityParsing(unittest.TestCase):
     def setUp(self):
@@ -88,3 +59,44 @@ class TestInequalityParsing(unittest.TestCase):
         print(result)
         assert (result[0] == ineq1 and result[1] == ineq2) \
             or (result[0] == ineq2 and result[1] == ineq1)
+
+class TestWordParser(unittest.TestCase):
+    def test_working_1(self):
+        line = "this is a test sentence"
+        with WordParser(line) as words:
+            for word in words:
+                pass
+
+    def test_working_2(self):
+        line = "fancy 1 2 3 4"
+        with WordParser(line) as words:
+            it = iter(words)
+            assert(next(it) == "fancy")
+            nums = list(map(int, it))
+            assert(nums == [1,2,3,4])
+
+    def test_exception_int(self):
+        try:
+            line = "  fancy 1 2  a 4"
+            with WordParser(line) as words:
+                it = iter(words)
+                assert(next(it) == "fancy")
+                nums = list(map(int, it))
+        except ParseError as e:
+            assert(e.column == 14)
+        else:
+            assert(False)
+
+
+    def test_exception_manual(self):
+        try:
+            line = "  this  notis a test sentence"
+            with WordParser(line) as words:
+                it = iter(words)
+                assert(next(it) == "this")
+                if next(it) != "is":
+                    raise ValueError("Expected is.")
+        except ParseError as e:
+            assert(e.column == 9)
+        else:
+            assert(False)

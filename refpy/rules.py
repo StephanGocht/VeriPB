@@ -93,7 +93,7 @@ class ReverseUnitPropagationFailed(InvalidProof):
 
 @register_rule
 class DeleteConstraints(Rule):
-    Id = "w" #(w)ithdraw
+    Id = "d" #(d)elete
 
     @classmethod
     def parse(cls, line, context):
@@ -532,7 +532,7 @@ class SetLevel(EmptyRule):
 
 @register_rule
 class WipeLevel(EmptyRule):
-    Id = "w2"
+    Id = "w"
 
     @classmethod
     def parse(cls, line, context):

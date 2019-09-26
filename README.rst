@@ -285,10 +285,11 @@ not violate any constraint. If the check is successful then the clause
 consisting of the negation of all literals is added. If the check is
 not successful then verification fails.
 
-# set level
+(#) set level
 -----------
 
 ::
+
     # [level]
 
 This rule does mark all following constraints, up to the next
@@ -300,6 +301,7 @@ the first occurrence of this rule are not marked with any level.
 ---------------
 
 ::
+
     w [level]
 
 Delete all constraints (see deletion command) that are marked with

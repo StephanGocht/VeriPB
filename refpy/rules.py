@@ -313,25 +313,19 @@ class LoadLitteralAxioms(Rule):
     @classmethod
     def parse(cls, line, context):
         with WordParser(line) as words:
-            numLiterals = words.nextInt()
-            words.expectZero()
+            lit = context.ineqFactory.lit2int(next(words))
             words.expectEnd()
 
-        return cls(numLiterals)
+        return cls(lit)
 
-    def __init__(self, numLiterals):
-        self.numLiterals = numLiterals
+    def __init__(self, lit):
+        self.lit = lit
 
     def compute(self, antecedents, context = None):
-        result = list()
-        for i in range(1, self.numLiterals + 1):
-            result.append(context.ineqFactory.fromTerms([Term(1, i)], 0))
-            result.append(context.ineqFactory.fromTerms([Term(1,-i)], 0))
-
-        return result
+        return [context.ineqFactory.fromTerms([Term(1, self.lit)], 0)]
 
     def numConstraints(self):
-        return 2 * self.numLiterals
+        return 1
 
     def antecedentIDs(self):
         return []

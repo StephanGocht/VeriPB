@@ -112,25 +112,9 @@ will be translated to::
 
 ::
 
-    l [nVars] 0
+    l [literal]
 
-Create literal axioms for i = 1 to i <= nVars:
-* 0   <= x_i gets ID := IDmax + 2i - 1
-* x_i <= 1 gets ID := IDmax + 2i
-
-Note that variables are required to start from 1.
-
-For example the proof file::
-
-    refutation using f 0
-    l 2 0
-
-will be translated to::
-
-    1: 1x1 >= 0
-    2: -1x1 >= -1
-    3: 1x2 >= 0
-    4: -1x2 >= -1
+Create literal axiom ``[literal] >= 0``.
 
 (c)ontradiction
 ----

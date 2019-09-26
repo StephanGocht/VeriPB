@@ -280,9 +280,27 @@ class IneqFactory():
     def fromTerms(self, terms, degree):
         return PyInequality([Term(a,l) for a,l in terms], degree)
 
+    def isLit(lit):
+        return ((lit[0] == "~") and isVarName(lit[1:])) \
+            or isVarName(lit)
+
+    def lit2Num(lit):
+        if (lit[0] == "~"):
+            return -name2Num(lit[1:])
+        else:
+            return name2Num(lit)
+
+    def isVarName(name):
+        assert(name == name.trim())
+        if len(name) >= 2 \
+                and (ord(name[0]) not in range(ord("A"), ord("Z")) \
+                    or ord(name[0]) not in range(ord("a"), ord("z"))):
+            return True
+        else:
+            return False
+
     def name2Num(self, name):
-        if ord(name[0]) not in range(ord("A"), ord("Z")) \
-                and ord(name[0]) not in range(ord("a"), ord("z")):
+        if not self.isVarName(name):
             raise ValueError("Expected variablename, got %s"%(name))
         try:
             return self.num[name]

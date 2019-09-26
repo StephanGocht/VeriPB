@@ -353,11 +353,16 @@ class ReversePolishNotation(Rule):
             elif word == "s":
                 stackSize += 0
             else:
-                try:
-                    word = int(word)
+                if context.ineqFactory.isLit(word):
+                    lit = context.ineqFactory.lit2Num(word)
+                    word = ("l", lit)
                     stackSize += 1
-                except ValueError:
-                    raise ValueError("Expected integer or one of +, *, d, s, r.")
+                else:
+                    try:
+                        word = int(word)
+                        stackSize += 1
+                    except ValueError:
+                        raise ValueError("Expected integer, literal or one of +, *, d, s, r.")
 
             if stackSize < 0:
                 raise ValueError("Trying to pop from empty stack in reverse polish notation.")
@@ -371,6 +376,10 @@ class ReversePolishNotation(Rule):
         return cls(sequence)
 
     class AntecedentIterator():
+        """
+        Iterator that only returns the contained constraint numbers
+        (antecedents) and skips everything else.
+        """
         def __init__(self, instructions):
             self.instructions = iter(instructions)
 
@@ -408,6 +417,11 @@ class ReversePolishNotation(Rule):
         while ins is not None:
             if isinstance(ins, int):
                 stack.append(next(antecedentIt).copy())
+            if isinstance(ins, tuple):
+                what = ins[0]
+                if what == "l":
+                    lit = ins[1]
+                    stack.append(context.ineqFactory.fromTerms((1,lit), 0))
             elif ins == "+":
                 second = stack.pop()
                 first  = stack.pop()

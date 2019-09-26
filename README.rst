@@ -210,8 +210,22 @@ operand.
 Where [constraint] is either a ConstraintId or a subsequence in
 reverse polish notation.
 
+* Literal Axioms::
 
-This allows to write down any treelike refutation with a single rule.
+    [literal]
+    x1
+    ~x1
+
+Where ``[literal]`` is a variable name or its negation (``~``) and
+generates the constraint that the literal is greater equal zero.
+For example for ``~x1`` this generates the constraint ~x1 >= 0.
+
+
+Conclusion
+^^^^^^^^^^
+
+This set of instructions allows to write down any treelike refutation
+with a single rule.
 
 For example::
 

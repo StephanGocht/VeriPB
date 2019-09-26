@@ -37,22 +37,42 @@ The formula is provided in `OPB <http://www.cril.univ-artois.fr/PB12/format.pdf>
 found
 `here <https://github.com/elffersj/roundingsat/blob/proof_logging/InputFormats.md>`_.
 
-Proof Format
-============
+The verifier also supports an extension to OPB, which allows to use
+arbitrary variable names instead of x1, x2, ... Variable names must
+follow the following properties:
+
+* start with a letter in ``A-Z, a-z``
+* are at least two characters long
+* may not contain space
+
+The following characters are guaranteed to be supported: ``a-z, A-Z,
+0-9, []{}_^``. Support of further characters is implementation
+specific and produces an error if unsupported characters are used.
+
+CNFs in DIMACS format do not use variable names but only non zero
+integers. By convention we will use ``x[integer]`` as variable name
+for ``[integer]``. For example, the literal ``1`` in DIMACS is
+equivalent to ``x1`` in OPB and ``-1`` to ``~x1``, ``2`` to ``x2``
+etc.
+
+Basic Proof Format
+==================
 TLDR;
 ----
 
 ::
 
-    refutation using f l p r c e 0
+    refutation using f l p c e i j 0
+    * load formula
     f [nProblemConstraints] 0
-    l [nVars] 0
+    * load literal axiom
+    l [literal]
+    * compute constraint in polish notation
     p [sequence of operations in reverse polish notation] 0
-    r [antecedent1] [antecedent2] ... 0
+    * introduce constraint that is verified by reverse unit propagation
+    u opb [OPB style constraint]
+    * verify contradiction
     c [which] 0
-    e [which] opb [OPB style constraint]
-    i [which] opb [OPB style constraint]
-    j [which] opb [OPB style constraint]
 
 Introduction
 ----
@@ -127,35 +147,6 @@ Verify that the constraint [ConstraintId] is contradicting, i.e. there
 is no satisfying assignment to the constraint (independent of other
 constraints).
 
-
-(e)quals
-----
-
-::
-
-    e [ConstraintId] opb [OPB style constraint]
-
-    e [ConstraintId] cnf [DIMACS style clause]
-
-Verify that constraint [ConstraintId] is equal to [OPB style constraint].
-
-(i)mplies
-----
-
-::
-
-    i [C: ConstraintId] opb [D: OPB style constraint]
-
-    i [C: ConstraintId] cnf [D: DIMACS style clause]
-
-Verify that C implies D, i.e. it is possible to derive D from C by
-adding literal axioms.
-
-(j) implies and add
----
-
-Identical to (i)mplies but also adds the constraint that is implied to
-the database.
 
 reverse (p)olish notation
 ----
@@ -268,23 +259,58 @@ Strong semantic
 
 Constraints are guaranteed to be deleted.
 
-(v) solution
-------------
+
+Convenience Rules and Rules for Sanity Checks
+=============================================
+
+TLDR;
+----
 
 ::
 
-    v [literal] [literal] ...
-    v x1 ~x2
+    * check equality
+    e [ConstraintId] opb [OPB style constraint]
+    * check implication
+    i [ConstraintId] opb [OPB style constraint]
+    * add constraint if implied
+    j [ConstraintId] opb [OPB style constraint]
+    * set level (for easier deletion)
+    # [level]
+    * wipe out level (for easier deletion)
+    w [level]
 
-Given a partial assignment in form of a list of ``[literal]``, i.e.
-variable names with ``~`` as prefix to indicate negation, check that
-after unit propagation we are left with a full assignment that does
-not violate any constraint. If the check is successful then the clause
-consisting of the negation of all literals is added. If the check is
-not successful then verification fails.
+
+(e)quals
+----
+
+::
+
+    e [ConstraintId] opb [OPB style constraint]
+
+    e [ConstraintId] cnf [DIMACS style clause]
+
+Verify that constraint [ConstraintId] is equal to [OPB style constraint].
+
+(i)mplies
+----
+
+::
+
+    i [C: ConstraintId] opb [D: OPB style constraint]
+
+    i [C: ConstraintId] cnf [D: DIMACS style clause]
+
+Verify that C implies D, i.e. it is possible to derive D from C by
+adding literal axioms.
+
+(j) implies and add
+---
+
+Identical to (i)mplies but also adds the constraint that is implied to
+the database.
 
 (#) set level
------------
+-------------
 
 ::
 
@@ -315,3 +341,29 @@ Example
     f 10 0              # IDs 11-20 now contain the formula constraints
     p 11 1 3 * + 42 d 0 # Take the first constraint from the formula,
                           weaken with 3 x_1 >= 0 and then divide by 42
+
+
+Beyond Refutations
+==================
+
+TLDR;
+----
+
+::
+
+    v [literal] [literal] ...
+
+(v) solution
+------------
+
+::
+
+    v [literal] [literal] ...
+    v x1 ~x2
+
+Given a partial assignment in form of a list of ``[literal]``, i.e.
+variable names with ``~`` as prefix to indicate negation, check that
+after unit propagation we are left with a full assignment that does
+not violate any constraint. If the check is successful then the clause
+consisting of the negation of all literals is added. If the check is
+not successful then verification fails.

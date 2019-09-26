@@ -348,6 +348,7 @@ class ReversePolishNotation(Rule):
                 stackSize += 0
             else:
                 if context.ineqFactory.isLit(word):
+                    print(word)
                     lit = context.ineqFactory.lit2Num(word)
                     word = ("l", lit)
                     stackSize += 1

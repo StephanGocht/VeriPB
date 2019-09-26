@@ -22,7 +22,9 @@ class RuleParser():
 
     def parseHeader(self, line, lineNum):
         with WordParser(line) as words:
-            words.expectExact("refutation")
+            first = next(words)
+            if first != "refutation" and first != "proof":
+                raise ValueError("Expected header starting with 'proof'")
             words.expectExact("using")
 
             try:

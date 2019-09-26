@@ -62,7 +62,7 @@ TLDR;
 
 ::
 
-    refutation using f l p c e i j 0
+    proof using f l p u d c 0
     * load formula
     f [nProblemConstraints] 0
     * load literal axiom
@@ -71,6 +71,8 @@ TLDR;
     p [sequence of operations in reverse polish notation] 0
     * introduce constraint that is verified by reverse unit propagation
     u opb [OPB style constraint]
+    * delete constraints
+    d [constraintId1] [constraintId2] [constraintId3] ... 0
     * verify contradiction
     c [which] 0
 
@@ -143,9 +145,8 @@ Create literal axiom ``[literal] >= 0``.
 
     c [ConstraintId] 0
 
-Verify that the constraint [ConstraintId] is contradicting, i.e. there
-is no satisfying assignment to the constraint (independent of other
-constraints).
+Verify that the constraint [ConstraintId] is contradiction, i.e. 0 >=
+1 (this is the same as the empty clause).
 
 
 reverse (p)olish notation
@@ -220,8 +221,8 @@ reverse (u)nit propagation
     u cnf [DIMACS style clause]
 
 Use reverse unit propagation to check if the constraint is implied,
-i.e. it assumes that the negation of the constraint and all other
-active constraints in the database and passes if this yields
+i.e. it assumes the negation of the constraint and all other (non
+deleted) constraints in the database and passes if this yields
 contradiction by unit propagation.
 
 If the constraint is implied it is added to the database. Otherwise,
@@ -285,11 +286,15 @@ TLDR;
 
 ::
 
-    e [ConstraintId] opb [OPB style constraint]
+    e [C: ConstraintId] opb [D: OPB style constraint]
 
-    e [ConstraintId] cnf [DIMACS style clause]
+    e [C: ConstraintId] cnf [D: DIMACS style clause]
 
-Verify that constraint [ConstraintId] is equal to [OPB style constraint].
+Verify that C is the same constraint as D, i.e. has the same degree
+and contains the same terms (order of terms does not matter).
+
+A constraint is equal to a [DIMACS style clause] if it contains the
+same variables, all with coefficient 1, and has degree 1.
 
 (i)mplies
 ----
@@ -300,8 +305,8 @@ Verify that constraint [ConstraintId] is equal to [OPB style constraint].
 
     i [C: ConstraintId] cnf [D: DIMACS style clause]
 
-Verify that C implies D, i.e. it is possible to derive D from C by
-adding literal axioms.
+Verify that C syntactically implies D, i.e. it is possible to derive D
+from C by adding literal axioms.
 
 (j) implies and add
 ---

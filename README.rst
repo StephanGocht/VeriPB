@@ -2,9 +2,10 @@ refpy Refutations in Python
 ====
 
 refpy is a tool for verifying refutations (proofs of unsatisfiability)
-in python and c++. A description of the proof file format follows.
+and more (such as verifying that all solutions were found) in python
+and c++. A description of the proof file format can be found below.
 
-Currently it only supports pseudo-Boolean refutations.
+Currently it only supports pseudo-Boolean proofs.
 
 WARNING
 =======
@@ -32,7 +33,7 @@ If installed as described above the tool can be updated with ``git pull``.
 Formula Format
 ==============
 
-The formula is provided in `OPB<http://www.cril.univ-artois.fr/PB10/format.pdf>`_ format. A short overview can be
+The formula is provided in `OPB<http://www.cril.univ-artois.fr/PB12/format.pdf>`_ format. A short overview can be
 found
 `here<https://github.com/elffersj/roundingsat/blob/proof_logging/InputFormats.md>`_.
 
@@ -82,6 +83,10 @@ replaced by two inequalities, where the first inequality is '>=' and
 the second '<='. Afterwards, the i-th inequality in the input formula
 gets ID := IDmax + i.
 
+If the constraint count does not match or is missing then the
+behaviour is implementation specific and verification either fails or
+the correct value is used (optionally a warning is emitted).
+
 
 For example the opb file::
 
@@ -127,17 +132,6 @@ will be translated to::
     3: 1x2 >= 0
     4: -1x2 >= -1
 
-(r)esolution
-----
-
-::
-
-    r [antecedent1] [antecedent2] ... 0
-
-Performs multiple (input) resolution steps. Requires antecedents to be
-clausal (degree 1).
-
-
 (c)ontradiction
 ----
 
@@ -145,7 +139,9 @@ clausal (degree 1).
 
     c [ConstraintId] 0
 
-Verify that the constraint [ConstraintId] is contradicting.
+Verify that the constraint [ConstraintId] is contradicting, i.e. there
+is no satisfying assignment to the constraint (independent of other
+constraints).
 
 
 (e)quals
@@ -168,17 +164,14 @@ Verify that constraint [ConstraintId] is equal to [OPB style constraint].
 
     i [C: ConstraintId] cnf [D: DIMACS style clause]
 
-Verify that C implies D. Currently only a syntactic check is
-performed, i.e. it checks that the degree of C is >= degree of D and
-for coefficients a_i (b_i) of C (D) it holds that a_i <= b_i. The
-current implementation requires the literals in both constraints to
-have the same sign.
+Verify that C implies D, i.e. it is possible to derive D from C by
+adding literal axioms.
 
 (j) implies and add
 ---
 
 Identical to (i)mplies but also adds the constraint that is implied to
-the database
+the database.
 
 reverse (p)olish notation
 ----
@@ -217,14 +210,6 @@ operand.
 Where [constraint] is either a ConstraintId or a subsequence in
 reverse polish notation.
 
-* Resolve Maybe::
-
-    [constraint1] [constraint2] [variable] r
-
-Try to resolve [constraint1] and [constrain2] over [variable]
-(requires the constraints to be clausal (degree 1 an only coefficents
-1). If one of the constraints does not contain [variable] than this
-constraint is returned.
 
 This allows to write down any treelike refutation with a single rule.
 
@@ -236,8 +221,8 @@ Creates a new constraint by taking 3 times the constraint with index
 42, then adds constraint 43, followed by a saturation step and a
 division by 2.
 
-reverse (u)nit propagation <experimental>
-----
+reverse (u)nit propagation
+--------------------------
 
 ::
 
@@ -247,48 +232,46 @@ reverse (u)nit propagation <experimental>
 
 Use reverse unit propagation to check if the constraint is implied,
 i.e. it assumes that the negation of the constraint and all other
-active constraints in the database and and passes if this yields
+active constraints in the database and passes if this yields
 contradiction by unit propagation.
 
 If the constraint is implied it is added to the database. Otherwise,
 verification fails.
 
-Using this rule currently currently requires
-`roundingsat<https://github.com/elffersj/roundingsat>`_ to be
-available in the PATH environment. Alternatively you can use the bash
-command ``alias roundingsat=[path/to/roundingsat/binary]`` to
-configure the path to the roundingsat binary.
-
-(w)ithdraw constraint
-----
+(d)elete constraint
+-------------------
 
 ::
 
-    w [constraintId1] [constraintId2] [constraintId3] ... 0
+    d [constraintId1] [constraintId2] [constraintId3] ... 0
 
-Delete constraints with given constrain ids. They should longer be
-used after deletion and verification can fail if they are accessed
-after deletion. However, the verifier is not required to delete
-constraints. Especially, they might still be used during unit
-propagation. The goal of the current implementation of this rule is
-purely for performance benefits during verification.
+Delete constraints with given constrain ids. This verifier currently
+implements weak propagating semantic for deletion (see below) but will
+change to strong semantic in the foreseeable future, possibly keeping
+weak propagating semantic via a parameter settings.
 
-Note that this rule has not the same syntax/ semantic as the DRAT
-deletion rule.
+Weak semantic
+^^^^^^^^^^^^^
 
-Example
-----
+The constraints should no longer be used after deletion. It is
+implementation specific if verification fails if they are accessed
+after deletion. Especially, the verifier is not required to delete
+constraints. The goal of the weak semantic is purely for performance
+benefits during verification.
 
-::
+Weak propagating semantic
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
-    refutation graph using f l p 0
-    l 5 0               # IDs 1-10 now contain literal axioms
-    f 10 0              # IDs 11-20 now contain the formula constraints
-    p 11 1 3 * + 42 d 0 # Take the first constraint from the formula,
-                          weaken with 3 x_1 >= 0 and then divide by 42
+Same as weak semantic, but guarantees to keep unit propagations that
+were caused by deleted constraints.
+
+Strong semantic
+^^^^^^^^^^^^^^^
+
+Constraints are guaranteed to be deleted.
 
 (v) solution
-----
+------------
 
 ::
 
@@ -299,13 +282,36 @@ Given a partial assignment in form of a list of ``[literal]``, i.e.
 variable names with ``~`` as prefix to indicate negation, check that
 after unit propagation we are left with a full assignment that does
 not violate any constraint. If the check is successful then the clause
-consisting of the negation of all literals is added, i.e. the solution
-is ruled out. If the check is not successful then verification fails.
+consisting of the negation of all literals is added. If the check is
+not successful then verification fails.
 
 # set level
-----
+-----------
 
+::
+    # [level]
 
+This rule does mark all following constraints, up to the next
+invocation of this rule, with ``[level]``. ``[level]`` is a positive
+integer (greater equal zero). Constraints which are generated before
+the first occurrence of this rule are not marked with any level.
 
 (w)ipeout level
-----
+---------------
+
+::
+    w [level]
+
+Delete all constraints (see deletion command) that are marked with
+``[level]`` or a greater number.
+
+Example
+-------
+
+::
+
+    refutation graph using f l p 0
+    l 5 0               # IDs 1-10 now contain literal axioms
+    f 10 0              # IDs 11-20 now contain the formula constraints
+    p 11 1 3 * + 42 d 0 # Take the first constraint from the formula,
+                          weaken with 3 x_1 >= 0 and then divide by 42

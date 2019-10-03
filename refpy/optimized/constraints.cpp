@@ -71,7 +71,6 @@ bool nonzero(std::vector<int> aList){
     return true;
 }
 
-
 template<typename T>
 T divideAndRoundUp(T value, T divisor) {
     return (value + divisor - 1) / divisor;
@@ -128,12 +127,55 @@ bool orderByCoeff(T &a, T &b) {
     return a.coeff < b.coeff;
 }
 
+class Var {
+public:
+    size_t value;
+
+    explicit Var(size_t value_)
+        : value(value_)
+    {}
+};
+
+class Lit {
+private:
+    size_t value;
+
+public:
+    explicit Lit(int t)
+        : value(std::abs(t) << 1 + (t < 0) ? 1 : 0)
+    {}
+
+    Lit(Var var, bool negated)
+        : value(var.value << 1 + static_cast<size_t>(negated))
+    {}
+
+    Var var() {
+        return Var(value >> 1);
+    }
+
+    bool negated() {
+        return value & 1;
+    }
+
+    void operator~(){
+        value ^= 1;
+    }
+
+    operator size_t() const
+    {
+        return value;
+    }
+};
+
+
+
+
 enum class State : uint8_t {
     False = 2, True = 3, Unassigned = 0
 };
 
-State operator!(State s) {
-    uint i = static_cast<uint>(s);
+State operator~(State s) {
+    uint8_t i = static_cast<uint8_t>(s);
     i = (i >> 1) ^ i;
     // in case of unassigned (0b00) i >> 1 = 0b00 so nothing is flipped
     // in case of false (0b10) or true (0b11) i >> 1 = 0b01 so the right
@@ -331,15 +373,99 @@ struct PropState {
     bool conflict = false;
 };
 
+template<typename T>
+class FixedSizeInequalityHandler {
+private:
+    void* malloc(size_t size) {
+        capacity = size;
+        size_t memSize = sizeof(FixedSizeInequality<T>) + size * sizeof(Term<T>);
+        // return std::aligned_alloc(64, memSize);
+        return std::malloc(memSize);
+    }
+
+    void free(){
+        if (ineq != nullptr) {
+            ineq->~FixedSizeInequality<T>();
+            std::free(ineq);
+            ineq = nullptr;
+        }
+    }
+
+public:
+    FixedSizeInequality<T>* ineq = nullptr;
+    size_t capacity = 0;
+
+    FixedSizeInequalityHandler(FixedSizeInequalityHandler& other) {
+        void* addr = malloc(other.ineq->size());
+        ineq = new (addr) FixedSizeInequality<T>(*other.ineq);
+    }
+
+    FixedSizeInequalityHandler(FixedSizeInequalityHandler&& other) {
+        ineq = other.ineq;
+        other.ineq = nullptr;
+    }
+
+    FixedSizeInequalityHandler& operator=(FixedSizeInequalityHandler&& other) {
+        this->free();
+        ineq = other.ineq;
+        other.ineq = nullptr;
+    }
+
+    FixedSizeInequalityHandler(std::vector<Term<T>>& terms, int degree) {
+        void* addr = malloc(terms.size());
+        ineq = new (addr) FixedSizeInequality<T>(terms, degree);
+    }
+
+    void resize(size_t size) {
+        if (ineq != nullptr && size == capacity) {
+            return;
+        }
+        free();
+        void* addr = malloc(size);
+        ineq = new (addr) FixedSizeInequality<T>(size);
+    }
+
+    ~FixedSizeInequalityHandler(){
+        free();
+    }
+};
+
+template<typename T>
+class ConstraintDatabase {
+private:
+    typedef FixedSizeInequalityHandler<T> Handler;
+    typedef std::vector<Handler> HandleList;
+    HandleList handled;
+
+public:
+    void take(FixedSizeInequalityHandler<T>&& t) {
+        handled.emplace_back(t);
+    }
+
+    void clean() {
+        handled.erase(
+            std::remove_if(
+                handled.begin(),
+                handled.end(),
+                [](Handler& handler){
+                    return handler->ineq.isDeleted();
+                }
+            ),
+            handled.end()
+        );
+    }
+};
 
 template<typename T>
 class PropEngine {
 private:
     typedef WatchInfo<T> WatchedType;
     typedef std::vector<WatchedType> WatchList;
+    typedef std::vector<FixedSizeInequality<T>*> OccursList;
 
     size_t nVars;
     std::vector<WatchList> wl;
+    std::vector<OccursList> ol;
     std::vector<int> trail;
 
     PropState current;
@@ -347,12 +473,15 @@ private:
 
 public:
     WatchList* watchlist;
+    OccursList* occurs;
     Assignment assignment;
 
     PropEngine(size_t _nVars)
         : nVars(_nVars)
         , wl(2 * _nVars + 1)
+        , ol(2 * _nVars + 1)
         , watchlist(wl.data() + _nVars)
+        , occurs(ol.data() + _nVars)
         , assignment(_nVars)
     {
 
@@ -461,6 +590,10 @@ public:
 
     void watch(int lit, WatchInfo<T>& w) {
         watchlist[lit].push_back(w);
+    }
+
+    void addOccurence(int lit, FixedSizeInequality<T>& w) {
+        occurs[lit].push_back(w);
     }
 
 };
@@ -576,52 +709,6 @@ public:
 
 template<typename T>
 using FatInequalityPtr = std::unique_ptr<FatInequality<T>>;
-
-template<typename T>
-class FixedSizeInequalityHandler {
-private:
-    void* malloc(size_t size) {
-        capacity = size;
-        size_t memSize = sizeof(FixedSizeInequality<T>) + size * sizeof(Term<T>);
-        // return std::aligned_alloc(64, memSize);
-        return std::malloc(memSize);
-    }
-
-    void free(){
-        if (ineq != nullptr) {
-            ineq->~FixedSizeInequality<T>();
-            std::free(ineq);
-            ineq = nullptr;
-        }
-    }
-
-public:
-    FixedSizeInequality<T>* ineq = nullptr;
-    size_t capacity = 0;
-
-    FixedSizeInequalityHandler(FixedSizeInequalityHandler& other) {
-        void* addr = malloc(other.ineq->size());
-        ineq = new (addr) FixedSizeInequality<T>(*other.ineq);
-    }
-
-    FixedSizeInequalityHandler(std::vector<Term<T>>& terms, int degree) {
-        void* addr = malloc(terms.size());
-        ineq = new (addr) FixedSizeInequality<T>(terms, degree);
-    }
-
-    void resize(size_t size) {
-        if (ineq != nullptr && size == capacity) {
-            return;
-        }
-        free();
-        void* addr = malloc(size);
-        ineq = new (addr) FixedSizeInequality<T>(size);
-    }
-
-    ~FixedSizeInequalityHandler(){
-        free();
-    }
-};
 
 /**
  * stores constraint in (literal) normalized form
@@ -840,7 +927,7 @@ public:
 
     bool isContradiction(){
         contract();
-        int slack = -ineq->degree;
+        T slack = -ineq->degree;
         for (Term<T> term: *ineq) {
             slack += term.coeff;
         }

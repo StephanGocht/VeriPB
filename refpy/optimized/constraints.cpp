@@ -76,23 +76,123 @@ T divideAndRoundUp(T value, T divisor) {
     return (value + divisor - 1) / divisor;
 }
 
+typedef uint32_t LitData;
+
+class Var {
+public:
+    LitData value;
+
+    explicit Var(LitData value_)
+        : value(value_)
+    {}
+
+    operator size_t() const {
+        return value;
+    }
+};
+
+class Lit {
+private:
+    LitData value;
+
+    Lit(){}
+
+public:
+    explicit Lit(int t)
+        : value((std::abs(t) << 1) + (t < 0 ? 1 : 0))
+    {}
+
+    Lit(Var var, bool negated)
+        : value((var.value << 1) + static_cast<LitData>(negated))
+    {}
+
+    Var var() const {
+        return Var(value >> 1);
+    }
+
+    bool negated() const {
+        return value & 1;
+    }
+
+    Lit operator~() const {
+        Lit res;
+        res.value = value ^ 1;
+        return res;
+    }
+
+    bool operator==(const Lit& other) const {
+        return value == other.value;
+    }
+
+    bool operator!=(const Lit& other) const {
+        return value != other.value;
+    }
+
+    bool operator>(const Lit& other) const {
+        return value > other.value;
+    }
+
+    explicit operator size_t() const {
+        return value;
+    }
+
+    static Lit Undef() {
+        return Lit(0);
+    };
+};
+
+/*
+ * some syntactic suggar to prevent us from accidentally using Var to
+ * go in to a Lit inexed vector and vice versa.
+ */
 template<typename T>
-T cpsign(T a, T b) {
+class LitIndexedVec:public std::vector<T> {
+public:
+    using std::vector<T>::vector;
+    // uncomment to allow indexing with integers
+    // using std::vector<T>::operator[];
+    T& operator[](Var idx) = delete;
+    T& operator[](Lit idx) {
+        return this->std::vector<T>::operator[](
+            static_cast<size_t>(idx)
+        );
+    }
+};
+
+/*
+ * some syntactic suggar to prevent us from accidentally using Var to
+ * go in to a Lit inexed vector and vice versa.
+ */
+template<typename T>
+class VarIndexedVec:public std::vector<T> {
+public:
+    using std::vector<T>::vector;
+    // uncomment to allow indexing with integers
+    // using std::vector<T>::operator[];
+    T& operator[](Lit idx) = delete;
+    T& operator[](Var idx) {
+        return this->std::vector<T>::operator[](
+            static_cast<size_t>(idx)
+        );
+    }
+};
+
+template<typename T>
+T cpsign(T a, Lit b) {
     using namespace std;
-    if (b >= 0) {
-        return abs(a);
-    } else {
+    if (b.negated()) {
         return -abs(a);
+    } else {
+        return abs(a);
     }
 }
-
 
 template<typename T>
 struct Term {
     T coeff;
-    int lit;
+    Lit lit;
 
-    Term(T coeff_, int lit_)
+    Term(T coeff_, Lit lit_)
         : coeff(coeff_)
         , lit(lit_)
         {}
@@ -111,7 +211,7 @@ struct Term {
         std::vector<Term<T>> result;
         result.reserve(size);
         for (size_t i = 0; i < size; i++) {
-            result.emplace_back(coeffs[i], lits[i]);
+            result.emplace_back(coeffs[i], Lit(lits[i]));
         }
         return result;
     }
@@ -127,49 +227,6 @@ bool orderByCoeff(T &a, T &b) {
     return a.coeff < b.coeff;
 }
 
-class Var {
-public:
-    size_t value;
-
-    explicit Var(size_t value_)
-        : value(value_)
-    {}
-};
-
-class Lit {
-private:
-    size_t value;
-
-public:
-    explicit Lit(int t)
-        : value(std::abs(t) << 1 + (t < 0) ? 1 : 0)
-    {}
-
-    Lit(Var var, bool negated)
-        : value(var.value << 1 + static_cast<size_t>(negated))
-    {}
-
-    Var var() {
-        return Var(value >> 1);
-    }
-
-    bool negated() {
-        return value & 1;
-    }
-
-    void operator~(){
-        value ^= 1;
-    }
-
-    operator size_t() const
-    {
-        return value;
-    }
-};
-
-
-
-
 enum class State : uint8_t {
     False = 2, True = 3, Unassigned = 0
 };
@@ -184,25 +241,21 @@ State operator~(State s) {
 }
 
 class Assignment {
-private:
-    std::vector<State> v;
-
 public:
-    State* value;
+    LitIndexedVec<State> value;
 
     Assignment(int nVars)
-        : v(2 * nVars + 1)
-        , value(v.data() + nVars)
+        : value(2 * (nVars + 1))
     {}
 
-    void assign(int lit) {
+    void assign(Lit lit) {
         value[lit] = State::True;
-        value[-lit] = State::False;
+        value[~lit] = State::False;
     }
 
-    void unassign(int lit) {
+    void unassign(Lit lit) {
         value[lit] = State::Unassigned;
-        value[-lit] = State::Unassigned;
+        value[~lit] = State::Unassigned;
     }
 };
 
@@ -297,7 +350,7 @@ public:
     }
 
     template<bool init>
-    void updateWatch(PropEngine<T>& prop, int falsifiedLit = 0) {
+    void updateWatch(PropEngine<T>& prop, Lit falsifiedLit = Lit::Undef()) {
         if (init) {
             computeWatchSize();
         }
@@ -464,37 +517,34 @@ private:
     typedef std::vector<FixedSizeInequality<T>*> OccursList;
 
     size_t nVars;
-    std::vector<WatchList> wl;
-    std::vector<OccursList> ol;
-    std::vector<int> trail;
+    std::vector<Lit> trail;
 
     PropState current;
     PropState base;
 
 public:
-    WatchList* watchlist;
-    OccursList* occurs;
     Assignment assignment;
+    LitIndexedVec<WatchList> watchlist;
+    LitIndexedVec<OccursList> occurs;
+
 
     PropEngine(size_t _nVars)
         : nVars(_nVars)
-        , wl(2 * _nVars + 1)
-        , ol(2 * _nVars + 1)
-        , watchlist(wl.data() + _nVars)
-        , occurs(ol.data() + _nVars)
         , assignment(_nVars)
+        , watchlist(2 * (_nVars + 1))
+        , occurs(2 * (_nVars + 1))
     {
 
     }
 
-    void propagate(int lit) {
+    void propagate(Lit lit) {
         assignment.assign(lit);
         trail.push_back(lit);
     }
 
     void propagate(bool permanent = false) {
         while (current.qhead < trail.size() and !current.conflict) {
-            int falsifiedLit = -trail[current.qhead];
+            Lit falsifiedLit = ~trail[current.qhead];
             WatchList& ws = watchlist[falsifiedLit];
             WatchList wsTmp;
             wsTmp.reserve(ws.size());
@@ -520,10 +570,11 @@ public:
 
     bool checkSat(std::vector<int>& lits) {
         for (int lit: lits) {
-            auto val = assignment.value[lit];
+            Lit l(lit);
+            auto val = assignment.value[l];
 
             if (val == State::Unassigned) {
-                propagate(lit);
+                propagate(l);
             } else if (val == State::False) {
                 conflict();
                 break;
@@ -536,7 +587,7 @@ public:
         if (!current.conflict) {
             success = true;
             for (uint var = 1; var <= nVars; var++) {
-                auto val = assignment.value[var];
+                auto val = assignment.value[Lit(var)];
                 if (val == State::Unassigned) {
                     success = false;
                     break;
@@ -588,11 +639,11 @@ public:
         current.conflict = true;
     }
 
-    void watch(int lit, WatchInfo<T>& w) {
+    void watch(Lit lit, WatchInfo<T>& w) {
         watchlist[lit].push_back(w);
     }
 
-    void addOccurence(int lit, FixedSizeInequality<T>& w) {
+    void addOccurence(Lit lit, FixedSizeInequality<T>& w) {
         occurs[lit].push_back(w);
     }
 
@@ -605,23 +656,23 @@ public:
 template<typename T>
 class FatInequality {
 private:
-    std::vector<T> coeffs;
-    std::vector<uint8_t> used;
-    std::vector<int> usedList;
+    VarIndexedVec<T> coeffs;
+    VarIndexedVec<uint8_t> used;
+    std::vector<Var> usedList;
     T degree;
     bool bussy;
 
-    void setCoeff(uint var, T value) {
+    void setCoeff(Var var, T value) {
         if (value != 0) {
             use(var);
             coeffs[var] = value;
         }
     }
 
-    void use(uint var) {
+    void use(Var var) {
         if (this->coeffs.size() <= var) {
-            this->coeffs.resize(var + 1, 0);
-            this->used.resize(var + 1, false);
+            this->coeffs.resize(var.value + 1, 0);
+            this->used.resize(var.value + 1, false);
         }
 
         if (!used[var]) {
@@ -637,19 +688,15 @@ public:
     }
 
     void load(FixedSizeInequality<T>& ineq) {
-        if (bussy) {
-            std::cout << "critical error: I am too bussy for this!" << std::endl;
-            exit(1);
-        }
+        assert(!bussy && "critical error: I am used twice!");
         bussy = true;
 
         this->degree = ineq.degree;
         for (Term<T>& term: ineq) {
             T coeff = cpsign(term.coeff, term.lit);
             using namespace std;
-            int var = abs(term.lit);
 
-            setCoeff(var, coeff);
+            setCoeff(term.lit.var(), coeff);
         }
     }
 
@@ -657,9 +704,9 @@ public:
         bussy = false;
 
         Term<T>* pos = ineq.begin();
-        for (int var: this->usedList) {
+        for (Var var: this->usedList) {
             T coeff = this->coeffs[var];
-            T lit = cpsign(var, coeff);
+            Lit lit(var, coeff < 0);
             using namespace std;
             coeff = abs(coeff);
 
@@ -682,7 +729,7 @@ public:
 
     size_t size() {
         size_t result = 0;
-        for (int var: this->usedList) {
+        for (Var var: this->usedList) {
             if (this->coeffs[var] != 0) {
                 result += 1;
             }
@@ -695,7 +742,7 @@ public:
         for (const Term<T> &term:other) {
             using namespace std;
             T b = cpsign(term.coeff, term.lit);
-            int var = abs(term.lit);
+            Var var = term.lit.var();
             this->use(var);
             T a = this->coeffs[var];
             this->coeffs[var] = a + b;
@@ -764,7 +811,7 @@ public:
         contract();
 
         for (Term<T> term: *ineq) {
-            assert(static_cast<uint>(std::abs(term.lit)) <= numVars);
+            assert(term.lit.var() <= numVars);
         }
 
         // todo we are currently using twice the memory neccessary, we would want to
@@ -861,10 +908,10 @@ public:
         for (Term<T> &term: *ineq) {
             using namespace std;
             s << term.coeff << " ";
-            if (term.lit < 0) {
+            if (term.lit.negated()) {
                 s << "~";
             }
-            s << varName(abs(term.lit)) << " ";
+            s << varName(term.lit.var()) << " ";
         }
         s << ">= " << ineq->degree;
         return s.str();
@@ -881,16 +928,15 @@ public:
     bool implies(Inequality* other) {
         this->contract();
         other->contract();
-        std::unordered_map<int, Term<T>> lookup;
+        std::unordered_map<size_t, Term<T>> lookup;
         for (Term<T>& term:*other->ineq) {
-            using namespace std;
-            lookup.insert(make_pair(abs(term.lit), term));
+            lookup.insert(std::make_pair(term.lit.var(), term));
         }
 
         T weakenCost = 0;
         for (Term<T>& mine:*ineq) {
             using namespace std;
-            int var = abs(mine.lit);
+            size_t var = mine.lit.var();
 
             auto search = lookup.find(var);
             if (search == lookup.end()) {
@@ -914,7 +960,7 @@ public:
         ineq->degree = -ineq->degree + 1;
         for (Term<T>& term:*ineq) {
             ineq->degree += term.coeff;
-            term.lit *= -1;
+            term.lit = ~term.lit;
         }
 
         return this;
@@ -957,6 +1003,11 @@ int main(int argc, char const *argv[])
     Inequality<int> foo({1,1,1},{1,1,1},1);
 
     std::cout << foo.isContradiction() << std::endl;
+
+    std::cout << std::endl;
+    std::cout << (~Lit(Var(2), false)).var() << std::endl;
+    int test = 4 ^ 1;
+    std::cout << test << std::endl;
     return 0;
 }
 

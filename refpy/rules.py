@@ -348,8 +348,7 @@ class ReversePolishNotation(Rule):
                 stackSize += 0
             else:
                 if context.ineqFactory.isLit(word):
-                    print(word)
-                    lit = context.ineqFactory.lit2Num(word)
+                    lit = context.ineqFactory.lit2int(word)
                     word = ("l", lit)
                     stackSize += 1
                 else:
@@ -416,7 +415,7 @@ class ReversePolishNotation(Rule):
                 what = ins[0]
                 if what == "l":
                     lit = ins[1]
-                    stack.append(context.ineqFactory.fromTerms((1,lit), 0))
+                    stack.append(context.ineqFactory.fromTerms([(1,lit)], 0))
             elif ins == "+":
                 second = stack.pop()
                 first  = stack.pop()

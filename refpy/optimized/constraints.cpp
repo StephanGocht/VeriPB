@@ -337,6 +337,11 @@ private:
         watchSize = i;
     }
 
+    void registerOccurence(PropEngine<T>& prop) {
+        for (Term<T>& term: *this) {
+            prop.addOccurence(term.lit, this);
+        }
+    }
 
 public:
     void clearWatches(PropEngine<T>& prop) {
@@ -349,10 +354,12 @@ public:
         }
     }
 
-    template<bool init>
+    template<bool autoInit>
     void updateWatch(PropEngine<T>& prop, Lit falsifiedLit = Lit::Undef()) {
+        bool init = autoInit && (watchSize == 0);
         if (init) {
             computeWatchSize();
+            registerOccurence(prop);
         }
 
         T slack = -this->degree;
@@ -394,7 +401,7 @@ public:
                 if (terms[i].coeff > slack
                     && value[terms[i].lit] == State::Unassigned)
                 {
-                    prop.propagate(terms[i].lit);
+                    prop.enqueue(terms[i].lit);
                 }
             }
         }
@@ -448,14 +455,25 @@ public:
     FixedSizeInequality<T>* ineq = nullptr;
     size_t capacity = 0;
 
-    FixedSizeInequalityHandler(FixedSizeInequalityHandler& other) {
-        void* addr = malloc(other.ineq->size());
-        ineq = new (addr) FixedSizeInequality<T>(*other.ineq);
+    FixedSizeInequalityHandler(FixedSizeInequality& copyFrom) {
+        void* addr = malloc(copyFrom->size());
+        ineq = new (addr) FixedSizeInequality<T>(copyFrom);
     }
+
+    FixedSizeInequalityHandler(FixedSizeInequalityHandler& other):
+        FixedSizeInequalityHandler(*other.ineq) {}
 
     FixedSizeInequalityHandler(FixedSizeInequalityHandler&& other) {
         ineq = other.ineq;
         other.ineq = nullptr;
+    }
+
+    FixedSizeInequality& operator*(){
+        return *ineq;
+    }
+
+    FixedSizeInequality* operator->(){
+        return ineq;
     }
 
     FixedSizeInequalityHandler& operator=(FixedSizeInequalityHandler&& other) {
@@ -520,7 +538,23 @@ private:
     std::vector<Lit> trail;
 
     PropState current;
-    PropState base;
+
+    class AutoReset {
+    private:
+        PropEngine& engine;
+        PropState base;
+
+    public:
+        AutoReset(PropEngine& engine_)
+            : engine(engine_)
+            , base(engine.current) {
+
+        }
+
+        ~AutoReset(){
+            engine.reset(base);
+        }
+    };
 
 public:
     Assignment assignment;
@@ -537,12 +571,12 @@ public:
 
     }
 
-    void propagate(Lit lit) {
+    void enqueue(Lit lit) {
         assignment.assign(lit);
         trail.push_back(lit);
     }
 
-    void propagate(bool permanent = false) {
+    void propagate() {
         while (current.qhead < trail.size() and !current.conflict) {
             Lit falsifiedLit = ~trail[current.qhead];
             WatchList& ws = watchlist[falsifiedLit];
@@ -550,7 +584,7 @@ public:
             wsTmp.reserve(ws.size());
             std::swap(ws, wsTmp);
 
-            const uint lookAhead = 6;
+            const uint lookAhead = 3;
             WatchedType* end = wsTmp.data() + wsTmp.size();
             for (WatchedType* next = wsTmp.data(); next != end; next++) {
                 auto fetch = next + lookAhead;
@@ -563,18 +597,17 @@ public:
             }
             current.qhead += 1;
         }
-        if (permanent) {
-            base = current;
-        }
     }
 
     bool checkSat(std::vector<int>& lits) {
+        AutoReset autoReset(*this);
+
         for (int lit: lits) {
             Lit l(lit);
             auto val = assignment.value[l];
 
             if (val == State::Unassigned) {
-                propagate(l);
+                enqueue(l);
             } else if (val == State::False) {
                 conflict();
                 break;
@@ -595,14 +628,13 @@ public:
             }
         }
 
-        reset();
         return success;
     }
 
-    void _attach(Inequality<T>* ineq, bool permanent = true) {
+    void _attach(Inequality<T>* ineq) {
         ineq->freeze(this->nVars);
         ineq->updateWatch(*this);
-        propagate(permanent);
+        propagate();
     }
 
     void attach(Inequality<T>* ineq) {
@@ -615,15 +647,82 @@ public:
         }
     }
 
-    bool attachTmp(Inequality<T>* ineq) {
-        _attach(ineq, false);
-        bool result = isConflicting();
-        reset();
-        ineq->clearWatches(*this);
-        return result;
+    /*
+     * Propagates a constraint once without attaching it.
+     * Returns true if some variable was propagated.
+     */
+    bool singleTmpPropagation(FixedSizeInequality& ineq) {
+        disableWatchUpdate();
+        redundant.template updateWatch<true>(*this);
+        enableWatchUpdate();
+
+        return (current.qhead != trail.size());
     }
 
-    void reset() {
+    void disableWatchUpdate(){
+        this->updateWatch = false;
+    }
+
+    void enableWatchUpdate(){
+        this->updateWatch = true;
+    }
+
+    bool ratCheck(const Inequality<T>* ineq, std::vector<Lit> w) {
+        FixedSizeInequality& redundant = ineq->ineq;
+
+        {
+            Assignment a(this->nVars);
+            for (Lit lit: w) {
+                a.assign(lit);
+            }
+            if (!redundant.isSatisfied(a)) {
+                return false;
+            }
+        }
+
+        AutoReset autoReset(*this);
+        FixedSizeInequalityHandler negated(redundant);
+        negated->negate();
+
+        while (!current.conflict &&
+                singleTmpPropagation(*negated))
+        {
+            propagate();
+        }
+
+        if (current.conflict) {
+            return true;
+        }
+
+        for (Lit lit: w) {
+            for (const FixedSizeInequality& ineq: occurs[~lit]) {
+                if (redundant.implies(ineq)) {
+                    continue;
+                } else {
+                    AutoReset autoReset(*this);
+                    FixedSizeInequalityHandler implied(ineq);
+                    implied->negate();
+
+                    while (!current.conflict
+                        && (singleTmpPropagation(*implied)
+                            || singleTmpPropagation(*negated)))
+                    {
+                        propagate();
+                    }
+
+                    if (!current.conflict) {
+                        return false;
+                    } else {
+                        continue;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    void reset(PropState base) {
         while (trail.size() > base.qhead) {
             assignment.unassign(trail.back());
             trail.pop_back();
@@ -640,11 +739,15 @@ public:
     }
 
     void watch(Lit lit, WatchInfo<T>& w) {
-        watchlist[lit].push_back(w);
+        if (updateWatch) {
+            watchlist[lit].push_back(w);
+        }
     }
 
     void addOccurence(Lit lit, FixedSizeInequality<T>& w) {
-        occurs[lit].push_back(w);
+        if (updateWatch) {
+            occurs[lit].push_back(&w);
+        }
     }
 
 };

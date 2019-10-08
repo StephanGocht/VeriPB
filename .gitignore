@@ -8,4 +8,6 @@ __pycache__
 *.pyc
 *.so
 *.cppimporthash
-.rendered.*.cpp
+refpy/optimized/.rendered.*.cpp
+refpy/optimized/.rendered.constraints
+refpy/optimized/constraints

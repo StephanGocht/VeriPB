@@ -5,6 +5,8 @@ from refpy.parser import OPBParser, WordParser
 
 from refpy import InvalidProof
 
+import itertools
+
 registered_rules = []
 def register_rule(rule):
     registered_rules.append(rule)
@@ -130,15 +132,26 @@ class ReverseUnitPropagation(Rule):
     @classmethod
     def parse(cls, line, context):
         with WordParser(line) as words:
+            peek = next(words)
+            w = list()
+            if peek == "w":
+                for nxt in words:
+                    if nxt == "0":
+                        break
+                    w.append(context.ineqFactory.lit2int(nxt))
+            else:
+                words = itertools.chain([peek], words)
+
             parser = OPBParser(
                     ineqFactory = context.ineqFactory,
                     allowEq = False)
             ineq = parser.parseConstraint(words)
 
-        return cls(ineq[0])
+        return cls(ineq[0], w)
 
-    def __init__(self, constraint):
+    def __init__(self, constraint, w):
         self.constraint = constraint
+        self.w = w
 
     def numConstraints(self):
         return 1
@@ -153,10 +166,9 @@ class ReverseUnitPropagation(Rule):
         return False
 
     def compute(self, antecedents, context):
-        assumption = self.constraint.copy().negated()
-        conflicting = context.propEngine.attachTmp(assumption)
+        success = self.constraint.ratCheck(self.w, context.propEngine)
 
-        if conflicting:
+        if success:
             return [self.constraint]
         else:
             raise ReverseUnitPropagationFailed("Failed to show '%s' by reverse unit propagation."%(str(self.constraint)))

@@ -255,7 +255,7 @@ public:
     LitIndexedVec<State> value;
 
     Assignment(int nVars)
-        : value(2 * (nVars + 1))
+        : value(2 * (nVars + 1), State::Unassigned)
     {}
 
     void assign(Lit lit) {
@@ -266,6 +266,10 @@ public:
     void unassign(Lit lit) {
         value[lit] = State::Unassigned;
         value[~lit] = State::Unassigned;
+    }
+
+    void resize(size_t nVars) {
+        value.resize(2 * (nVars + 1), State::Unassigned);
     }
 
     State& operator[](Lit lit) {
@@ -674,6 +678,16 @@ public:
         trail.push_back(lit);
     }
 
+    void increaseNumVarsTo(size_t _nVars){
+        assert(nVars <= _nVars);
+        if (nVars < _nVars) {
+            this->nVars = _nVars;
+            assignment.resize(_nVars);
+            watchlist.resize(2 * (_nVars + 1));
+            occurs.resize(2 * (_nVars + 1));
+        }
+    }
+
     void propagate() {
         while (current.qhead < trail.size() and !current.conflict) {
             Lit falsifiedLit = ~trail[current.qhead];
@@ -811,6 +825,7 @@ public:
                     }
 
                     if (!current.conflict) {
+                        std::cout << "  ...rup check failed" << std::endl;
                         return false;
                     } else {
                         std::cout << "  ...rup check succeded" << std::endl;
@@ -1220,7 +1235,8 @@ int main(int argc, char const *argv[])
             .def("attach", &PropEngine<int>::attach)
             .def("detach", &PropEngine<int>::detach)
             .def("reset", &PropEngine<int>::reset)
-            .def("checkSat", &PropEngine<int>::checkSat);
+            .def("checkSat", &PropEngine<int>::checkSat)
+            .def("increaseNumVarsTo", &PropEngine<int>::increaseNumVarsTo);
 
 
         py::class_<Inequality<int>>(m, "CppInequality")

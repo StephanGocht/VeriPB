@@ -313,6 +313,9 @@ class IneqFactory():
     def num2Name(self, num):
         return self.names[num - 1]
 
+    def numVars(self):
+        return len(self.names)
+
     def toString(self, constraint):
         def f(num):
             return self.num2Name(num)

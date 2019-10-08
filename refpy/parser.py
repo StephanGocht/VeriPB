@@ -118,6 +118,10 @@ class OPBParser():
                 e.line = lineNum
                 raise e
 
+        if self.ineqFactory.numVars() != numVar:
+            logging.warn("Number of variables did not match,"\
+                " using %i instead."%(self.ineqFactory.numVars()))
+
         return ((numVar, numC), constraints)
 
     def parseHeader(self, line):

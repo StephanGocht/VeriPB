@@ -798,7 +798,7 @@ public:
         }
 
         if (current.conflict) {
-            std::cout << "rup check succeded" << std::endl;
+            // std::cout << "rup check succeded" << std::endl;
             return true;
         } else if (w.size() == 0) {
             std::cout << "rup check failed" << std::endl;

@@ -4,7 +4,8 @@ import logging
 from refpy import InvalidProof
 from refpy import ParseError
 from refpy.verifier import Verifier, Context
-from refpy.parser import OPBParser
+from refpy.parser import OPBParser, CNFParser
+from refpy.drat import DRATParser
 from refpy.rules import registered_rules
 from refpy.parser import RuleParser
 from refpy.exceptions import ParseError
@@ -12,12 +13,12 @@ from refpy.optimized.constraints import PropEngine
 from refpy.constraints import newDefaultFactory
 from time import perf_counter
 
-profile = False
+profile = True
 
 if profile:
     import cProfile
 
-def run(formulaFile, rulesFile, settings = None):
+def run(formulaFile, rulesFile, settings = None, drat = False):
     if profile:
         pr = cProfile.Profile()
         pr.enable()
@@ -31,7 +32,10 @@ def run(formulaFile, rulesFile, settings = None):
     context.ineqFactory = newDefaultFactory()
 
     try:
-        formula = OPBParser(context.ineqFactory).parse(formulaFile)
+        if not drat:
+            formula = OPBParser(context.ineqFactory).parse(formulaFile)
+        else:
+            formula = CNFParser(context.ineqFactory).parse(formulaFile)
         numVars, numConstraints = formula[0]
         context.formula = formula[1]
     except ParseError as e:
@@ -41,7 +45,10 @@ def run(formulaFile, rulesFile, settings = None):
     context.propEngine = PropEngine(numVars)
 
     try:
-        rules = RuleParser(context).parse(rules, rulesFile)
+        if not drat:
+            rules = RuleParser(context).parse(rules, rulesFile)
+        else:
+            rules = DRATParser(context).parse(rulesFile)
     except ParseError as e:
         e.fileName = rulesFile.name
         raise e
@@ -103,6 +110,12 @@ def run_cmd_main():
         help="Be verbose",
         action="store_const", dest="loglevel", const=logging.INFO,
     )
+    p.add_argument(
+        '--drat',
+        help="Process CNF with DRAT proof.",
+        action="store_true", dest="drat", default=False
+    )
+
 
     Verifier.Settings.addArgParser(p)
 
@@ -112,4 +125,4 @@ def run_cmd_main():
 
     logging.basicConfig(level=args.loglevel)
 
-    return runUI(args.formula, args.derivation, verifyerSettings)
+    return runUI(args.formula, args.derivation, verifyerSettings, args.drat)

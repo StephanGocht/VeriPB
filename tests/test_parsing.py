@@ -39,7 +39,7 @@ class TestParsing(unittest.TestCase):
         assert res == [ineq1, ineq2]
 
     def test_CNF_line(self):
-        res = OPBParser(self.ineqFactory).parseCNF("2 -1 0".split())
+        res = OPBParser(self.ineqFactory).parseCNF("-1 2 0".split())
         assert res == [self.ineqFactory.fromTerms([Term(1,2), Term(1,-1)], 1)]
 
     def test_equals(self):

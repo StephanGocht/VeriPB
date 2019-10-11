@@ -63,7 +63,7 @@ class Rule():
     def __str__(self):
         return type(self).__name__
 
-class EmptyRule():
+class EmptyRule(Rule):
     def compute(self, antecednets, context):
         return []
 

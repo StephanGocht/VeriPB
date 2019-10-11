@@ -132,8 +132,14 @@ class PyInequality():
             self._terms = None
 
     def normalize(self):
+        occurs = set()
         for term in self.terms:
             if term.coefficient < 0:
+                if abs(term.variable) in occurs:
+                    raise ValueError("Variable occurs twice, currently not supported.")
+                else:
+                    occurs.add(abs(term.variable))
+
                 term.variable = -term.variable
                 term.coefficient = abs(term.coefficient)
                 self.degree += self.variableUpperBounds[abs(term.variable)] * term.coefficient
@@ -289,6 +295,13 @@ class IneqFactory():
             return -self.name2Num(lit[1:])
         else:
             return self.name2Num(lit)
+
+    def intlit2int(self, lit):
+        var = self.name2Num("x%i"%(abs(lit)))
+        if lit < 0:
+            return -var
+        else:
+            return var
 
     def isVarName(self, name):
         assert(name == name.strip())

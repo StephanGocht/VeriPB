@@ -161,7 +161,7 @@ class OPBParser():
         except StopIteration:
             raise ValueError("Expected 0 at end of constraint.")
 
-        return [self.ineqFactory.fromTerms([Term(1,l) for l in lits], 1)]
+        return [self.ineqFactory.fromTerms([Term(1,self.ineqFactory.intlit2int(l)) for l in lits], 1)]
 
     def parseOPB(self, words):
         def parseVar(s):

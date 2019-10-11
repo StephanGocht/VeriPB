@@ -8,13 +8,71 @@ from refpy.constraints import Term
 from functools import partial
 from refpy.exceptions import ParseError
 
-class RuleParser():
+class RuleParserBase():
+    commentChar = None
+
     def __init__(self, context):
         self.context = context
         try:
             self.context.addIneqListener
         except AttributeError:
             self.context.addIneqListener = list()
+
+    def isEmpty(self, line):
+        if len(line) == 0 \
+            or line == "\n" \
+            or line[0] == self.commentChar \
+            or ((line[0] == " " or line[0] == "\t")
+                and line.strip() == ""):
+
+            return True
+        else:
+            return False
+
+    def parse(self, rules, file, defaultRule = None):
+        self.rules = {rule.Id: rule for rule in rules}
+        result = list()
+
+        lineNum = 1
+        ineqId = 1
+        lines = iter(file)
+
+        defaultIdSize = 1
+        # the first line is not allowed to be comment line or empty but must be the header
+        if hasattr(self, "parseHeader"):
+            self.parseHeader(next(lines), lineNum)
+
+        for line in lines:
+            idSize = defaultIdSize
+            lineNum += 1
+
+            if not self.isEmpty(line):
+                try:
+                    rule = self.rules[line[0:idSize]]
+                except KeyError as e:
+                    if defaultRule is None:
+                        raise ParseError("Unsupported rule '%s'"%(line[0]), line = lineNum)
+                    else:
+                        rule = defaultRule
+                        idSize = 0
+
+                try:
+                    step = rule.parse(line[idSize:], self.context)
+                    numConstraints = step.numConstraints()
+                    result.append(step)
+                    for listener in self.context.addIneqListener:
+                        listener(range(ineqId, ineqId + numConstraints), self.context)
+                    ineqId += numConstraints
+
+                except refpy.ParseError as e:
+                    e.line = lineNum
+                    e.column += idSize
+                    raise e
+
+        return result
+
+class RuleParser(RuleParserBase):
+    commentChar = "*"
 
     def checkIdentifier(self, Id):
         if not Id in self.rules:
@@ -36,53 +94,6 @@ class RuleParser():
                 raise ValueError("Expected 0 at end of constraint.")
 
             words.expectEnd()
-
-    def isEmpty(self, line):
-        if  len(line) == 0 \
-            or line == "\n" \
-            or line[0] == "*" \
-            or ((line[0] == " " or line[0] == "\t")
-                and line.strip() == ""):
-
-            return True
-        else:
-            return False
-
-    def parse(self, rules, file):
-        self.rules = {rule.Id: rule for rule in rules}
-        result = list()
-
-        lineNum = 1
-        ineqId = 1
-        lines = iter(file)
-
-        idSize = 1
-        # the first line is not allowed to be comment line or empty but must be the header
-        self.parseHeader(next(lines), lineNum)
-
-        for line in lines:
-            lineNum += 1
-
-            if not self.isEmpty(line):
-                try:
-                    rule = self.rules[line[0:idSize]]
-                except KeyError as e:
-                    raise ParseError("Unsupported rule '%s'"%(line[0]), line = lineNum)
-
-                try:
-                    step = rule.parse(line[idSize:], self.context)
-                    numConstraints = step.numConstraints()
-                    result.append(step)
-                    for listener in self.context.addIneqListener:
-                        listener(range(ineqId, ineqId + numConstraints), self.context)
-                    ineqId += numConstraints
-
-                except refpy.ParseError as e:
-                    e.line = lineNum
-                    e.column += idSize
-                    raise e
-
-        return result
 
 def flatten(constraintList):
     result = list()
@@ -117,6 +128,10 @@ class OPBParser():
             except ParseError as e:
                 e.line = lineNum
                 raise e
+
+        if self.ineqFactory.numVars() != numVar:
+            logging.warn("Number of variables did not match,"\
+                " using %i instead."%(self.ineqFactory.numVars()))
 
         return ((numVar, numC), constraints)
 
@@ -193,6 +208,74 @@ class OPBParser():
             result.append(self.ineqFactory.fromTerms([(-a,l) for a,l in terms], -degree))
         return result
 
+class CNFParser():
+    def __init__(self, ineqFactory, allowEq = True):
+        self.ineqFactory = ineqFactory
+        self.allowEq = allowEq
+
+    def parse(self, formulaFile):
+        lines = iter(enumerate(formulaFile, start = 1))
+
+        numVar, numC = None, None
+        for lineNum, line in lines:
+            if not self.isEmpty(line):
+                try:
+                    numVar, numC = self.parseHeader(line)
+                except ParseError as e:
+                    e.line = lineNum
+                    raise e
+                break
+
+        if numVar is None:
+            raise ParseError("Expected header." ,line = len(lines) + 1)
+
+        constraints = list()
+        for lineNum, line in lines:
+            try:
+                constraints.extend(self.parseLine(line.rstrip()))
+            except ParseError as e:
+                e.line = lineNum
+                raise e
+
+        if self.ineqFactory.numVars() != numVar:
+            logging.warn("Number of variables did not match,"\
+                " using %i instead."%(self.ineqFactory.numVars()))
+
+        return ((numVar, numC), constraints)
+
+    def parseHeader(self, line):
+        with WordParser(line) as words:
+            words.expectExact("p")
+            words.expectExact("cnf")
+            numVar = words.nextInt()
+            numC = words.nextInt()
+
+            return (numVar, numC)
+
+    def isEmpty(self,line):
+        return len(line) == 0 or line[0] == "c" or len(line.strip()) == 0
+
+    def parseLine(self, line):
+        if self.isEmpty(line):
+            return []
+        else:
+            with WordParser(line) as words:
+                result = self.parseCNF(words)
+                words.expectEnd()
+                return result
+
+    def parseCNF(self, words):
+        words = iter(words)
+        lits = list()
+        try:
+            nxt = int(next(words))
+            while (nxt != 0):
+                lits.append(nxt)
+                nxt = int(next(words))
+        except StopIteration:
+            raise ValueError("Expected 0 at end of constraint.")
+
+        return [self.ineqFactory.fromTerms([Term(1,self.ineqFactory.intlit2int(l)) for l in lits], 1)]
 
 class WordParser():
     def __init__(self, line):

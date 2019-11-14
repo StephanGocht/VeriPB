@@ -70,7 +70,7 @@ TLDR;
     * compute constraint in polish notation
     p [sequence of operations in reverse polish notation] 0
     * introduce constraint that is verified by reverse unit propagation
-    u opb [OPB style constraint]
+    u  [OPB style constraint]
     * delete constraints
     d [constraintId1] [constraintId2] [constraintId3] ... 0
     * verify contradiction
@@ -216,9 +216,7 @@ reverse (u)nit propagation
 
 ::
 
-    u opb [OPB style constraint]
-
-    u cnf [DIMACS style clause]
+    u [OPB style constraint]
 
 Use reverse unit propagation to check if the constraint is implied,
 i.e. it assumes the negation of the constraint and all other (non
@@ -286,9 +284,7 @@ TLDR;
 
 ::
 
-    e [C: ConstraintId] opb [D: OPB style constraint]
-
-    e [C: ConstraintId] cnf [D: DIMACS style clause]
+    e [C: ConstraintId] [D: OPB style constraint]
 
 Verify that C is the same constraint as D, i.e. has the same degree
 and contains the same terms (order of terms does not matter).
@@ -301,9 +297,7 @@ same variables, all with coefficient 1, and has degree 1.
 
 ::
 
-    i [C: ConstraintId] opb [D: OPB style constraint]
-
-    i [C: ConstraintId] cnf [D: DIMACS style clause]
+    i [C: ConstraintId] [D: OPB style constraint]
 
 Verify that C syntactically implies D, i.e. it is possible to derive D
 from C by adding literal axioms.

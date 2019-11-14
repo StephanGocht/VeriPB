@@ -43,11 +43,11 @@ class TestParsing(unittest.TestCase):
         assert res == [self.ineqFactory.fromTerms([Term(1,2), Term(1,-1)], 1)]
 
     def test_equals(self):
-        rule = ConstraintEquals.parse("42 opb 3 x1 >= 2;", self.context)
+        rule = ConstraintEquals.parse("42 3 x1 >= 2;", self.context)
         assert rule == ConstraintEquals(42, self.ineqFactory.fromTerms([Term(3,1)], 2))
 
     def test_implies(self):
-        rule = ConstraintImplies.parse("42 opb 3 x1 >= 2;", self.context)
+        rule = ConstraintImplies.parse("42 3 x1 >= 2;", self.context)
         assert rule == ConstraintImplies(42, self.ineqFactory.fromTerms([Term(3,1)], 2))
 
     def test_contradiction(self):

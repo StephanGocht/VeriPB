@@ -156,13 +156,7 @@ class OPBParser():
                 return result
 
     def parseConstraint(self, words):
-        constraintType = next(words)
-        if constraintType == "opb":
-            ineq = self.parseOPB(words)
-        elif constraintType == "cnf":
-            ineq = self.parseCNF(words)
-        else:
-            raise ValueError("Unnown constraint type.")
+        ineq = self.parseOPB(words)
         return ineq
 
     def parseCNF(self, words):

@@ -313,11 +313,12 @@ class IneqFactory():
             return False
 
     def name2Num(self, name):
-        if not self.isVarName(name):
-            raise ValueError("Expected variablename, got %s"%(name))
         try:
             return self.num[name]
         except KeyError:
+            if not self.isVarName(name):
+                raise ValueError("Expected variablename, got %s"%(name))
+
             self.names.append(name)
             num = len(self.names)
             self.num[name] = num

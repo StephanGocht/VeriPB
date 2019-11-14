@@ -17,6 +17,7 @@ profile = True
 
 if profile:
     import cProfile
+    from pyprof2calltree import convert as convert2kcachegrind
 
 def run(formulaFile, rulesFile, settings = None, drat = False):
     if profile:
@@ -61,7 +62,7 @@ def run(formulaFile, rulesFile, settings = None, drat = False):
 
     if profile:
         pr.disable()
-        pr.print_stats()
+        convert2kcachegrind(pr.getstats(), 'prof.kgrind')
 
 def runUI(*args):
     try:

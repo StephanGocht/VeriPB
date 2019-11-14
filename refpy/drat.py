@@ -75,18 +75,19 @@ class DRAT(ReverseUnitPropagation):
     def parse(cls, line, context):
         lits = list()
         with WordParser(line) as words:
-            while True:
-                lit = words.nextInt()
-                if lit == 0:
+            for w in words:
+                if w == "0":
                     break
-                lits.append(lit)
+                else:
+                    lits.append(int(w))
 
         clauseFinder = DRATClauseFinder.get(context)
         clauseFinder.add(lits)
 
-        ineq = context.ineqFactory.fromTerms([(1,context.ineqFactory.intlit2int(l)) for l in lits], 1)
+        terms = [(1,context.ineqFactory.intlit2int(l)) for l in lits]
+        ineq = context.ineqFactory.fromTerms(terms, 1)
         if len(lits) > 0:
-            w = [context.ineqFactory.intlit2int(lits[0])]
+            w = [terms[0][1]]
         else:
             w = []
         return cls(ineq, w, context.ineqFactory.numVars())

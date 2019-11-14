@@ -140,7 +140,9 @@ reverse (p)olish notation
 
 The refutation itself is constructed by a 0 terminated sequence of
 arithmetic operations over the constraints. These are written down in
-reverse polish notation. Available operations are:
+reverse polish notation. We will use ``[constraint]``  to indicate
+either a ConstraintId or a subsequence in reverse polish notation.
+Available operations are:
 
 * Addition::
 
@@ -164,9 +166,6 @@ operand.
 * Boolean Saturation::
 
     [constraint] s
-
-Where [constraint] is either a ConstraintId or a subsequence in
-reverse polish notation.
 
 * Literal Axioms::
 
@@ -262,7 +261,7 @@ TLDR;
 
 
 (e)quals
-----
+--------
 
 ::
 
@@ -271,11 +270,8 @@ TLDR;
 Verify that C is the same constraint as D, i.e. has the same degree
 and contains the same terms (order of terms does not matter).
 
-A constraint is equal to a [DIMACS style clause] if it contains the
-same variables, all with coefficient 1, and has degree 1.
-
 (i)mplies
-----
+---------
 
 ::
 
@@ -285,7 +281,7 @@ Verify that C syntactically implies D, i.e. it is possible to derive D
 from C by adding literal axioms.
 
 (j) implies and add
----
+-------------------
 
 Identical to (i)mplies but also adds the constraint that is implied to
 the database.
@@ -342,8 +338,14 @@ TLDR;
     v x1 ~x2
 
 Given a partial assignment in form of a list of ``[literal]``, i.e.
-variable names with ``~`` as prefix to indicate negation, check that
-after unit propagation we are left with a full assignment that does
-not violate any constraint. If the check is successful then the clause
-consisting of the negation of all literals is added. If the check is
-not successful then verification fails.
+variable names with ``~`` as prefix to indicate negation, check that:
+
+ * after unit propagation we are left with a full assignment, i.e. an
+   assignment that assigns all variables that are mentioned in a
+   constraint in the formula or the proof
+
+ * the full assignment does not violate any constraint
+
+If the check is successful then the clause consisting of the negation
+of all literals is added. If the check is not successful then
+verification fails.

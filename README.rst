@@ -49,12 +49,6 @@ The following characters are guaranteed to be supported: ``a-z, A-Z,
 0-9, []{}_^``. Support of further characters is implementation
 specific and produces an error if unsupported characters are used.
 
-CNFs in DIMACS format do not use variable names but only non zero
-integers. By convention we will use ``x[integer]`` as variable name
-for ``[integer]``. For example, the literal ``1`` in DIMACS is
-equivalent to ``x1`` in OPB and ``-1`` to ``~x1``, ``2`` to ``x2``
-etc.
-
 Basic Proof Format
 ==================
 TLDR;
@@ -65,8 +59,6 @@ TLDR;
     pseudo Boolean proof version 1.0
     * load formula
     f [nProblemConstraints] 0
-    * load literal axiom
-    l [literal]
     * compute constraint in polish notation
     p [sequence of operations in reverse polish notation] 0
     * introduce constraint that is verified by reverse unit propagation
@@ -127,16 +119,6 @@ will be translated to::
     2: 1x3 1x4 >= 1;
     3: -1x3 -1x4 >= -1;
 
-
-
-(l)iteral axiom
-----
-
-::
-
-    l [literal]
-
-Create literal axiom ``[literal] >= 0``.
 
 (c)ontradiction
 ----
@@ -268,11 +250,11 @@ TLDR;
 ::
 
     * check equality
-    e [ConstraintId] opb [OPB style constraint]
+    e [ConstraintId] [OPB style constraint]
     * check implication
-    i [ConstraintId] opb [OPB style constraint]
+    i [ConstraintId] [OPB style constraint]
     * add constraint if implied
-    j [ConstraintId] opb [OPB style constraint]
+    j [ConstraintId] [OPB style constraint]
     * set level (for easier deletion)
     # [level]
     * wipe out level (for easier deletion)

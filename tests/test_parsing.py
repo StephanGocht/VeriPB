@@ -18,7 +18,7 @@ class TestParsing(unittest.TestCase):
 
     def test_header(self):
         parser = RuleParser(DummyContext())
-        print(parser.parse(registered_rules, ["refutation using e 0"]))
+        print(parser.parse(registered_rules, ["pseudo Boolean proof version 1.0"]))
 
     def test_OPB_line_1(self):
         res = OPBParser(self.ineqFactory).parseOPB("3 x1 >= 2;".split())

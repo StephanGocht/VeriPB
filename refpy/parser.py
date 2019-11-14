@@ -40,7 +40,11 @@ class RuleParserBase():
         defaultIdSize = 1
         # the first line is not allowed to be comment line or empty but must be the header
         if hasattr(self, "parseHeader"):
-            self.parseHeader(next(lines), lineNum)
+            try:
+                self.parseHeader(next(lines))
+            except ParseError as e:
+                e.line = lineNum
+                raise e
 
         for line in lines:
             idSize = defaultIdSize
@@ -78,20 +82,16 @@ class RuleParser(RuleParserBase):
         if not Id in self.rules:
             raise ValueError("Unsuported rule '%s'."%(Id))
 
-    def parseHeader(self, line, lineNum):
+    def parseHeader(self, line):
         with WordParser(line) as words:
-            first = next(words)
-            if first != "refutation" and first != "proof":
-                raise ValueError("Expected header starting with 'proof'")
-            words.expectExact("using")
-
-            try:
-                nxt = next(words)
-                while (nxt != "0"):
-                    self.checkIdentifier(nxt)
-                    nxt = next(words)
-            except StopIteration:
-                raise ValueError("Expected 0 at end of constraint.")
+            words.expectExact("pseudo")
+            words.expectExact("Boolean")
+            words.expectExact("proof")
+            words.expectExact("version")
+            version = next(words)
+            major, minor = map(int, version.split("."))
+            if major != 1 or minor < 0 or 0 < minor:
+                raise ValueError("Unsupported version.")
 
             words.expectEnd()
 

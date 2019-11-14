@@ -1,4 +1,4 @@
-refutation using f p e j c 0
+pseudo Boolean proof version 1.0
 f 0
 p 3 1 * 4 1 * + s
 e 6 +1 x3 >= 1;

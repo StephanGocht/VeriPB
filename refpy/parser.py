@@ -281,35 +281,37 @@ class WordParser():
     def __init__(self, line):
         self.line = line
         self.words = line.split()
-        self.pos = -1
+        self.wordIter = iter(line.split())
 
     def __iter__(self):
-        return self
+        return self.wordIter
 
     def __next__(self):
-        self.pos += 1
-        if (self.pos >= len(self.words)):
-            raise StopIteration(self)
-        return self.words[self.pos]
+        return next(self.wordIter)
 
     def __enter__(self):
         return self
 
     def __exit__(self, exec_type, exec_value, exec_traceback):
         if exec_type is not None:
+            wordNum = 0
+            for x in self.wordIter:
+                wordNum += 1
+            wordNum = len(self.words) - wordNum - 1
+
             if issubclass(exec_type, ValueError):
-                self.raiseParseError(self.pos, exec_value)
+                self.raiseParseError(wordNum, exec_value)
             if issubclass(exec_type, StopIteration) \
                     and exec_value.value is self:
                 self.expectedWord()
 
-    def raiseParseError(self, word, error):
+    def raiseParseError(self, wordNum, error):
         column = None
-        if self.pos >= len(self.words):
+        if wordNum >= len(self.words):
             column = len(self.line)
         else:
             for idx, match in enumerate(re.finditer(r" *(?P<word>[^ ]+)", self.line)):
-                if idx == self.pos:
+                if idx == wordNum:
                     column = match.start("word")
 
         assert(column is not None)
@@ -318,11 +320,11 @@ class WordParser():
         raise ParseError(error, column = column)
 
     def expectedWord(self):
-        self.raiseParseError(self.pos, "Expected another word.")
+        self.raiseParseError(len(self.words), "Expected another word.")
 
     def next(self, what = None):
         try:
-            return next(self)
+            return next(self.wordIter)
         except StopIteration:
             if what is None:
                 self.expectedWord()

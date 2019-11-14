@@ -307,30 +307,6 @@ class IsContradiction(Rule):
         return True
 
 @register_rule
-class LoadLitteralAxioms(Rule):
-    Id = "l"
-
-    @classmethod
-    def parse(cls, line, context):
-        with WordParser(line) as words:
-            lit = context.ineqFactory.lit2int(next(words))
-            words.expectEnd()
-
-        return cls(lit)
-
-    def __init__(self, lit):
-        self.lit = lit
-
-    def compute(self, antecedents, context = None):
-        return [context.ineqFactory.fromTerms([Term(1, self.lit)], 0)]
-
-    def numConstraints(self):
-        return 1
-
-    def antecedentIDs(self):
-        return []
-
-@register_rule
 class ReversePolishNotation(Rule):
     Id = "p"
 

@@ -318,9 +318,8 @@ Example
 ::
 
     pseudo Boolean proof version 1.0
-    l 5 0               # IDs 1-10 now contain literal axioms
-    f 10 0              # IDs 11-20 now contain the formula constraints
-    p 11 1 3 * + 42 d 0 # Take the first constraint from the formula,
+    f 10 0              # IDs 1-10 now contain the formula constraints
+    p 1 x1 3 * + 42 d 0 # Take the first constraint from the formula,
                           weaken with 3 x_1 >= 0 and then divide by 42
 
 

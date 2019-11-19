@@ -62,6 +62,7 @@ class RuleParserBase():
 
                 try:
                     step = rule.parse(line[idSize:], self.context)
+                    step.lineInFile = lineNum
                     numConstraints = step.numConstraints()
                     result.append(step)
                     for listener in self.context.addIneqListener:

@@ -1,9 +1,9 @@
-import refpy.constraints
-from refpy.constraints import Term
-from refpy.pbsolver import RoundingSat, Formula
-from refpy.parser import OPBParser, WordParser
+import veripb.constraints
+from veripb.constraints import Term
+from veripb.pbsolver import RoundingSat, Formula
+from veripb.parser import OPBParser, WordParser
 
-from refpy import InvalidProof
+from veripb import InvalidProof
 
 registered_rules = []
 def register_rule(rule):

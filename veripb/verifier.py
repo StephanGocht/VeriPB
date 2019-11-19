@@ -1,8 +1,8 @@
 from recordclass import structclass
 from enum import Enum
-from refpy.rules import DummyRule, IsContradiction
+from veripb.rules import DummyRule, IsContradiction
 from time import perf_counter
-from refpy import InvalidProof
+from veripb import InvalidProof
 
 import logging
 

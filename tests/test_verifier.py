@@ -1,10 +1,10 @@
 import unittest
 
 
-from env import refpy
-from refpy.verifier import Verifier, Context, DummyPropEngine
-from refpy.rules import *
-from refpy import InvalidProof
+from env import veripb
+from veripb.verifier import Verifier, Context, DummyPropEngine
+from veripb.rules import *
+from veripb import InvalidProof
 from unittest.mock import MagicMock
 
 class MockRule(Rule):

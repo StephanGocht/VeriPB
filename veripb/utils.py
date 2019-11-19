@@ -1,15 +1,15 @@
 import argparse
 import logging
 
-from refpy import InvalidProof
-from refpy import ParseError
-from refpy.verifier import Verifier, Context
-from refpy.parser import OPBParser
-from refpy.rules import registered_rules
-from refpy.parser import RuleParser
-from refpy.exceptions import ParseError
-from refpy.optimized.constraints import PropEngine
-from refpy.constraints import newDefaultFactory
+from veripb import InvalidProof
+from veripb import ParseError
+from veripb.verifier import Verifier, Context
+from veripb.parser import OPBParser
+from veripb.rules import registered_rules
+from veripb.parser import RuleParser
+from veripb.exceptions import ParseError
+from veripb.optimized.constraints import PropEngine
+from veripb.constraints import newDefaultFactory
 from time import perf_counter
 
 profile = False

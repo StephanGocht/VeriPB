@@ -274,7 +274,7 @@ class PyInequality():
     def copy(self):
         return LazyInequality(self)
 
-optimized = cppimport.imp("refpy.optimized.constraints")
+optimized = cppimport.imp("veripb.optimized.constraints")
 CppInequality = optimized.CppInequality
 
 

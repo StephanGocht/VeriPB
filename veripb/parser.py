@@ -1,12 +1,12 @@
 import logging
-import refpy.constraints
+import veripb.constraints
 import mmap
 import re
 
-from refpy.constraints import Term
+from veripb.constraints import Term
 
 from functools import partial
-from refpy.exceptions import ParseError
+from veripb.exceptions import ParseError
 
 class RuleParserBase():
     commentChar = None
@@ -68,7 +68,7 @@ class RuleParserBase():
                         listener(range(ineqId, ineqId + numConstraints), self.context)
                     ineqId += numConstraints
 
-                except refpy.ParseError as e:
+                except veripb.ParseError as e:
                     e.line = lineNum
                     e.column += idSize
                     raise e
@@ -330,7 +330,7 @@ class WordParser():
     def expectExact(self, what):
         nxt = next(self)
         if (nxt != what):
-            raise ValueError("Expected %s, got %s."%(what, nxt))
+            raise ValueError("Expected key word %s, got %s."%(what, nxt))
 
     def expectZero(self):
         if (next(self) != "0"):

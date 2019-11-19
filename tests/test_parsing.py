@@ -1,10 +1,10 @@
 import unittest
 
-from env import refpy
-from refpy.parser import *
-from refpy.rules import *
-from refpy.constraints import Term
-from refpy.constraints import newDefaultFactory
+from env import veripb
+from veripb.parser import *
+from veripb.rules import *
+from veripb.constraints import Term
+from veripb.constraints import newDefaultFactory
 
 
 class DummyContext:

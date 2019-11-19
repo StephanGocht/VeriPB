@@ -1,21 +1,21 @@
 from setuptools import setup
 
 setup(
-    name='refpy',
+    name='veripb',
     version='0.1',
     description='Tool for verifying refutations.',
-    url='http://github.com/StephanGocht/refpy',
+    url='http://github.com/StephanGocht/veripb',
     author='Stephan Gocht',
     author_email='stephan@gobro.de',
     license='MIT',
-    packages=['refpy'],
+    packages=['veripb'],
     install_requires=[
         "recordclass",
         "cppimport"
     ],
     entry_points={
         'console_scripts': [
-            'refpy=refpy:run_cmd_main',
+            'veripb=veripb:run_cmd_main',
         ]
     },
 )

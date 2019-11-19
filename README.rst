@@ -1,8 +1,8 @@
-refpy Refutations in Python
-====
+VeriPB --- Verifier for (linear) pseudo-Boolean proofs
+======================================================
 
-refpy is a tool for verifying refutations (proofs of unsatisfiability)
-and more (such as verifying that all solutions were found) in python
+VeriPB is a tool for verifying refutations (proofs of unsatisfiability)
+and more (such as verifying that a valid solution is found) in python
 and c++. A description of the proof file format can be found below.
 
 Currently it only supports pseudo-Boolean proofs.
@@ -19,10 +19,10 @@ Installation
 
 ::
 
-    git clone git@github.com:StephanGocht/refpy.git
-    pip3 install -e ./refpy
+    git clone git@github.com:StephanGocht/veripb.git
+    pip3 install -e ./veripb
 
-run ``refpy --help`` for help
+run ``veripb --help`` for help
 
 Update
 ------

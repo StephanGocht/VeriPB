@@ -1,8 +1,8 @@
 import unittest
-from env import refpy
+from env import veripb
 
 import cppimport
-constraints = cppimport.imp("refpy.optimized.constraints")
+constraints = cppimport.imp("veripb.optimized.constraints")
 
 Inequality = constraints.CppInequality
 

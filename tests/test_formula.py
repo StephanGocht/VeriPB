@@ -1,9 +1,9 @@
 import unittest
 import io
 
-from env import refpy
-from refpy.pbsolver import Formula
-from refpy.constraints import PyInequality, Term
+from env import veripb
+from veripb.pbsolver import Formula
+from veripb.constraints import PyInequality, Term
 
 class TestFormula(unittest.TestCase):
     def test_toString(self):

@@ -1,4 +1,4 @@
-pseudo Boolean proof version 1.0
+pseudo-Boolean proof version 1.0
 f 3 0
 d 1 2 3 0
 u 1 x1 1 x2 >= 1;

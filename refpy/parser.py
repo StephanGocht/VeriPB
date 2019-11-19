@@ -84,8 +84,7 @@ class RuleParser(RuleParserBase):
 
     def parseHeader(self, line):
         with WordParser(line) as words:
-            words.expectExact("pseudo")
-            words.expectExact("Boolean")
+            words.expectExact("pseudo-Boolean")
             words.expectExact("proof")
             words.expectExact("version")
             version = next(words)

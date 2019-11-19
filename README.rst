@@ -56,7 +56,7 @@ TLDR;
 
 ::
 
-    pseudo Boolean proof version 1.0
+    pseudo-Boolean proof version 1.0
     * load formula
     f [nProblemConstraints] 0
     * compute constraint in polish notation
@@ -110,7 +110,7 @@ For example the opb file::
 
 with the proof file::
 
-    pseudo Boolean proof version 1.0
+    pseudo-Boolean proof version 1.0
     f 3 0
 
 will be translated to::
@@ -313,7 +313,7 @@ Example
 
 ::
 
-    pseudo Boolean proof version 1.0
+    pseudo-Boolean proof version 1.0
     f 10 0              # IDs 1-10 now contain the formula constraints
     p 1 x1 3 * + 42 d 0 # Take the first constraint from the formula,
                           weaken with 3 x_1 >= 0 and then divide by 42

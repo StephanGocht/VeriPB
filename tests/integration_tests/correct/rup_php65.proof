@@ -1,4 +1,4 @@
-pseudo Boolean proof version 1.0
+pseudo-Boolean proof version 1.0
 f 11 0
 u 1 ~x5 1 x26 1 x27 1 x28 1 x29 >= 1;
 u 1 ~x10 1 x26 1 x27 1 x28 1 x29 >= 1;

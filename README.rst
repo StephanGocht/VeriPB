@@ -1,11 +1,11 @@
-VeriPB --- Verifier for (linear) pseudo-Boolean proofs
-======================================================
+VeriPB - Verifier for pseudo-Boolean proofs
+===========================================
 
 VeriPB is a tool for verifying refutations (proofs of unsatisfiability)
 and more (such as verifying that a valid solution is found) in python
 and c++. A description of the proof file format can be found below.
 
-Currently it only supports pseudo-Boolean proofs.
+Currently it only supports linear pseudo-Boolean proofs using cutting planes.
 
 WARNING
 =======

@@ -19,7 +19,7 @@ Installation
 
 ::
 
-    git clone git@github.com:StephanGocht/veripb.git
+    git clone git@github.com:StephanGocht/VeriPB.git
     pip3 install -e ./veripb
 
 run ``veripb --help`` for help

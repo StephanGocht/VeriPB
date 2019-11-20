@@ -1,7 +1,7 @@
 import subprocess
 import io
 import re
-from refpy.constraints import PyInequality, Term
+from veripb.constraints import PyInequality, Term
 
 class SolverNotAvailable(RuntimeError):
     pass

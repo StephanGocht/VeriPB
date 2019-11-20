@@ -2,10 +2,10 @@ import unittest
 
 from math import copysign
 
-from env import refpy
+from env import veripb
 
-from refpy.constraints import Term
-from refpy.constraints import newDefaultFactory
+from veripb.constraints import Term
+from veripb.constraints import newDefaultFactory
 
 ineqFactory = newDefaultFactory()
 
@@ -350,7 +350,7 @@ class TestInequality(unittest.TestCase):
         r = geq([(2,1), (1,3)], 2)
         assert r == i
 
-    if not isinstance(ineqFactory, refpy.constraints.CppIneqFactory):
+    if not isinstance(ineqFactory, veripb.constraints.CppIneqFactory):
         def test_resolve_1(self):
             a = clause([1, 2])
             b = clause([-1, 3])

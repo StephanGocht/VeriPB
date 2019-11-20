@@ -2,13 +2,13 @@ import unittest
 
 from pathlib import Path
 
-from env import refpy
-from refpy import run, InvalidProof, ParseError
+from env import veripb
+from veripb import run, InvalidProof, ParseError
 
 class TestIntegration(unittest.TestCase):
     def run_single(self, formulaPath):
         proofPath = formulaPath.with_suffix(".proof")
-        print("refpy %s %s"%(formulaPath, proofPath))
+        print("veripb %s %s"%(formulaPath, proofPath))
         with formulaPath.open() as formula:
             with proofPath.open() as proof:
                 run(formula, proof)

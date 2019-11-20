@@ -1,6 +1,6 @@
-refutation using f v 0
+pseudo-Boolean proof version 1.0
 f 1 0
 v x1 x2
 v ~x1
 v ~x2
-u cnf 0
+u >= 1;

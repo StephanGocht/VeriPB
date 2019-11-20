@@ -1,19 +1,19 @@
 import argparse
 import logging
 
-from refpy import InvalidProof
-from refpy import ParseError
-from refpy.verifier import Verifier, Context
-from refpy.parser import OPBParser, CNFParser
-from refpy.drat import DRATParser
-from refpy.rules import registered_rules
-from refpy.parser import RuleParser
-from refpy.exceptions import ParseError
-from refpy.optimized.constraints import PropEngine
-from refpy.constraints import newDefaultFactory
+from veripb import InvalidProof
+from veripb import ParseError
+from veripb.verifier import Verifier, Context
+from veripb.parser import OPBParser, CNFParser
+from veripb.drat import DRATParser
+from veripb.rules import registered_rules
+from veripb.parser import RuleParser
+from veripb.exceptions import ParseError
+from veripb.optimized.constraints import PropEngine
+from veripb.constraints import newDefaultFactory
 from time import perf_counter
 
-profile = True
+profile = False
 
 if profile:
     import cProfile
@@ -34,7 +34,7 @@ def run(formulaFile, rulesFile, settings = None, drat = False):
 
     try:
         if not drat:
-            formula = OPBParser(context.ineqFactory).parse(formulaFile)
+        formula = OPBParser(context.ineqFactory).parse(formulaFile)
         else:
             formula = CNFParser(context.ineqFactory).parse(formulaFile)
         numVars, numConstraints = formula[0]
@@ -47,7 +47,7 @@ def run(formulaFile, rulesFile, settings = None, drat = False):
 
     try:
         if not drat:
-            rules = RuleParser(context).parse(rules, rulesFile)
+        rules = RuleParser(context).parse(rules, rulesFile)
         else:
             rules = DRATParser(context).parse(rulesFile)
     except ParseError as e:

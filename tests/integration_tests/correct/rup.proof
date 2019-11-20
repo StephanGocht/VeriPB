@@ -1,6 +1,6 @@
-refutation using f e u 0
+pseudo-Boolean proof version 1.0
 f 3 0
-u cnf 1 2 0
-e 4 opb 1 x1 1 x2 >= 1;
-u opb >= 0;
-e 5 opb >= 0;
+u 1 x1 1 x2 >= 1;
+e 4 1 x1 1 x2 >= 1;
+u >= 1;
+e 5 >= 1;

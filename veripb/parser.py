@@ -1,12 +1,12 @@
 import logging
-import refpy.constraints
+import veripb.constraints
 import mmap
 import re
 
-from refpy.constraints import Term
+from veripb.constraints import Term
 
 from functools import partial
-from refpy.exceptions import ParseError
+from veripb.exceptions import ParseError
 
 class RuleParserBase():
     commentChar = None
@@ -40,7 +40,11 @@ class RuleParserBase():
         defaultIdSize = 1
         # the first line is not allowed to be comment line or empty but must be the header
         if hasattr(self, "parseHeader"):
-            self.parseHeader(next(lines), lineNum)
+            try:
+                self.parseHeader(next(lines))
+            except ParseError as e:
+                e.line = lineNum
+                raise e
 
         for line in lines:
             idSize = defaultIdSize
@@ -58,13 +62,14 @@ class RuleParserBase():
 
                 try:
                     step = rule.parse(line[idSize:], self.context)
+                    step.lineInFile = lineNum
                     numConstraints = step.numConstraints()
                     result.append(step)
                     for listener in self.context.addIneqListener:
                         listener(range(ineqId, ineqId + numConstraints), self.context)
                     ineqId += numConstraints
 
-                except refpy.ParseError as e:
+                except veripb.ParseError as e:
                     e.line = lineNum
                     e.column += idSize
                     raise e
@@ -78,20 +83,15 @@ class RuleParser(RuleParserBase):
         if not Id in self.rules:
             raise ValueError("Unsuported rule '%s'."%(Id))
 
-    def parseHeader(self, line, lineNum):
+    def parseHeader(self, line):
         with WordParser(line) as words:
-            first = next(words)
-            if first != "refutation" and first != "proof":
-                raise ValueError("Expected header starting with 'proof'")
-            words.expectExact("using")
-
-            try:
-                nxt = next(words)
-                while (nxt != "0"):
-                    self.checkIdentifier(nxt)
-                    nxt = next(words)
-            except StopIteration:
-                raise ValueError("Expected 0 at end of constraint.")
+            words.expectExact("pseudo-Boolean")
+            words.expectExact("proof")
+            words.expectExact("version")
+            version = next(words)
+            major, minor = map(int, version.split("."))
+            if major != 1 or minor < 0 or 0 < minor:
+                raise ValueError("Unsupported version.")
 
             words.expectEnd()
 
@@ -156,13 +156,7 @@ class OPBParser():
                 return result
 
     def parseConstraint(self, words):
-        constraintType = next(words)
-        if constraintType == "opb":
-            ineq = self.parseOPB(words)
-        elif constraintType == "cnf":
-            ineq = self.parseCNF(words)
-        else:
-            raise ValueError("Unnown constraint type.")
+        ineq = self.parseOPB(words)
         return ineq
 
     def parseCNF(self, words):
@@ -337,7 +331,7 @@ class WordParser():
     def expectExact(self, what):
         nxt = next(self)
         if (nxt != what):
-            raise ValueError("Expected %s, got %s."%(what, nxt))
+            raise ValueError("Expected key word %s, got %s."%(what, nxt))
 
     def expectZero(self):
         if (next(self) != "0"):

@@ -1,11 +1,11 @@
-refpy Refutations in Python
-====
+VeriPB - Verifier for pseudo-Boolean proofs
+===========================================
 
-refpy is a tool for verifying refutations (proofs of unsatisfiability)
-and more (such as verifying that all solutions were found) in python
+VeriPB is a tool for verifying refutations (proofs of unsatisfiability)
+and more (such as verifying that a valid solution is found) in python
 and c++. A description of the proof file format can be found below.
 
-Currently it only supports pseudo-Boolean proofs.
+Currently it only supports linear pseudo-Boolean proofs using cutting planes.
 
 WARNING
 =======
@@ -19,10 +19,10 @@ Installation
 
 ::
 
-    git clone git@github.com:StephanGocht/refpy.git
-    pip3 install -e ./refpy
+    git clone git@github.com:StephanGocht/VeriPB.git
+    pip3 install -e ./veripb
 
-run ``refpy --help`` for help
+run ``veripb --help`` for help
 
 Update
 ------
@@ -49,12 +49,6 @@ The following characters are guaranteed to be supported: ``a-z, A-Z,
 0-9, []{}_^``. Support of further characters is implementation
 specific and produces an error if unsupported characters are used.
 
-CNFs in DIMACS format do not use variable names but only non zero
-integers. By convention we will use ``x[integer]`` as variable name
-for ``[integer]``. For example, the literal ``1`` in DIMACS is
-equivalent to ``x1`` in OPB and ``-1`` to ``~x1``, ``2`` to ``x2``
-etc.
-
 Basic Proof Format
 ==================
 TLDR;
@@ -62,15 +56,13 @@ TLDR;
 
 ::
 
-    proof using f l p u d c 0
+    pseudo-Boolean proof version 1.0
     * load formula
     f [nProblemConstraints] 0
-    * load literal axiom
-    l [literal]
     * compute constraint in polish notation
     p [sequence of operations in reverse polish notation] 0
     * introduce constraint that is verified by reverse unit propagation
-    u opb [OPB style constraint]
+    u  [OPB style constraint]
     * delete constraints
     d [constraintId1] [constraintId2] [constraintId3] ... 0
     * verify contradiction
@@ -118,7 +110,7 @@ For example the opb file::
 
 with the proof file::
 
-    refutation using f 0
+    pseudo-Boolean proof version 1.0
     f 3 0
 
 will be translated to::
@@ -127,16 +119,6 @@ will be translated to::
     2: 1x3 1x4 >= 1;
     3: -1x3 -1x4 >= -1;
 
-
-
-(l)iteral axiom
-----
-
-::
-
-    l [literal]
-
-Create literal axiom ``[literal] >= 0``.
 
 (c)ontradiction
 ----
@@ -158,7 +140,9 @@ reverse (p)olish notation
 
 The refutation itself is constructed by a 0 terminated sequence of
 arithmetic operations over the constraints. These are written down in
-reverse polish notation. Available operations are:
+reverse polish notation. We will use ``[constraint]``  to indicate
+either a ConstraintId or a subsequence in reverse polish notation.
+Available operations are:
 
 * Addition::
 
@@ -182,9 +166,6 @@ operand.
 * Boolean Saturation::
 
     [constraint] s
-
-Where [constraint] is either a ConstraintId or a subsequence in
-reverse polish notation.
 
 * Literal Axioms::
 
@@ -216,9 +197,7 @@ reverse (u)nit propagation
 
 ::
 
-    u opb [OPB style constraint]
-
-    u cnf [DIMACS style clause]
+    u [OPB style constraint]
 
 Use reverse unit propagation to check if the constraint is implied,
 i.e. it assumes the negation of the constraint and all other (non
@@ -270,11 +249,11 @@ TLDR;
 ::
 
     * check equality
-    e [ConstraintId] opb [OPB style constraint]
+    e [ConstraintId] [OPB style constraint]
     * check implication
-    i [ConstraintId] opb [OPB style constraint]
+    i [ConstraintId] [OPB style constraint]
     * add constraint if implied
-    j [ConstraintId] opb [OPB style constraint]
+    j [ConstraintId] [OPB style constraint]
     * set level (for easier deletion)
     # [level]
     * wipe out level (for easier deletion)
@@ -282,34 +261,27 @@ TLDR;
 
 
 (e)quals
-----
+--------
 
 ::
 
-    e [C: ConstraintId] opb [D: OPB style constraint]
-
-    e [C: ConstraintId] cnf [D: DIMACS style clause]
+    e [C: ConstraintId] [D: OPB style constraint]
 
 Verify that C is the same constraint as D, i.e. has the same degree
 and contains the same terms (order of terms does not matter).
 
-A constraint is equal to a [DIMACS style clause] if it contains the
-same variables, all with coefficient 1, and has degree 1.
-
 (i)mplies
-----
+---------
 
 ::
 
-    i [C: ConstraintId] opb [D: OPB style constraint]
-
-    i [C: ConstraintId] cnf [D: DIMACS style clause]
+    i [C: ConstraintId] [D: OPB style constraint]
 
 Verify that C syntactically implies D, i.e. it is possible to derive D
 from C by adding literal axioms.
 
 (j) implies and add
----
+-------------------
 
 Identical to (i)mplies but also adds the constraint that is implied to
 the database.
@@ -341,10 +313,9 @@ Example
 
 ::
 
-    refutation graph using f l p 0
-    l 5 0               # IDs 1-10 now contain literal axioms
-    f 10 0              # IDs 11-20 now contain the formula constraints
-    p 11 1 3 * + 42 d 0 # Take the first constraint from the formula,
+    pseudo-Boolean proof version 1.0
+    f 10 0              # IDs 1-10 now contain the formula constraints
+    p 1 x1 3 * + 42 d 0 # Take the first constraint from the formula,
                           weaken with 3 x_1 >= 0 and then divide by 42
 
 
@@ -367,8 +338,14 @@ TLDR;
     v x1 ~x2
 
 Given a partial assignment in form of a list of ``[literal]``, i.e.
-variable names with ``~`` as prefix to indicate negation, check that
-after unit propagation we are left with a full assignment that does
-not violate any constraint. If the check is successful then the clause
-consisting of the negation of all literals is added. If the check is
-not successful then verification fails.
+variable names with ``~`` as prefix to indicate negation, check that:
+
+ * after unit propagation we are left with a full assignment, i.e. an
+   assignment that assigns all variables that are mentioned in a
+   constraint in the formula or the proof
+
+ * the full assignment does not violate any constraint
+
+If the check is successful then the clause consisting of the negation
+of all literals is added. If the check is not successful then
+verification fails.

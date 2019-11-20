@@ -1,10 +1,10 @@
 import unittest
 
-from env import refpy
-from refpy.parser import *
-from refpy.rules import *
-from refpy.constraints import Term
-from refpy.constraints import newDefaultFactory
+from env import veripb
+from veripb.parser import *
+from veripb.rules import *
+from veripb.constraints import Term
+from veripb.constraints import newDefaultFactory
 
 
 class DummyContext:
@@ -18,7 +18,7 @@ class TestParsing(unittest.TestCase):
 
     def test_header(self):
         parser = RuleParser(DummyContext())
-        print(parser.parse(registered_rules, ["refutation using e 0"]))
+        print(parser.parse(registered_rules, ["pseudo-Boolean proof version 1.0"]))
 
     def test_OPB_line_1(self):
         res = OPBParser(self.ineqFactory).parseOPB("3 x1 >= 2;".split())
@@ -43,11 +43,11 @@ class TestParsing(unittest.TestCase):
         assert res == [self.ineqFactory.fromTerms([Term(1,2), Term(1,-1)], 1)]
 
     def test_equals(self):
-        rule = ConstraintEquals.parse("42 opb 3 x1 >= 2;", self.context)
+        rule = ConstraintEquals.parse("42 3 x1 >= 2;", self.context)
         assert rule == ConstraintEquals(42, self.ineqFactory.fromTerms([Term(3,1)], 2))
 
     def test_implies(self):
-        rule = ConstraintImplies.parse("42 opb 3 x1 >= 2;", self.context)
+        rule = ConstraintImplies.parse("42 3 x1 >= 2;", self.context)
         assert rule == ConstraintImplies(42, self.ineqFactory.fromTerms([Term(3,1)], 2))
 
     def test_contradiction(self):

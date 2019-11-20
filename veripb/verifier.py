@@ -1,8 +1,8 @@
 from recordclass import structclass
 from enum import Enum
-from refpy.rules import DummyRule, IsContradiction
+from veripb.rules import DummyRule, IsContradiction
 from time import perf_counter
-from refpy import InvalidProof
+from veripb import InvalidProof
 
 import logging
 
@@ -297,20 +297,30 @@ class Verifier():
         for rule, line, numInRule in self:
             ruleNum, rule = rule
             lineNum, line = line
+
+            try:
+                lineInFile = "from line %i" % (rule.lineInFile)
+            except AttributeError:
+                lineInFile = "unknown line - %i-th step" %(ruleNum)
+
             if line is None:
                 if rule.isGoal() or \
                         not self.settings.lazy:
                     self.execRule(rule, ruleNum, lineNum)
                     if self.settings.trace:
-                        print("- (step %i)"%(ruleNum))
+                        print("- (%s)"%(lineInFile))
 
             elif line.numUsed > 0 or \
                     not self.settings.lazy:
                 assert numInRule is not None
                 line.constraint = self.execRule(rule, ruleNum, lineNum, numInRule)
                 self.context.propEngine.attach(line.constraint)
-                if self.settings.trace:
-                    print("%i (step %i): %s"%(lineNum, ruleNum, self.context.ineqFactory.toString(line.constraint)))
+                if self.settings.trace and ruleNum > 0:
+                    print("%(line)i (%(lineInFile)s): %(ineq)s"%{
+                        "line": lineNum,
+                        "lineInFile": lineInFile,
+                        "ineq": self.context.ineqFactory.toString(line.constraint)
+                    })
                 if rule.isGoal():
                     self.decreaseUse(line)
 

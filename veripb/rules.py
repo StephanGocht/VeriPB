@@ -1,9 +1,9 @@
-import refpy.constraints
-from refpy.constraints import Term
-from refpy.pbsolver import RoundingSat, Formula
-from refpy.parser import OPBParser, WordParser
+import veripb.constraints
+from veripb.constraints import Term
+from veripb.pbsolver import RoundingSat, Formula
+from veripb.parser import OPBParser, WordParser
 
-from refpy import InvalidProof
+from veripb import InvalidProof
 
 import itertools
 
@@ -324,30 +324,6 @@ class IsContradiction(Rule):
 
     def isGoal(self):
         return True
-
-@register_rule
-class LoadLitteralAxioms(Rule):
-    Id = "l"
-
-    @classmethod
-    def parse(cls, line, context):
-        with WordParser(line) as words:
-            lit = context.ineqFactory.lit2int(next(words))
-            words.expectEnd()
-
-        return cls(lit)
-
-    def __init__(self, lit):
-        self.lit = lit
-
-    def compute(self, antecedents, context = None):
-        return [context.ineqFactory.fromTerms([Term(1, self.lit)], 0)]
-
-    def numConstraints(self):
-        return 1
-
-    def antecedentIDs(self):
-        return []
 
 @register_rule
 class ReversePolishNotation(Rule):

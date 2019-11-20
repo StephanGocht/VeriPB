@@ -1,5 +1,5 @@
-from refpy.rules import Rule, EmptyRule, ReverseUnitPropagation, LoadFormula
-from refpy.parser import RuleParserBase, WordParser
+from veripb.rules import Rule, EmptyRule, ReverseUnitPropagation, LoadFormula
+from veripb.parser import RuleParserBase, WordParser
 
 class DRATClauseFinder():
     @classmethod

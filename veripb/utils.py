@@ -34,7 +34,7 @@ def run(formulaFile, rulesFile, settings = None, drat = False):
 
     try:
         if not drat:
-        formula = OPBParser(context.ineqFactory).parse(formulaFile)
+            formula = OPBParser(context.ineqFactory).parse(formulaFile)
         else:
             formula = CNFParser(context.ineqFactory).parse(formulaFile)
         numVars, numConstraints = formula[0]
@@ -47,7 +47,7 @@ def run(formulaFile, rulesFile, settings = None, drat = False):
 
     try:
         if not drat:
-        rules = RuleParser(context).parse(rules, rulesFile)
+            rules = RuleParser(context).parse(rules, rulesFile)
         else:
             rules = DRATParser(context).parse(rulesFile)
     except ParseError as e:

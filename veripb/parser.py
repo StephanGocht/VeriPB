@@ -90,7 +90,7 @@ class RuleParser(RuleParserBase):
             words.expectExact("version")
             version = next(words)
             major, minor = map(int, version.split("."))
-            if major != 1 or minor < 0 or 0 < minor:
+            if major != 1 or minor < 0 or 1 < minor:
                 raise ValueError("Unsupported version.")
 
             words.expectEnd()

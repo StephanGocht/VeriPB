@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='veripb',
-    version='0.1',
+    version='0.2-alpha',
     description='Tool for verifying refutations.',
     url='http://github.com/StephanGocht/veripb',
     author='Stephan Gocht',

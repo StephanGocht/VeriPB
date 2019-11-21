@@ -1,5 +1,7 @@
 VeriPB - Verifier for pseudo-Boolean proofs
 ===========================================
+.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.3548581.svg
+   :target: https://doi.org/10.5281/zenodo.3548581
 
 VeriPB is a tool for verifying refutations (proofs of unsatisfiability)
 and more (such as verifying that a valid solution is found) in python

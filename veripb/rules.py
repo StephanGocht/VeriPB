@@ -333,6 +333,9 @@ class ReversePolishNotation(Rule):
                         stackSize += 1
                     except ValueError:
                         raise ValueError("Expected integer, literal or one of +, *, d, s, r.")
+                    else:
+                        if word == 0:
+                            raise ValueError("Got 0, which should only be used to terminate sequence.")
 
             if stackSize < 0:
                 raise ValueError("Trying to pop from empty stack in reverse polish notation.")

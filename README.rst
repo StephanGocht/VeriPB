@@ -294,9 +294,9 @@ the database.
     # [level]
 
 This rule does mark all following constraints, up to the next
-invocation of this rule, with ``[level]``. ``[level]`` is a positive
-integer (greater equal zero). Constraints which are generated before
-the first occurrence of this rule are not marked with any level.
+invocation of this rule, with ``[level]``. ``[level]`` is a
+non-negative integer. Constraints which are generated before the first
+occurrence of this rule are not marked with any level.
 
 (w)ipeout level
 ---------------
@@ -306,7 +306,8 @@ the first occurrence of this rule are not marked with any level.
     w [level]
 
 Delete all constraints (see deletion command) that are marked with
-``[level]`` or a greater number.
+``[level]`` or a greater number. Constraints that are not marked with
+a level can not be removed with this command.
 
 Example
 -------

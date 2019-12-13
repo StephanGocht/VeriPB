@@ -478,7 +478,7 @@ class LevelStack():
             return context.levelStack
         except AttributeError:
             context.levelStack = LevelStack()
-            context.addIneqCallback.append(cls.addIneqCallback)
+            context.addIneqListener.append(cls.addIneqCallback)
             return context.levelStack
 
     def __init__(self):
@@ -514,7 +514,9 @@ class SetLevel(EmptyRule):
         with WordParser(line) as words:
             level = words.nextInt()
             words.expectEnd()
-        levelSTack.setLevel(level)
+        levelStack.setLevel(level)
+
+        return cls()
 
 
 @register_rule
@@ -533,5 +535,5 @@ class WipeLevel(EmptyRule):
     def __init__(self, deleteConstraints):
         self._deleteConstraints = deleteConstraints
 
-    def deleteConstraints():
+    def deleteConstraints(self):
         return self._deleteConstraints

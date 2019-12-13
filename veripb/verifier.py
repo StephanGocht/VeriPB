@@ -256,7 +256,7 @@ class Verifier():
             constraint = self.db[otherLineNum].constraint
             deleted = self.db[otherLineNum].deleted
             if constraint is None:
-                if lineNum <= otherLineNum:
+                if lineNum is not None and lineNum <= otherLineNum:
                     raise InvalidProof("Rule %i is trying to access constraint "\
                         "(constraintId %i), which is not derived, yet."%(ruleNum, otherLineNum))
                 elif deleted is not False and deleted < ruleNum:

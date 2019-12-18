@@ -1,6 +1,8 @@
 import argparse
 import logging
 
+import pyximport; pyximport.install(language_level=3)
+
 from veripb import InvalidProof
 from veripb import ParseError
 from veripb.verifier import Verifier, Context

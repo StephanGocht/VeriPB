@@ -11,7 +11,8 @@ setup(
     packages=['veripb'],
     install_requires=[
         "recordclass",
-        "cppimport"
+        "cppimport",
+        "cython"
     ],
     entry_points={
         'console_scripts': [

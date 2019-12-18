@@ -6,6 +6,7 @@ from veripb import ParseError
 from veripb.verifier import Verifier, Context
 from veripb.parser import OPBParser
 from veripb.rules import registered_rules
+from veripb.rules import TimedFunction
 from veripb.parser import RuleParser
 from veripb.exceptions import ParseError
 from veripb.optimized.constraints import PropEngine
@@ -16,6 +17,7 @@ profile = False
 
 if profile:
     import cProfile
+    from pyprof2calltree import convert as convert2kcachegrind
 
 def run(formulaFile, rulesFile, settings = None):
     if profile:
@@ -52,9 +54,11 @@ def run(formulaFile, rulesFile, settings = None):
         settings = settings)
     verify(rules)
 
+    TimedFunction.print_stats()
+
     if profile:
         pr.disable()
-        pr.print_stats()
+        convert2kcachegrind(pr.getstats(), 'pyprof.callgrind')
 
 def runUI(*args):
     try:

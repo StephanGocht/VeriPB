@@ -1,14 +1,44 @@
 import veripb.constraints
+import logging
 from veripb.constraints import Term
 from veripb.pbsolver import RoundingSat, Formula
 from veripb.parser import OPBParser, WordParser
 
 from veripb import InvalidProof
 
+from time import perf_counter
+from collections import defaultdict
+
 registered_rules = []
 def register_rule(rule):
     registered_rules.append(rule)
     return rule
+
+
+class TimedFunction:
+    times = defaultdict(int)
+
+    @classmethod
+    def addTime(self, name, time):
+        self.times[name] += time
+
+    @classmethod
+    def time(cls, name):
+        def wrapp(function):
+            def wrapper(*args, **kwargs):
+                start = perf_counter()
+                res = function(*args, **kwargs)
+                cls.addTime(name, perf_counter() - start)
+                return res
+
+            return wrapper
+        return wrapp
+
+    @classmethod
+    def print_stats(cls):
+        for name, time in cls.times.items():
+            logging.info("time in %s: %.2fs"%(name,time))
+
 
 class Rule():
     @staticmethod
@@ -152,6 +182,7 @@ class ReverseUnitPropagation(Rule):
     def isGoal(self):
         return False
 
+    @TimedFunction.time("ReverseUnitPropagation::compute")
     def compute(self, antecedents, context):
         assumption = self.constraint.copy().negated()
         conflicting = context.propEngine.attachTmp(assumption)
@@ -196,6 +227,7 @@ class CompareToConstraint(Rule):
 class ConstraintEquals(CompareToConstraint):
     Id = "e"
 
+    @TimedFunction.time("ConstraintEquals::compute")
     def compute(self, antecedents, context = None):
         antecedents = list(antecedents)
         if self.constraint != antecedents[0]:
@@ -380,7 +412,9 @@ class ReversePolishNotation(Rule):
 
         self.instructions = instructions
 
+    @TimedFunction.time("ReversePolishNotation::compute")
     def compute(self, antecedents, context = None):
+        start = perf_counter()
         antecedents = list(antecedents)
         stack = list()
         antecedentIt = iter(antecedents)
@@ -394,7 +428,7 @@ class ReversePolishNotation(Rule):
                 what = ins[0]
                 if what == "l":
                     lit = ins[1]
-                    stack.append(context.ineqFactory.fromTerms([(1,lit)], 0))
+                    stack.append(context.ineqFactory.litAxiom(lit))
             elif ins == "+":
                 second = stack.pop()
                 first  = stack.pop()

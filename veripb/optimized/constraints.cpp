@@ -946,7 +946,10 @@ public:
                 if (mine.lit != theirs.lit) {
                     weakenCost += mine.coeff;
                 } else if (mine.coeff > theirs.coeff) {
-                    weakenCost += mine.coeff - theirs.coeff;
+                    if (theirs.coeff < other->ineq->degree) {
+                        // only weaken if target coefficient is not saturated
+                        weakenCost += mine.coeff - theirs.coeff;
+                    }
                 }
             }
         }

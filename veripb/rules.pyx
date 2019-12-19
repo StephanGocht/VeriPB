@@ -251,6 +251,7 @@ class ConstraintImplies(CompareToConstraint):
 class ConstraintImpliesGetImplied(ConstraintImplies):
     Id = "j"
 
+    @TimedFunction.time("ConstraintImpliesGetImplied::compute")
     def compute(self, antecedents, context = None):
         super().compute(antecedents)
         return [self.constraint]
@@ -285,6 +286,7 @@ class Solution(Rule):
     def __init__(self, partialAssignment):
         self.partialAssignment = partialAssignment
 
+    @TimedFunction.time("Solution::compute")
     def compute(self, antecedents, context):
         if not context.propEngine.checkSat(self.partialAssignment):
             raise SolutionCheckFailed()
@@ -321,6 +323,7 @@ class IsContradiction(Rule):
     def __init__(self, constraintId):
         self.constraintId = constraintId
 
+    @TimedFunction.time("IsContradiction::compute")
     def compute(self, antecedents, context = None):
         antecedents = list(antecedents)
         if not antecedents[0].isContradiction():
@@ -489,6 +492,7 @@ class LoadFormula(Rule):
     def __init__(self, numConstraints):
         self._numConstraints = numConstraints
 
+    @TimedFunction.time("LoadFormula::compute")
     def compute(self, antecedents, context = None):
         if (len(context.formula) != self._numConstraints):
             raise InvalidProof("Wrong number of constraints")

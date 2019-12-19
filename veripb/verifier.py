@@ -4,6 +4,8 @@ from veripb.rules import DummyRule, IsContradiction
 from time import perf_counter
 from veripb import InvalidProof
 
+from veripb.rules import TimedFunction
+
 import logging
 
 DBEntry = structclass("DBEntry","rule ruleNum constraint numUsed deleted")
@@ -287,6 +289,14 @@ class Verifier():
 
             return self._execCache[numInRule]
 
+    @TimedFunction.time("propEngine::attach")
+    def attach(self, constraint):
+        self.context.propEngine.attach(constraint)
+
+    @TimedFunction.time("propEngine::detach")
+    def detach(self, constraint):
+        self.context.propEngine.detach(constraint)
+
     def compute(self):
         # Forward pass to compute constraitns
         rule = None
@@ -314,7 +324,7 @@ class Verifier():
                     not self.settings.lazy:
                 assert numInRule is not None
                 line.constraint = self.execRule(rule, ruleNum, lineNum, numInRule)
-                self.context.propEngine.attach(line.constraint)
+                self.attach(line.constraint)
                 if self.settings.trace and ruleNum > 0:
                     print("%(line)i (%(lineInFile)s): %(ineq)s"%{
                         "line": lineNum,
@@ -325,7 +335,7 @@ class Verifier():
                     self.decreaseUse(line)
 
             for i in rule.deleteConstraints():
-                self.context.propEngine.detach(db[i].constraint)
+                self.detach(db[i].constraint)
                 db[i].constraint = None
 
         self.state = Verifier.State.DONE

@@ -363,6 +363,7 @@ public:
 
         for (size_t i = 0; i < this->watchSize; i++) {
             if (value[terms[i].lit] == State::False) {
+                Lit old = terms[i].lit;
                 for (;j < size(); j++) {
                     if (value[terms[j].lit] != State::False) {
                         using namespace std;
@@ -372,6 +373,14 @@ public:
                         prop.watch(terms[i].lit, w);
                         j++;
                         break;
+                    }
+                }
+
+                if (old != terms[i].lit) {
+                    for (auto& w: prop.watchlist[old]) {
+                        if (w.ineq == this) {
+                            w.ineq = nullptr;
+                        }
                     }
                 }
             }

@@ -26,6 +26,7 @@ setup_pybind11(cfg)
 #include <functional>
 
 #include <cstdlib>
+#include <iomanip>
 
 #undef assert
 #ifdef NDEBUG
@@ -413,6 +414,10 @@ public:
         return _size;
     }
 
+    size_t mem() const {
+        return sizeof(FixedSizeInequality<T>) + size() * sizeof(Term<T>);
+    }
+
     const Term<T>* begin() const {
         return terms;
     }
@@ -531,6 +536,10 @@ private:
     PropState current;
     PropState base;
 
+    size_t dbMem = 0;
+    size_t cumDbMem = 0;
+    size_t maxDbMem = 0;
+
 public:
     Assignment assignment;
     LitIndexedVec<WatchList> watchlist;
@@ -545,6 +554,20 @@ public:
         , occurs(2 * (_nVars + 1))
     {
 
+    }
+
+    void printStats() {
+        std::cerr << "used database memory: "
+            << std::fixed << std::setprecision(3)
+            << static_cast<float>(dbMem) / 1024 / 1024 / 1024 << " GB" << std::endl;
+
+        std::cerr << "cumulative database memory: "
+            << std::fixed << std::setprecision(3)
+            << static_cast<float>(cumDbMem) / 1024 / 1024 / 1024 << " GB" << std::endl;
+
+        std::cerr << "maixmal used database memory: "
+            << std::fixed << std::setprecision(3)
+            << static_cast<float>(maxDbMem) / 1024 / 1024 / 1024 << " GB" << std::endl;
     }
 
     void propagate(Lit lit) {
@@ -617,6 +640,9 @@ public:
     }
 
     void attach(Inequality<T>* ineq) {
+        dbMem += ineq->mem();
+        cumDbMem += ineq->mem();
+        maxDbMem = std::max(dbMem, maxDbMem);
         unattached.push_back(ineq);
     }
 
@@ -631,6 +657,7 @@ public:
 
     void detach(Inequality<T>* ineq) {
         if (ineq != nullptr) {
+            dbMem -= ineq->mem();
             auto foundIt = std::find(
                 unattached.rbegin(), unattached.rend(), ineq);
 
@@ -1012,6 +1039,11 @@ public:
         }
         return slack < 0;
     }
+
+    size_t mem() {
+        contract();
+        return ineq->mem();
+    }
 };
 
 // we need to initialzie the static template member manually;
@@ -1067,7 +1099,8 @@ int main(int argc, char const *argv[])
             .def("detach", &PropEngine<int>::detach)
             .def("attachTmp", &PropEngine<int>::attachTmp)
             .def("reset", &PropEngine<int>::reset)
-            .def("checkSat", &PropEngine<int>::checkSat);
+            .def("checkSat", &PropEngine<int>::checkSat)
+            .def("printStats", &PropEngine<int>::printStats);
 
 
         py::class_<Inequality<int>>(m, "CppInequality")

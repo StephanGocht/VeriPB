@@ -57,6 +57,7 @@ def run(formulaFile, rulesFile, settings = None):
     verify(rules)
 
     TimedFunction.print_stats()
+    context.propEngine.printStats()
 
     if profile:
         pr.disable()

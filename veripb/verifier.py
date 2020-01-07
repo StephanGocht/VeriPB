@@ -1,4 +1,3 @@
-from recordclass import structclass
 from enum import Enum
 from veripb.rules import DummyRule, IsContradiction
 from time import perf_counter
@@ -6,10 +5,24 @@ from veripb import InvalidProof
 
 from veripb.rules import TimedFunction
 
+import sys
 import logging
 
-DBEntry = structclass("DBEntry","rule ruleNum constraint numUsed deleted")
-Stats = structclass("Stats", "size space maxUsed")
+import gc
+
+class DBEntry:
+    def __init__(self, rule, ruleNum, constraint, numUsed, deleted):
+        self.rule = rule
+        self.ruleNum = ruleNum
+        self.constraint = constraint
+        self.numUsed = numUsed
+        self.deleted = deleted
+
+class Stats:
+    def __init__(self, size, space, maxUsed):
+        self.size = size
+        self.space = space
+        self.maxUsed = maxUsed
 
 class Context():
     pass
@@ -325,6 +338,8 @@ class Verifier():
                 assert numInRule is not None
                 line.constraint = self.execRule(rule, ruleNum, lineNum, numInRule)
                 self.attach(line.constraint)
+
+
                 if self.settings.trace and ruleNum > 0:
                     print("%(line)i (%(lineInFile)s): %(ineq)s"%{
                         "line": lineNum,
@@ -336,6 +351,10 @@ class Verifier():
 
             for i in rule.deleteConstraints():
                 self.detach(db[i].constraint)
+                if (sys.getrefcount(db[i].constraint) > 2):
+                    logging.warn("Internal Warning: refcount of "
+                        "deleted constraint too large, memory will "
+                        "not be freed.")
                 db[i].constraint = None
 
         self.state = Verifier.State.DONE

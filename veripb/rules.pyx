@@ -1,44 +1,15 @@
 import veripb.constraints
-import logging
 from veripb.constraints import Term
 from veripb.pbsolver import RoundingSat, Formula
 from veripb.parser import OPBParser, WordParser
+from veripb.timed_function import TimedFunction
 
 from veripb import InvalidProof
-
-from time import perf_counter
-from collections import defaultdict
 
 registered_rules = []
 def register_rule(rule):
     registered_rules.append(rule)
     return rule
-
-
-class TimedFunction:
-    times = defaultdict(int)
-
-    @classmethod
-    def addTime(self, name, time):
-        self.times[name] += time
-
-    @classmethod
-    def time(cls, name):
-        def wrapp(function):
-            def wrapper(*args, **kwargs):
-                start = perf_counter()
-                res = function(*args, **kwargs)
-                cls.addTime(name, perf_counter() - start)
-                return res
-
-            return wrapper
-        return wrapp
-
-    @classmethod
-    def print_stats(cls):
-        for name, time in cls.times.items():
-            logging.info("time in %s: %.2fs"%(name,time))
-
 
 class Rule():
     @staticmethod
@@ -233,6 +204,8 @@ class ConstraintEquals(CompareToConstraint):
         if self.constraint != antecedents[0]:
             raise EqualityCheckFailed(self.constraint, antecedents[0])
 
+        return []
+
 class ImpliesCheckFailed(InvalidProof):
     def __init__(self, expected, got):
         self.expected = expected
@@ -246,6 +219,7 @@ class ConstraintImplies(CompareToConstraint):
         antecedents = list(antecedents)
         if not antecedents[0].implies(self.constraint):
             raise ImpliesCheckFailed(self.constraint, antecedents[0])
+        return []
 
 @register_rule
 class ConstraintImpliesGetImplied(ConstraintImplies):
@@ -328,6 +302,7 @@ class IsContradiction(Rule):
         antecedents = list(antecedents)
         if not antecedents[0].isContradiction():
             raise ContradictionCheckFailed()
+        return []
 
     def numConstraints(self):
         return 0
@@ -417,7 +392,6 @@ class ReversePolishNotation(Rule):
 
     @TimedFunction.time("ReversePolishNotation::compute")
     def compute(self, antecedents, context = None):
-        start = perf_counter()
         antecedents = list(antecedents)
         stack = list()
         antecedentIt = iter(antecedents)

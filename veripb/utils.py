@@ -1,5 +1,6 @@
 import argparse
 import logging
+from guppy import hpy
 
 import pyximport; pyximport.install(language_level=3)
 
@@ -26,10 +27,9 @@ def run(formulaFile, rulesFile, settings = None):
         pr = cProfile.Profile()
         pr.enable()
 
+    TimedFunction.startTotalTimer()
 
     rules = list(registered_rules)
-
-    start_parse = perf_counter()
 
     context = Context()
     context.ineqFactory = newDefaultFactory()
@@ -44,17 +44,16 @@ def run(formulaFile, rulesFile, settings = None):
 
     context.propEngine = PropEngine(numVars)
 
-    try:
-        rules = RuleParser(context).parse(rules, rulesFile)
-    except ParseError as e:
-        e.fileName = rulesFile.name
-        raise e
-
-    logging.info("Parsing Time: %.2f" % (perf_counter() - start_parse))
     verify = Verifier(
         context = context,
         settings = settings)
-    verify(rules)
+
+    try:
+        rules = RuleParser(context).parse(rules, rulesFile)
+        verify(rules)
+    except ParseError as e:
+        e.fileName = rulesFile.name
+        raise e
 
     TimedFunction.print_stats()
     context.propEngine.printStats()

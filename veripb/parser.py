@@ -8,6 +8,9 @@ from veripb.constraints import Term
 from functools import partial
 from veripb.exceptions import ParseError
 
+from veripb.timed_function import TimedFunction
+
+
 class RuleParserBase():
     commentChar = None
 
@@ -29,9 +32,9 @@ class RuleParserBase():
         else:
             return False
 
+    @TimedFunction.timeIter("RuleParserBase::parse")
     def parse(self, rules, file, defaultRule = None):
         self.rules = {rule.Id: rule for rule in rules}
-        result = list()
 
         lineNum = 1
         ineqId = 1
@@ -64,7 +67,7 @@ class RuleParserBase():
                     step = rule.parse(line[idSize:], self.context)
                     step.lineInFile = lineNum
                     numConstraints = step.numConstraints()
-                    result.append(step)
+                    yield step
                     for listener in self.context.addIneqListener:
                         listener(range(ineqId, ineqId + numConstraints), self.context)
                     ineqId += numConstraints
@@ -73,8 +76,6 @@ class RuleParserBase():
                     e.line = lineNum
                     e.column += idSize
                     raise e
-
-        return result
 
 class RuleParser(RuleParserBase):
     commentChar = "*"
@@ -107,6 +108,7 @@ class OPBParser():
         self.ineqFactory = ineqFactory
         self.allowEq = allowEq
 
+    @TimedFunction.time("OPBParser::parse")
     def parse(self, formulaFile):
         lines = iter(enumerate(formulaFile, start = 1))
 

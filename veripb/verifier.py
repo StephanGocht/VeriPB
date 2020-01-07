@@ -108,13 +108,13 @@ class Verifier():
                 action="store_false",
                 help="Turn off invariant checking.")
 
-            group.add_argument("--deletion", dest = name+".disableDeletion",
+            group.add_argument("--auto-deletion", dest = name+".disableDeletion",
                 action="store_false",
                 default=defaults["disableDeletion"],
-                help="turn on deletion of no longer needed constraitns to save space")
-            group.add_argument("--no-deletion", dest = name+".disableDeletion",
+                help="turn on smart auto deletion of no longer needed constraitns to save space, only usefull if unit propagation is not used")
+            group.add_argument("--no-auto-deletion", dest = name+".disableDeletion",
                 action="store_true",
-                help="turn off deletion of no longer needed constraitns to save space")
+                help="turn off smart auto deletion of no longer needed constraitns to save space, only usefull if unit propagation is not used")
 
             group.add_argument("--trace", dest = name+".trace",
                 action="store_true",
@@ -124,7 +124,7 @@ class Verifier():
             group.add_argument("--lazy", dest = name+".lazy",
                 action="store_true",
                 default=defaults["lazy"],
-                help="only compute constraints necessary for verification")
+                help="only compute constraints necessary for verification, only usefull if unit propagation is not used")
             group.add_argument("--no-lazy", dest = name+".lazy",
                 action="store_false",
                 help="compute all constraints")

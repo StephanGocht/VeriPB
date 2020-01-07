@@ -535,6 +535,7 @@ public:
     Assignment assignment;
     LitIndexedVec<WatchList> watchlist;
     LitIndexedVec<OccursList> occurs;
+    LitIndexedVec<Inequality<T>*> unattached;
 
 
     PropEngine(size_t _nVars)
@@ -578,6 +579,7 @@ public:
     }
 
     bool checkSat(std::vector<int>& lits) {
+        attachUnattached();
         for (int lit: lits) {
             Lit l(lit);
             auto val = assignment.value[l];
@@ -615,16 +617,35 @@ public:
     }
 
     void attach(Inequality<T>* ineq) {
-        _attach(ineq, true);
+        unattached.push_back(ineq);
+    }
+
+    void attachUnattached() {
+        for (Inequality<T>* ineq: unattached) {
+            if (ineq != nullptr) {
+                _attach(ineq, true);
+            }
+        }
+        unattached.clear();
     }
 
     void detach(Inequality<T>* ineq) {
         if (ineq != nullptr) {
-            ineq->clearWatches(*this);
+            auto foundIt = std::find(
+                unattached.rbegin(), unattached.rend(), ineq);
+
+            if (foundIt != unattached.rend()) {
+                std::swap(*foundIt, unattached.back());
+                assert(unattached.back() == ineq);
+                unattached.pop_back();
+            } else {
+                ineq->clearWatches(*this);
+            }
         }
     }
 
     bool attachTmp(Inequality<T>* ineq) {
+        attachUnattached();
         _attach(ineq, false);
         bool result = isConflicting();
         reset();

@@ -137,19 +137,19 @@ class Verifier():
         self.foundContradiction = False
 
         for ruleNum, rule in enumerate(itertools.chain([DummyRule()], rules)):
+            didPrint = False
+
             if isinstance(rule, IsContradiction):
                 self.foundContradiction = True
 
             antecedents = self.antecedents(rule.antecedentIDs(), ruleNum)
             constraints = rule.compute(antecedents, self.context)
 
-            if len(constraints) == 0 and self.settings.trace:
-                print("- (%s)"%(fileLineNum(ruleNum, rule)))
-
             for i, constraint in enumerate(constraints):
                 lineNum = len(self.db) + i
                 self.attach(constraint)
                 if self.settings.trace and ruleNum > 0:
+                    didPrint = True
                     print("%(line)i (%(lineInFile)s): %(ineq)s"%{
                         "line": lineNum,
                         "lineInFile": fileLineNum(ruleNum, rule),
@@ -158,13 +158,29 @@ class Verifier():
 
             self.db.extend(constraints)
 
-            for i in rule.deleteConstraints():
+            deletedConstraints = list(rule.deleteConstraints())
+            if self.settings.trace and len(deletedConstraints) > 0:
+                didPrint = True
+                print("- (%(lineInFile)s): deleting %(ineq)s"%{
+                    "lineInFile": fileLineNum(ruleNum, rule),
+                    "ineq": ", ".join(map(str,deletedConstraints))
+                })
+
+            for i in deletedConstraints:
                 self.detach(self.db[i])
-                if (sys.getrefcount(self.db[i]) > 2):
+
+                # clean constraint to supress superficial warning
+                constraint = None
+                refcount = sys.getrefcount(self.db[i])
+                if (refcount > 2):
                     logging.warn("Internal Warning: refcount of "
-                        "deleted constraint too large, memory will "
-                        "not be freed.")
+                        "deleted constraint too large (is %i), memory will "
+                        "not be freed."%(refcount))
                 self.db[i] = None
+
+            if not didPrint == True and self.settings.trace and ruleNum > 0:
+                print("- (%s)"%(fileLineNum(ruleNum, rule)))
+
 
         if not self.foundContradiction:
             logging.warn("The provided proof did not claim contradiction.")

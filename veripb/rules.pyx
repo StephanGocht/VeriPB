@@ -498,6 +498,7 @@ class LevelStack():
         self.levels = list()
 
     def setLevel(self, level):
+        self.currentLevel = level
         while len(self.levels) <= level:
             self.levels.append(list())
 

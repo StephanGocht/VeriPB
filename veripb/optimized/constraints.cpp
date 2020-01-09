@@ -103,15 +103,15 @@ public:
         : value((std::abs(t) << 1) + (t < 0 ? 1 : 0))
     {}
 
-    Lit(Var var, bool negated)
-        : value((var.value << 1) + static_cast<LitData>(negated))
+    Lit(Var var, bool isNegated)
+        : value((var.value << 1) + static_cast<LitData>(isNegated))
     {}
 
     Var var() const {
         return Var(value >> 1);
     }
 
-    bool negated() const {
+    bool isNegated() const {
         return value & 1;
     }
 
@@ -181,7 +181,7 @@ public:
 template<typename T>
 T cpsign(T a, Lit b) {
     using namespace std;
-    if (b.negated()) {
+    if (b.isNegated()) {
         return -abs(a);
     } else {
         return abs(a);
@@ -965,7 +965,7 @@ public:
         for (Term<T> &term: *ineq) {
             using namespace std;
             s << term.coeff << " ";
-            if (term.lit.negated()) {
+            if (term.lit.isNegated()) {
                 s << "~";
             }
             s << varName(term.lit.var()) << " ";
@@ -1051,30 +1051,30 @@ template<typename T>
 std::vector<FatInequalityPtr<T>> Inequality<T>::pool;
 
 
-int main(int argc, char const *argv[])
-{
-    /* code */
-    {
-    Inequality<int> foo({1,1,1},{1,1,1},1);
-    Inequality<int> baa({1,1,1},{-1,-1,-1},3);
-    PropEngine<int> p(10);
-    foo.eq(&baa);
-    foo.implies(&baa);
-    foo.negated();
-    Inequality<int> test(baa);
-    p.attach(&foo);
-    p.attachTmp(&baa);
-    }
-    Inequality<int> foo({1,1,1},{1,1,1},1);
+// int main(int argc, char const *argv[])
+// {
+//     /* code */
+//     {
+//     Inequality<int> foo({1,1,1},{1,1,1},1);
+//     Inequality<int> baa({1,1,1},{-1,-1,-1},3);
+//     PropEngine<int> p(10);
+//     foo.eq(&baa);
+//     foo.implies(&baa);
+//     foo.negated();
+//     Inequality<int> test(baa);
+//     p.attach(&foo);
+//     p.attachTmp(&baa);
+//     }
+//     Inequality<int> foo({1,1,1},{1,1,1},1);
 
-    std::cout << foo.isContradiction() << std::endl;
+//     std::cout << foo.isContradiction() << std::endl;
 
-    std::cout << std::endl;
-    std::cout << (~Lit(Var(2), false)).var() << std::endl;
-    int test = 4 ^ 1;
-    std::cout << test << std::endl;
-    return 0;
-}
+//     std::cout << std::endl;
+//     std::cout << (~Lit(Var(2), false)).var() << std::endl;
+//     int test = 4 ^ 1;
+//     std::cout << test << std::endl;
+//     return 0;
+// }
 
 
 

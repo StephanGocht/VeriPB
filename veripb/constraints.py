@@ -341,6 +341,9 @@ def terms2lists(terms):
         if len(terms) > 0 else ([],[])
 
 class CppIneqFactory(IneqFactory):
+    def litAxiom(self, lit):
+        return CppInequality([1], [lit], 0)
+
     def fromTerms(self, terms, degree):
         ineq = super().fromTerms(terms, degree)
         return CppInequality(*terms2lists(ineq.terms), ineq.degree)

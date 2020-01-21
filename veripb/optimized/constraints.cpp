@@ -26,6 +26,7 @@ setup_pybind11(cfg)
 #include <functional>
 
 #include <cstdlib>
+#include <iomanip>
 
 #undef assert
 #ifdef NDEBUG
@@ -102,15 +103,15 @@ public:
         : value((std::abs(t) << 1) + (t < 0 ? 1 : 0))
     {}
 
-    Lit(Var var, bool negated)
-        : value((var.value << 1) + static_cast<LitData>(negated))
+    Lit(Var var, bool isNegated)
+        : value((var.value << 1) + static_cast<LitData>(isNegated))
     {}
 
     Var var() const {
         return Var(value >> 1);
     }
 
-    bool negated() const {
+    bool isNegated() const {
         return value & 1;
     }
 
@@ -190,7 +191,7 @@ public:
 template<typename T>
 T cpsign(T a, Lit b) {
     using namespace std;
-    if (b.negated()) {
+    if (b.isNegated()) {
         return -abs(a);
     } else {
         return abs(a);
@@ -392,6 +393,7 @@ public:
 
         for (size_t i = 0; i < this->watchSize; i++) {
             if (value[terms[i].lit] == State::False) {
+                Lit old = terms[i].lit;
                 for (;j < size(); j++) {
                     if (value[terms[j].lit] != State::False) {
                         using namespace std;
@@ -401,6 +403,14 @@ public:
                         prop.watch(terms[i].lit, w);
                         j++;
                         break;
+                    }
+                }
+
+                if (old != terms[i].lit) {
+                    for (auto& w: prop.watchlist[old]) {
+                        if (w.ineq == this) {
+                            w.ineq = nullptr;
+                        }
                     }
                 }
             }
@@ -456,7 +466,10 @@ public:
                 if (mine.lit != theirs.lit) {
                     weakenCost += mine.coeff;
                 } else if (mine.coeff > theirs.coeff) {
-                    weakenCost += mine.coeff - theirs.coeff;
+                    if (theirs.coeff < other.degree) {
+                        // only weaken if target coefficient is not saturated
+                        weakenCost += mine.coeff - theirs.coeff;
+                    }
                 }
             }
         }
@@ -509,6 +522,10 @@ public:
 
     size_t size() const {
         return _size;
+    }
+
+    size_t mem() const {
+        return sizeof(FixedSizeInequality<T>) + size() * sizeof(Term<T>);
     }
 
     const Term<T>* begin() const {
@@ -640,12 +657,15 @@ private:
     PropState current;
 
     bool updateWatch = true;
+    size_t dbMem = 0;
+    size_t cumDbMem = 0;
+    size_t maxDbMem = 0;
+
 
     class AutoReset {
     private:
         PropEngine& engine;
         PropState base;
-
     public:
         AutoReset(PropEngine& engine_)
             : engine(engine_)
@@ -662,6 +682,7 @@ public:
     Assignment assignment;
     LitIndexedVec<WatchList> watchlist;
     LitIndexedVec<OccursList> occurs;
+    LitIndexedVec<Inequality<T>*> unattached;
 
 
     PropEngine(size_t _nVars)
@@ -671,6 +692,20 @@ public:
         , occurs(2 * (_nVars + 1))
     {
 
+    }
+
+    void printStats() {
+        std::cerr << "used database memory: "
+            << std::fixed << std::setprecision(3)
+            << static_cast<float>(dbMem) / 1024 / 1024 / 1024 << " GB" << std::endl;
+
+        std::cerr << "cumulative database memory: "
+            << std::fixed << std::setprecision(3)
+            << static_cast<float>(cumDbMem) / 1024 / 1024 / 1024 << " GB" << std::endl;
+
+        std::cerr << "maixmal used database memory: "
+            << std::fixed << std::setprecision(3)
+            << static_cast<float>(maxDbMem) / 1024 / 1024 / 1024 << " GB" << std::endl;
     }
 
     void enqueue(Lit lit) {
@@ -713,7 +748,7 @@ public:
 
     bool checkSat(std::vector<int>& lits) {
         AutoReset autoReset(*this);
-
+        attachUnattached();
         for (int lit: lits) {
             Lit l(lit);
             auto val = assignment.value[l];
@@ -743,16 +778,42 @@ public:
         return success;
     }
 
-    void attach(Inequality<T>* ineq) {
+    void _attach(Inequality<T>* ineq) {
         ineq->freeze(this->nVars);
         ineq->updateWatch(*this);
         propagate();
     }
 
+    void attach(Inequality<T>* ineq) {
+        dbMem += ineq->mem();
+        cumDbMem += ineq->mem();
+        maxDbMem = std::max(dbMem, maxDbMem);
+        unattached.push_back(ineq);
+    }
+
+    void attachUnattached() {
+        for (Inequality<T>* ineq: unattached) {
+            if (ineq != nullptr) {
+                _attach(ineq);
+            }
+        }
+        unattached.clear();
+    }
+
     void detach(Inequality<T>* ineq) {
         if (ineq != nullptr) {
+            dbMem -= ineq->mem();
+            auto foundIt = std::find(
+                unattached.rbegin(), unattached.rend(), ineq);
+
+            if (foundIt != unattached.rend()) {
+                std::swap(*foundIt, unattached.back());
+                assert(unattached.back() == ineq);
+                unattached.pop_back();
+            } else {
             ineq->clearWatches(*this);
         }
+    }
     }
 
     /*
@@ -776,6 +837,7 @@ public:
     }
 
     bool ratCheck(const FixedSizeInequality<T>& redundant, const std::vector<Lit>& w) {
+        attachUnattached();
         Assignment a(this->nVars);
         if (w.size() > 0) {
             for (Lit lit: w) {
@@ -1128,7 +1190,7 @@ public:
         for (Term<T> &term: *ineq) {
             using namespace std;
             s << term.coeff << " ";
-            if (term.lit.negated()) {
+            if (term.lit.isNegated()) {
                 s << "~";
             }
             s << varName(term.lit.var()) << " ";
@@ -1181,6 +1243,11 @@ public:
             slack += term.coeff;
         }
         return slack < 0;
+    }
+
+    size_t mem() {
+        contract();
+        return ineq->mem();
     }
 };
 
@@ -1236,7 +1303,8 @@ int main(int argc, char const *argv[])
             .def("detach", &PropEngine<int>::detach)
             .def("reset", &PropEngine<int>::reset)
             .def("checkSat", &PropEngine<int>::checkSat)
-            .def("increaseNumVarsTo", &PropEngine<int>::increaseNumVarsTo);
+            .def("increaseNumVarsTo", &PropEngine<int>::increaseNumVarsTo)
+            .def("printStats", &PropEngine<int>::printStats);
 
 
         py::class_<Inequality<int>>(m, "CppInequality")

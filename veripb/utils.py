@@ -1,5 +1,8 @@
 import argparse
 import logging
+from guppy import hpy
+
+import pyximport; pyximport.install(language_level=3)
 
 from veripb import InvalidProof
 from veripb import ParseError
@@ -7,6 +10,7 @@ from veripb.verifier import Verifier, Context
 from veripb.parser import OPBParser, CNFParser
 from veripb.drat import DRATParser
 from veripb.rules import registered_rules
+from veripb.rules import TimedFunction
 from veripb.parser import RuleParser
 from veripb.exceptions import ParseError
 from veripb.optimized.constraints import PropEngine
@@ -24,10 +28,9 @@ def run(formulaFile, rulesFile, settings = None, drat = False):
         pr = cProfile.Profile()
         pr.enable()
 
+    TimedFunction.startTotalTimer()
 
     rules = list(registered_rules)
-
-    start_parse = perf_counter()
 
     context = Context()
     context.ineqFactory = newDefaultFactory()
@@ -45,24 +48,26 @@ def run(formulaFile, rulesFile, settings = None, drat = False):
 
     context.propEngine = PropEngine(numVars)
 
+    verify = Verifier(
+        context = context,
+        settings = settings)
+
     try:
         if not drat:
             rules = RuleParser(context).parse(rules, rulesFile)
         else:
             rules = DRATParser(context).parse(rulesFile)
+        verify(rules)
     except ParseError as e:
         e.fileName = rulesFile.name
         raise e
 
-    logging.info("Parsing Time: %.2f" % (perf_counter() - start_parse))
-    verify = Verifier(
-        context = context,
-        settings = settings)
-    verify(rules)
+    TimedFunction.print_stats()
+    context.propEngine.printStats()
 
     if profile:
         pr.disable()
-        convert2kcachegrind(pr.getstats(), 'prof.kgrind')
+        convert2kcachegrind(pr.getstats(), 'pyprof.callgrind')
 
 def runUI(*args):
     try:

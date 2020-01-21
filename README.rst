@@ -1,5 +1,7 @@
 VeriPB - Verifier for pseudo-Boolean proofs
 ===========================================
+.. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.3548581.svg
+   :target: https://doi.org/10.5281/zenodo.3548581
 
 VeriPB is a tool for verifying refutations (proofs of unsatisfiability)
 and more (such as verifying that a valid solution is found) in python
@@ -74,8 +76,9 @@ Introduction
 There are multiple rules, which are described in more detail below.
 Each rule can create an arbitrary number of constraints (including
 none). The verifier keeps a database of constraints and each
-constraint is assigned an index, called ConstraintId, starting from 1.
-Rules can reference other constraints by their ConstraintId.
+constraint is assigned an index, called ConstraintId, starting from 1
+and increasing by one for every added constraint. Rules can reference
+other constraints by their ConstraintId.
 
 In what follows we will use IDmax to refer to the largest used ID
 before a rule is executed.
@@ -138,7 +141,7 @@ reverse (p)olish notation
 
     p [sequence in reverse polish notation] 0
 
-The refutation itself is constructed by a 0 terminated sequence of
+Add a new constraint with ConstraintId := IDmax + 1. How to derive the constraint is describe by a 0 terminated sequence of
 arithmetic operations over the constraints. These are written down in
 reverse polish notation. We will use ``[constraint]``  to indicate
 either a ConstraintId or a subsequence in reverse polish notation.
@@ -200,12 +203,13 @@ reverse (u)nit propagation
     u [OPB style constraint]
 
 Use reverse unit propagation to check if the constraint is implied,
-i.e. it assumes the negation of the constraint and all other (non
-deleted) constraints in the database and passes if this yields
-contradiction by unit propagation.
+i.e., it temporarily adds the negation of the constraint and performs
+unit propagation, including all other (non deleted) constraints in
+the database. If this unit propagation yields contradiction then we
+know that the constraint is implied and the check passes.
 
-If the constraint is implied it is added to the database. Otherwise,
-verification fails.
+If the reverse unit propagation check passes then the constraint is
+added with ConstraintId := IDmax + 1. Otherwise, verification fails.
 
 (d)elete constraint
 -------------------
@@ -283,8 +287,8 @@ from C by adding literal axioms.
 (j) implies and add
 -------------------
 
-Identical to (i)mplies but also adds the constraint that is implied to
-the database.
+Identical to (i)mplies but also adds the constraint that is implied
+to the database with ConstraintId := IDmax + 1.
 
 (#) set level
 -------------
@@ -294,9 +298,9 @@ the database.
     # [level]
 
 This rule does mark all following constraints, up to the next
-invocation of this rule, with ``[level]``. ``[level]`` is a positive
-integer (greater equal zero). Constraints which are generated before
-the first occurrence of this rule are not marked with any level.
+invocation of this rule, with ``[level]``. ``[level]`` is a
+non-negative integer. Constraints which are generated before the first
+occurrence of this rule are not marked with any level.
 
 (w)ipeout level
 ---------------
@@ -306,7 +310,8 @@ the first occurrence of this rule are not marked with any level.
     w [level]
 
 Delete all constraints (see deletion command) that are marked with
-``[level]`` or a greater number.
+``[level]`` or a greater number. Constraints that are not marked with
+a level can not be removed with this command.
 
 Example
 -------
@@ -347,5 +352,5 @@ variable names with ``~`` as prefix to indicate negation, check that:
  * the full assignment does not violate any constraint
 
 If the check is successful then the clause consisting of the negation
-of all literals is added. If the check is not successful then
-verification fails.
+of all literals is added with ConstraintId := IDmax + 1. If the check
+is not successful then verification fails.

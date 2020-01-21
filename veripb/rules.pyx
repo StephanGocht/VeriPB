@@ -2,6 +2,7 @@ import veripb.constraints
 from veripb.constraints import Term
 from veripb.pbsolver import RoundingSat, Formula
 from veripb.parser import OPBParser, WordParser
+from veripb.timed_function import TimedFunction
 
 from veripb import InvalidProof
 
@@ -171,6 +172,7 @@ class ReverseUnitPropagation(Rule):
     def isGoal(self):
         return False
 
+    @TimedFunction.time("ReverseUnitPropagation::compute")
     def compute(self, antecedents, context):
         context.propEngine.increaseNumVarsTo(self.numVars)
         success = self.constraint.ratCheck(self.w, context.propEngine)
@@ -215,10 +217,13 @@ class CompareToConstraint(Rule):
 class ConstraintEquals(CompareToConstraint):
     Id = "e"
 
+    @TimedFunction.time("ConstraintEquals::compute")
     def compute(self, antecedents, context = None):
         antecedents = list(antecedents)
         if self.constraint != antecedents[0]:
             raise EqualityCheckFailed(self.constraint, antecedents[0])
+
+        return []
 
 class ImpliesCheckFailed(InvalidProof):
     def __init__(self, expected, got):
@@ -233,11 +238,13 @@ class ConstraintImplies(CompareToConstraint):
         antecedents = list(antecedents)
         if not antecedents[0].implies(self.constraint):
             raise ImpliesCheckFailed(self.constraint, antecedents[0])
+        return []
 
 @register_rule
 class ConstraintImpliesGetImplied(ConstraintImplies):
     Id = "j"
 
+    @TimedFunction.time("ConstraintImpliesGetImplied::compute")
     def compute(self, antecedents, context = None):
         super().compute(antecedents)
         return [self.constraint]
@@ -272,6 +279,7 @@ class Solution(Rule):
     def __init__(self, partialAssignment):
         self.partialAssignment = partialAssignment
 
+    @TimedFunction.time("Solution::compute")
     def compute(self, antecedents, context):
         if not context.propEngine.checkSat(self.partialAssignment):
             raise SolutionCheckFailed()
@@ -308,10 +316,12 @@ class IsContradiction(Rule):
     def __init__(self, constraintId):
         self.constraintId = constraintId
 
+    @TimedFunction.time("IsContradiction::compute")
     def compute(self, antecedents, context = None):
         antecedents = list(antecedents)
         if not antecedents[0].isContradiction():
             raise ContradictionCheckFailed()
+        return []
 
     def numConstraints(self):
         return 0
@@ -352,6 +362,9 @@ class ReversePolishNotation(Rule):
                         stackSize += 1
                     except ValueError:
                         raise ValueError("Expected integer, literal or one of +, *, d, s, r.")
+                    # else:
+                    #     if word == 0:
+                    #         raise ValueError("Got 0, which should only be used to terminate sequence.")
 
             if stackSize < 0:
                 raise ValueError("Trying to pop from empty stack in reverse polish notation.")
@@ -396,6 +409,7 @@ class ReversePolishNotation(Rule):
 
         self.instructions = instructions
 
+    @TimedFunction.time("ReversePolishNotation::compute")
     def compute(self, antecedents, context = None):
         antecedents = list(antecedents)
         stack = list()
@@ -410,7 +424,7 @@ class ReversePolishNotation(Rule):
                 what = ins[0]
                 if what == "l":
                     lit = ins[1]
-                    stack.append(context.ineqFactory.fromTerms([(1,lit)], 0))
+                    stack.append(context.ineqFactory.litAxiom(lit))
             elif ins == "+":
                 second = stack.pop()
                 first  = stack.pop()
@@ -472,6 +486,7 @@ class LoadFormula(Rule):
     def __init__(self, numConstraints):
         self._numConstraints = numConstraints
 
+    @TimedFunction.time("LoadFormula::compute")
     def compute(self, antecedents, context = None):
         if (len(context.formula) != self._numConstraints):
             raise InvalidProof("Wrong number of constraints")
@@ -495,7 +510,7 @@ class LevelStack():
             return context.levelStack
         except AttributeError:
             context.levelStack = LevelStack()
-            context.addIneqCallback.append(cls.addIneqCallback)
+            context.addIneqListener.append(cls.addIneqCallback)
             return context.levelStack
 
     def __init__(self):
@@ -503,6 +518,7 @@ class LevelStack():
         self.levels = list()
 
     def setLevel(self, level):
+        self.currentLevel = level
         while len(self.levels) <= level:
             self.levels.append(list())
 
@@ -531,7 +547,9 @@ class SetLevel(EmptyRule):
         with WordParser(line) as words:
             level = words.nextInt()
             words.expectEnd()
-        levelSTack.setLevel(level)
+        levelStack.setLevel(level)
+
+        return cls()
 
 
 @register_rule
@@ -550,5 +568,5 @@ class WipeLevel(EmptyRule):
     def __init__(self, deleteConstraints):
         self._deleteConstraints = deleteConstraints
 
-    def deleteConstraints():
+    def deleteConstraints(self):
         return self._deleteConstraints

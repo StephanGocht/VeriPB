@@ -55,6 +55,32 @@ class TestInequality(unittest.TestCase):
         b = geq([(2,2), (2, 1), (3, 3)], 4)
         assert (not a.implies(b))
 
+    def test_implies_5(self):
+        a = geq([(5, 1), (1,2), (1,3)], 3)
+        b = geq([(1,1)], 1)
+        assert a.implies(b)
+
+    def test_implies_5_f(self):
+        a = geq([(5, 1), (1,2), (1,3), (1,3)], 3)
+        b = geq([(1,1)], 1)
+        assert(not a.implies(b))
+
+    def test_implies_6(self):
+        a = geq([(1, 1), (5,2), (5,3), (1,4)], 3)
+        b = geq([(1,2), (1,3)], 1)
+        assert a.implies(b)
+
+    def test_implies_6_f(self):
+        a = geq([(2, 1), (5,2), (5,3), (1,4)], 3)
+        b = geq([(1,2), (1,3)], 1)
+        assert(not a.implies(b))
+
+    def test_implies_7_f(self):
+        a = geq([(2,-1), (5,2), (5,3), (1,4)], 3)
+        b = geq([(1,2), (1,3)], 1)
+        assert(not a.implies(b))
+
+
     def test_saturate_signle_1(self):
         a = geq([(4, -1)], 3)
         a.saturate()

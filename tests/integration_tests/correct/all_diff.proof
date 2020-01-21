@@ -1,0 +1,9 @@
+pseudo-Boolean proof version 1.0
+f 15 0
+* step 1
+p 3 4 + 5 + 0
+* step 2
+p 14 15 + y_x1_8 + y_x2_8 + y_x1_9 + y_x2_9 + 0
+* step 3
+p 16 17 +
+c 18 0

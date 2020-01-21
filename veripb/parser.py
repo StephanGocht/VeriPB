@@ -33,7 +33,7 @@ class RuleParserBase():
             return False
 
     @TimedFunction.timeIter("RuleParserBase::parse")
-    def parse(self, rules, file, defaultRule = None):
+    def parse(self, rules, file, dumpLine = False, defaultRule = None):
         self.rules = {rule.Id: rule for rule in rules}
 
         lineNum = 1
@@ -52,6 +52,8 @@ class RuleParserBase():
         for line in lines:
             idSize = defaultIdSize
             lineNum += 1
+            if dumpLine:
+                print("line %03d: %s"% (lineNum, line.rstrip()))
 
             if not self.isEmpty(line):
                 try:

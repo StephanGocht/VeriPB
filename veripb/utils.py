@@ -1,7 +1,11 @@
 import argparse
 import logging
 
-import pyximport; pyximport.install(language_level=3)
+import os
+import pyximport; pyximport.install(
+    language_level=3,
+    build_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)), "__pycache__/pyximport")
+)
 
 from veripb import InvalidProof
 from veripb import ParseError
@@ -27,6 +31,9 @@ def run(formulaFile, rulesFile, settings = None):
         pr = cProfile.Profile()
         pr.enable()
 
+    if settings == None:
+        settings = Verifier.Settings()
+
     TimedFunction.startTotalTimer()
 
     rules = list(registered_rules)
@@ -49,7 +56,7 @@ def run(formulaFile, rulesFile, settings = None):
         settings = settings)
 
     try:
-        rules = RuleParser(context).parse(rules, rulesFile)
+        rules = RuleParser(context).parse(rules, rulesFile, dumpLine = settings.trace)
         verify(rules)
     except ParseError as e:
         e.fileName = rulesFile.name

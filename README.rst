@@ -98,11 +98,13 @@ Introduction
 ----
 
 There are multiple rules, which are described in more detail below.
-Each rule can create an arbitrary number of constraints (including
-none). The verifier keeps a database of constraints and each
-constraint is assigned an index, called ConstraintId, starting from 1
-and increasing by one for every added constraint. Rules can reference
-other constraints by their ConstraintId.
+Every rule has to be written on one line and no line may contain more
+than one rule. Each rule can create an arbitrary number of
+constraints (including none). The verifier keeps a database of
+constraints and each constraint is assigned an index, called
+ConstraintId, starting from 1 and increasing by one for every added
+constraint. Rules can reference other constraints by their
+ConstraintId.
 
 In what follows we will use IDmax to refer to the largest used ID
 before a rule is executed.

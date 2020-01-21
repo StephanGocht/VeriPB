@@ -136,6 +136,10 @@ class Verifier():
         self.db = list()
         self.foundContradiction = False
 
+        if self.settings.trace:
+            print()
+            print("=== begin trace ===")
+
         for ruleNum, rule in enumerate(itertools.chain([DummyRule()], rules)):
             didPrint = False
 
@@ -150,9 +154,8 @@ class Verifier():
                 self.attach(constraint)
                 if self.settings.trace and ruleNum > 0:
                     didPrint = True
-                    print("%(line)i (%(lineInFile)s): %(ineq)s"%{
+                    print("  ConstraintId %(line)03d: %(ineq)s"%{
                         "line": lineNum,
-                        "lineInFile": fileLineNum(ruleNum, rule),
                         "ineq": self.context.ineqFactory.toString(constraint)
                     })
 
@@ -161,8 +164,7 @@ class Verifier():
             deletedConstraints = list(rule.deleteConstraints())
             if self.settings.trace and len(deletedConstraints) > 0:
                 didPrint = True
-                print("- (%(lineInFile)s): deleting %(ineq)s"%{
-                    "lineInFile": fileLineNum(ruleNum, rule),
+                print("  ConstraintId  - : deleting %(ineq)s"%{
                     "ineq": ", ".join(map(str,deletedConstraints))
                 })
 
@@ -179,8 +181,12 @@ class Verifier():
                 self.db[i] = None
 
             if not didPrint == True and self.settings.trace and ruleNum > 0:
-                print("- (%s)"%(fileLineNum(ruleNum, rule)))
+                print("  ConstraintId  - : check passed")
 
+
+        if self.settings.trace:
+            print("=== end trace ===")
+            print()
 
         if not self.foundContradiction:
             logging.warn("The provided proof did not claim contradiction.")

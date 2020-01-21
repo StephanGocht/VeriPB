@@ -1,6 +1,5 @@
 import argparse
 import logging
-from guppy import hpy
 
 import pyximport; pyximport.install(language_level=3)
 
@@ -21,6 +20,7 @@ profile = False
 if profile:
     import cProfile
     from pyprof2calltree import convert as convert2kcachegrind
+    from guppy import hpy
 
 def run(formulaFile, rulesFile, settings = None):
     if profile:

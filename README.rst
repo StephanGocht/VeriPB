@@ -13,8 +13,17 @@ WARNING
 =======
 The current version only uses fixed bitwdith integers and does not
 contain code for catching overflows. This means that trying to verify
-proofs that contain or result in large numbers lead to undefined
+proofs that contain or result in large numbers leads to undefined
 behaviour.
+
+ATTENTION
+=========
+VeriPB is still in early and active development and to be understood
+as a rapidly changing proof of concept (for research publications). A
+stable version is to be expected towards the end of my PhD in 2022.
+If you want to use VeriPB, e.g. because you need it for your
+cutting-edge research or to compare it to other tools, I highly
+encourage you to get in contact with me.
 
 Installation
 ============
@@ -22,14 +31,29 @@ Installation
 ::
 
     git clone git@github.com:StephanGocht/VeriPB.git
-    pip3 install -e ./veripb
+    cd ./VeriPB
+    pip3 install -e ./
 
-run ``veripb --help`` for help
+Run ``veripb --help`` for help. Note that the first call to veripb
+after installation or update will take a while as it is compiling
+code.
 
 Update
 ------
 
 If installed as described above the tool can be updated with ``git pull``.
+
+
+Getting Started
+===============
+
+A good way to getting started is probably to have a look at the
+examples under ``tests/integration_tests/correct`` and to run VeriPB
+with the ``--trace`` option, which will output the derived proof.
+
+For Example::
+
+    veripb --trace tests/integration_tests/correct/miniProof_polishnotation_1.opb tests/integration_tests/correct/miniProof_polishnotation_1.proof
 
 
 Formula Format
@@ -108,8 +132,8 @@ the correct value is used (optionally a warning is emitted).
 For example the opb file::
 
     * #variable= 3 #constraint= 1
-    1x1 2x2 >= 1;
-    1x3 1x4  = 1;
+    1 x1 2 x2 >= 1;
+    1 x3 1 x4  = 1;
 
 with the proof file::
 
@@ -118,9 +142,9 @@ with the proof file::
 
 will be translated to::
 
-    1: 1x1 2x2 >= 1;
-    2: 1x3 1x4 >= 1;
-    3: -1x3 -1x4 >= -1;
+    1: 1 x1 2 x2 >= 1;
+    2: 1 x3 1 x4 >= 1;
+    3: -1 x3 -1 x4 >= -1;
 
 
 (c)ontradiction
@@ -130,8 +154,14 @@ will be translated to::
 
     c [ConstraintId] 0
 
-Verify that the constraint [ConstraintId] is contradiction, i.e. 0 >=
-1 (this is the same as the empty clause).
+Verify that the constraint [ConstraintId] is contradicting, i.e., it
+can not be satisfied.
+
+Examples of contradicting constraints::
+
+    >= 1;
+    >= 3;
+    3 x1 -2 x2 >= 4;
 
 
 reverse (p)olish notation

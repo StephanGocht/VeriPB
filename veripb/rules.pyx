@@ -478,6 +478,34 @@ class LoadFormula(Rule):
     def antecedentIDs(self):
         return []
 
+@register_rule
+class LoadAxiom(Rule):
+    Id = "l"
+
+    @classmethod
+    def parse(cls, line, context):
+        with WordParser(line) as words:
+            num = words.nextInt()
+            words.expectEnd()
+            return cls(num)
+
+    def __init__(self, axiomId):
+        self._axiomId = axiomId
+
+    @TimedFunction.time("LoadAxiom::compute")
+    def compute(self, antecedents, context):
+        try:
+            return [context.formula[self._axiomId - 1]]
+        except IndexError as e:
+            raise InvalidProof("Trying to load non existing axiom.")
+
+
+    def numConstraints(self):
+        return 1
+
+    def antecedentIDs(self):
+        return []
+
 class LevelStack():
     @staticmethod
     def addIneqCallback(ineqs, context):

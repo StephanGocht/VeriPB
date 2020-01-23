@@ -83,6 +83,10 @@ class LazyInequality():
     def __repr__(self):
         return str(PyInequality(self.terms, self.degree))
 
+    def toString(self, varNameMapping):
+        return PyInequality(self.terms, self.degree).toString(varNameMapping)
+
+
 class PyInequality():
     """
     Constraint representing sum of terms greater or equal degree.

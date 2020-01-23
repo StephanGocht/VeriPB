@@ -96,8 +96,8 @@ def runUI(*args, **kwargs):
                 "and make a bug report.")
             exit(1)
         else:
-            print("Sorry, there was an internal error. Because you are runing in "
-                "debug mod I will give you the exception.")
+            print("Sorry, there was an internal error. Because you are running in "
+                "debug mode I will give you the exception.")
             raise e
     else:
         print("Verification succeeded.")

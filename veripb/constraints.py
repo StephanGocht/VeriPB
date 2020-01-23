@@ -254,12 +254,15 @@ class PyInequality():
         return self.degree == other.degree \
             and sorted(self.terms, key = key) == sorted(other.terms, key = key)
 
-    def toOPB(self):
+    def toOPB(self, varNameMapping = None):
+        if varNameMapping == None:
+            varNameMapping = lambda x: "x%i"%(x)
+
         def term2str(term):
             if term.variable < 0:
-                return "%+i ~x%i"%(term.coefficient, -term.variable)
+                return "%+i ~%s"%(term.coefficient, varNameMapping(-term.variable))
             else:
-                return "%+i x%i"%(term.coefficient, term.variable)
+                return "%+i %s"%(term.coefficient, varNameMapping(term.variable))
 
         return " ".join(
             map(term2str, self.terms)) + \
@@ -267,6 +270,9 @@ class PyInequality():
 
     def __str__(self):
         return self.toOPB()
+
+    def toString(self, varNameMapping):
+        return self.toOPB(varNameMapping)
 
     def __repr__(self):
         return str(self)

@@ -1112,13 +1112,12 @@ std::vector<FatInequalityPtr<T>> Inequality<T>::pool;
             .def("contract", &Inequality<int>::contract)
             .def("copy", &Inequality<int>::copy)
             .def("implies", &Inequality<int>::implies)
-            .def("expand", &Inequality<int>::expand)
+            // .def("expand", &Inequality<int>::expand)
             .def("contract", &Inequality<int>::contract)
             .def("negated", &Inequality<int>::negated)
             .def("__eq__", &Inequality<int>::eq)
             .def("__repr__", &Inequality<int>::repr)
             .def("toString", &Inequality<int>::toString)
-            .def("toOPB", &Inequality<int>::repr)
             .def("isContradiction", &Inequality<int>::isContradiction);
 
         py::add_ostream_redirect(m, "ostream_redirect");

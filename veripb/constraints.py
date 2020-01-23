@@ -80,12 +80,20 @@ class LazyInequality():
     def copy(self):
         return LazyInequality(self)
 
+    def __eq__(self, other):
+        return PyInequality(self.terms, self.degree) == other
+
     def __repr__(self):
         return str(PyInequality(self.terms, self.degree))
 
     def toString(self, varNameMapping):
         return PyInequality(self.terms, self.degree).toString(varNameMapping)
 
+    def isContradiction(self):
+        return PyInequality(self.terms, self.degree).isContradiction()
+
+    def implies(self, other):
+        return PyInequality(self.terms, self.degree).implies(other)
 
 class PyInequality():
     """

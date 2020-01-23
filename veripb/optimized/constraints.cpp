@@ -565,7 +565,7 @@ public:
             << std::fixed << std::setprecision(3)
             << static_cast<float>(cumDbMem) / 1024 / 1024 / 1024 << " GB" << std::endl;
 
-        std::cerr << "maixmal used database memory: "
+        std::cerr << "maximal used database memory: "
             << std::fixed << std::setprecision(3)
             << static_cast<float>(maxDbMem) / 1024 / 1024 / 1024 << " GB" << std::endl;
     }

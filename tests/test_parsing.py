@@ -4,7 +4,7 @@ from env import veripb
 from veripb.parser import *
 from veripb.rules import *
 from veripb.constraints import Term
-from veripb.constraints import newDefaultFactory
+from veripb.constraints import CppIneqFactory as IneqFactory
 
 
 class DummyContext:
@@ -12,7 +12,7 @@ class DummyContext:
 
 class TestParsing(unittest.TestCase):
     def setUp(self):
-        self.ineqFactory = newDefaultFactory()
+        self.ineqFactory = IneqFactory()
         self.context = DummyContext()
         self.context.ineqFactory = self.ineqFactory
 

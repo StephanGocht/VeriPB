@@ -5,9 +5,9 @@ from math import copysign
 from env import veripb
 
 from veripb.constraints import Term
-from veripb.constraints import newDefaultFactory
+from veripb.constraints import CppIneqFactory as IneqFactory
 
-ineqFactory = newDefaultFactory()
+ineqFactory = IneqFactory()
 
 def toTerms(terms):
     return list(map(lambda x: Term(x[0], x[1]), terms))

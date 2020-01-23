@@ -15,8 +15,8 @@ from veripb.rules import registered_rules
 from veripb.rules import TimedFunction
 from veripb.parser import RuleParser
 from veripb.exceptions import ParseError
-from veripb.optimized.constraints import PropEngine
-from veripb.constraints import newDefaultFactory
+from veripb.optimized.constraints import PropEngine as CppPropEngine
+from veripb.constraints import PropEngine,CppIneqFactory,IneqFactory
 from time import perf_counter
 
 profile = False
@@ -26,7 +26,7 @@ if profile:
     from pyprof2calltree import convert as convert2kcachegrind
     from guppy import hpy
 
-def run(formulaFile, rulesFile, settings = None):
+def run(formulaFile, rulesFile, settings = None, arbitraryPrecision = False):
     if profile:
         pr = cProfile.Profile()
         pr.enable()
@@ -39,7 +39,10 @@ def run(formulaFile, rulesFile, settings = None):
     rules = list(registered_rules)
 
     context = Context()
-    context.ineqFactory = newDefaultFactory()
+    if arbitraryPrecision:
+        context.ineqFactory = IneqFactory()
+    else:
+        context.ineqFactory = CppIneqFactory()
 
     try:
         formula = OPBParser(context.ineqFactory).parse(formulaFile)
@@ -49,7 +52,10 @@ def run(formulaFile, rulesFile, settings = None):
         e.fileName = formulaFile.name
         raise e
 
-    context.propEngine = PropEngine(numVars)
+    if arbitraryPrecision:
+        context.propEngine = PropEngine()
+    else:
+        context.propEngine = CppPropEngine(numVars)
 
     verify = Verifier(
         context = context,
@@ -69,9 +75,9 @@ def run(formulaFile, rulesFile, settings = None):
         pr.disable()
         convert2kcachegrind(pr.getstats(), 'pyprof.callgrind')
 
-def runUI(*args):
+def runUI(*args, **kwargs):
     try:
-        run(*args)
+        run(*args, **kwargs)
     except InvalidProof as e:
         print("Verification failed.")
         hint = str(e)
@@ -82,7 +88,7 @@ def runUI(*args):
         logging.error(e)
         exit(1)
     except NotImplementedError as e:
-        logging.error(e)
+        logging.error("Not Implemented: %s" % str(e))
         exit(1)
     except Exception as e:
         if logging.getLogger().getEffectiveLevel() != logging.DEBUG:
@@ -117,6 +123,14 @@ def run_cmd_main():
         action="store_const", dest="loglevel", const=logging.INFO,
     )
 
+    p.add_argument("--arbitraryPrecision",
+        action="store_true",
+        default=False,
+        help="Turn on arbitrary precision. Experimental, does not work with unit propagation or solution checking.")
+    p.add_argument("--no-arbitraryPrecision",
+        action="store_false",
+        help="Turn off arbitrary precision.")
+
     Verifier.Settings.addArgParser(p)
 
     args = p.parse_args()
@@ -125,4 +139,4 @@ def run_cmd_main():
 
     logging.basicConfig(level=args.loglevel)
 
-    return runUI(args.formula, args.derivation, verifyerSettings)
+    return runUI(args.formula, args.derivation, verifyerSettings, arbitraryPrecision = args.arbitraryPrecision)

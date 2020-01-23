@@ -19,7 +19,7 @@ class AllBooleanUpperBound():
 
 class LazyInequality():
     """
-    Essentially the same interface as Inequality but postpones some
+    Essentially the same interface as PyInequality but postpones some
     of the operations.
     """
 
@@ -67,14 +67,14 @@ class LazyInequality():
         return result.add(other)
 
     def resolve(self, other, resolvedVar):
-        result = Inequality(self.terms, self.degree)
+        result = PyInequality(self.terms, self.degree)
         return result.resolve(other, resolvedVar)
 
     def contract(self):
         pass
 
     def negated(self):
-        result = Inequality(self.terms, self.degree)
+        result = PyInequality(self.terms, self.degree)
         return result.negated()
 
     def copy(self):
@@ -192,8 +192,8 @@ class PyInequality():
 
     def resolve(self, other, resolvedVar):
         # todo: clean up. this is ugly
-        # we do not know if we have a lazy inequality or not
-        other = Inequality(other.terms, other.degree)
+        # we do not know if we have a lazy PyInequality or not
+        other = PyInequality(other.terms, other.degree)
 
         if self.degree != 1 or other.degree != 1:
             # todo: find a good implementation for this case
@@ -283,6 +283,9 @@ class IneqFactory():
         self.names = list()
         self.num = dict()
 
+    def litAxiom(self, lit):
+        return PyInequality([Term(1, lit)], 0)
+
     def fromTerms(self, terms, degree):
         return PyInequality([Term(a,l) for a,l in terms], degree)
 
@@ -340,6 +343,25 @@ def terms2lists(terms):
     return zip(*[(a,l) for a,l in terms]) \
         if len(terms) > 0 else ([],[])
 
+class PropEngine:
+    def attach(self, ineq):
+        pass
+
+    def detach(self, ineq):
+        pass
+
+    def attachTmp(self, ineq):
+        raise NotImplementedError("arbitrary precision unit propagation")
+
+    def reset(self, ineq):
+        pass
+
+    def checkSat(self, v):
+        raise NotImplementedError("arbitrary precision solution check")
+
+    def printStats(self):
+        pass
+
 class CppIneqFactory(IneqFactory):
     def litAxiom(self, lit):
         return CppInequality([1], [lit], 0)
@@ -347,5 +369,3 @@ class CppIneqFactory(IneqFactory):
     def fromTerms(self, terms, degree):
         ineq = super().fromTerms(terms, degree)
         return CppInequality(*terms2lists(ineq.terms), ineq.degree)
-
-newDefaultFactory = CppIneqFactory

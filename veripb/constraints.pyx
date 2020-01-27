@@ -118,6 +118,7 @@ class PyInequality():
         self.variableUpperBounds = variableUpperBounds
         self.normalize()
 
+
     @property
     def dict(self):
         self._expand()
@@ -129,7 +130,7 @@ class PyInequality():
         return self._terms
 
     @terms.setter
-    def set_terms(self, l):
+    def terms(self, l):
         self.contract()
         self._terms = l
 

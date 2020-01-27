@@ -30,7 +30,9 @@ class LazyInequality():
 
     @property
     def terms(self):
-        return map(self.applyTerm, self.constraint.terms)
+        return filter(
+            lambda x: x.coefficient > 0,
+            map(self.applyTerm, self.constraint.terms))
 
     @property
     def degree(self):
@@ -188,6 +190,7 @@ class PyInequality():
             term.coefficient = min(
                 term.coefficient,
                 self.degree)
+        self.terms = [x for x in self.terms if x.coefficient > 0]
         return self
 
     def divide(self, d):

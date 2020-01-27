@@ -890,10 +890,19 @@ public:
     Inequality* saturate(){
         assert(!frozen);
         contract();
+
         for (Term<T>& term: *ineq) {
             using namespace std;
             term.coeff = min(term.coeff, ineq->degree);
         }
+
+        if (ineq->degree <= 0 && ineq->size() > 0) {
+            // nasty hack to shrink the constraint as this should not
+            // happen frequently anyway.
+            expand();
+            contract();
+        }
+
         return this;
     }
 

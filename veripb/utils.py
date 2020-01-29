@@ -26,6 +26,15 @@ if profile:
     from pyprof2calltree import convert as convert2kcachegrind
     from guppy import hpy
 
+import re
+def rule_count(fname):
+    with open(fname,"r") as f:
+        i=0
+        for l in f:
+            if not l.isspace() and not re.match(r'\s?\*', l):
+                i+=1
+        return i
+
 def run(formulaFile, rulesFile, settings = None, arbitraryPrecision = False):
     if profile:
         pr = cProfile.Profile()
@@ -56,6 +65,8 @@ def run(formulaFile, rulesFile, settings = None, arbitraryPrecision = False):
         context.propEngine = PropEngine()
     else:
         context.propEngine = CppPropEngine(numVars)
+
+    context.ruleCount=rule_count(rulesFile.name)
 
     verify = Verifier(
         context = context,

@@ -28,6 +28,29 @@ def fileLineNum(ruleNum, rule):
     except AttributeError:
         return "unknown line - %i-th step" %(ruleNum)
 
+# Print iterations progress
+def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r", stream = sys.stderr):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+        stream      - Optional  : output stream (File object)
+    """
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = printEnd,file=stream)
+    # Print New Line on Complete
+    if iteration == total:
+        print(file=stream)
+
 class Verifier():
     """
     Class to veryfi a complete proof.
@@ -58,6 +81,7 @@ class Verifier():
             return {
                 "isInvariantsOn": False,
                 "trace": False,
+                "progressBar": False,
             }
 
         def computeNumUse(self):
@@ -79,7 +103,12 @@ class Verifier():
             group.add_argument("--trace", dest = name+".trace",
                 action="store_true",
                 default=False,
-                help="print a trace of derived constraints")
+                help="Print a trace of derived constraints.")
+
+            group.add_argument("--progressBar", dest = name+".progressBar",
+                action="store_true",
+                default=False,
+                help="Print a progress bar to stderr.")
 
         @classmethod
         def extract(cls, result, name = "verifier"):
@@ -140,7 +169,12 @@ class Verifier():
             print()
             print("=== begin trace ===")
 
+
         for ruleNum, rule in enumerate(itertools.chain([DummyRule()], rules)):
+
+            if self.settings.progressBar:
+                printProgressBar(ruleNum,self.context.ruleCount,length=50)
+
             didPrint = False
 
             if isinstance(rule, IsContradiction):

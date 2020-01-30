@@ -21,6 +21,20 @@ class RuleParserBase():
         except AttributeError:
             self.context.addIneqListener = list()
 
+    def numRules(self, file):
+        pos = file.tell()
+        file.seek(0)
+
+        num = 0
+        for line in file:
+            if not self.isEmpty(line):
+                num += 1
+
+        file.seek(pos)
+        # don't count the proof header line
+        return num - 1
+
+
     def isEmpty(self, line):
         if len(line) == 0 \
             or line == "\n" \

@@ -57,12 +57,16 @@ def run(formulaFile, rulesFile, settings = None, arbitraryPrecision = False):
     else:
         context.propEngine = CppPropEngine(numVars)
 
+
     verify = Verifier(
         context = context,
         settings = settings)
 
     try:
-        rules = RuleParser(context).parse(rules, rulesFile, dumpLine = settings.trace)
+        ruleParser = RuleParser(context)
+        if settings.progressBar:
+            context.ruleCount = ruleParser.numRules(rulesFile)
+        rules = ruleParser.parse(rules, rulesFile, dumpLine = settings.trace)
         verify(rules)
     except ParseError as e:
         e.fileName = rulesFile.name

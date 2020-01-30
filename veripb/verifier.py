@@ -6,6 +6,7 @@ from veripb.timed_function import TimedFunction
 
 import sys
 import logging
+import time
 
 class Context():
     pass
@@ -29,7 +30,7 @@ def fileLineNum(ruleNum, rule):
         return "unknown line - %i-th step" %(ruleNum)
 
 # Print iterations progress
-def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r", stream = sys.stderr):
+def printProgressBar (iteration, total, start_time, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r", stream = sys.stderr):
     """
     Call in a loop to create terminal progress bar
     @params:
@@ -44,9 +45,10 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
         stream      - Optional  : output stream (File object)
     """
     percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    time_left = 0 if iteration==0 else int(round((time.time() - start_time)*(float(total)/iteration-1)))
     filledLength = int(length * iteration // total)
     bar = fill * filledLength + '-' * (length - filledLength)
-    print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = printEnd,file=stream)
+    print('\r%s |%s| %s%% %ds remaining %s' % (prefix, bar, percent, time_left, suffix), end = printEnd,file=stream)
     # Print New Line on Complete
     if iteration == total:
         print(file=stream)
@@ -169,11 +171,13 @@ class Verifier():
             print()
             print("=== begin trace ===")
 
+        if self.settings.progressBar:
+            start_time = time.time()
 
         for ruleNum, rule in enumerate(itertools.chain([DummyRule()], rules)):
 
             if self.settings.progressBar:
-                printProgressBar(ruleNum,self.context.ruleCount,length=50)
+                printProgressBar(ruleNum,self.context.ruleCount,start_time,length=60)
 
             didPrint = False
 

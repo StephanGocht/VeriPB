@@ -1,4 +1,3 @@
-from recordclass import structclass
 import cppimport
 
 def copysign(a, b):
@@ -7,7 +6,18 @@ def copysign(a, b):
     else:
         return -abs(a)
 
-Term = structclass("Term","coefficient variable")
+class Term:
+    def __init__(self, coeff, var):
+        self.coefficient = coeff
+        self.variable = var
+
+    def __iter__(self):
+        return iter((self.coefficient, self.variable))
+
+    def __eq__(self, other):
+        return self.coefficient == other.coefficient \
+            and self.variable == other.variable
+
 
 class AllBooleanUpperBound():
     """

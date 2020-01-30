@@ -172,6 +172,7 @@ class Verifier():
 
         for ruleNum, rule in enumerate(itertools.chain([DummyRule()], rules)):
 
+            print(ruleNum, self.context.ruleCount)
             if self.settings.progressBar:
                 printProgressBar(ruleNum,self.context.ruleCount,length=50)
 

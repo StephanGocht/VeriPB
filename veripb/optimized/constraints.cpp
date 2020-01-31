@@ -204,7 +204,7 @@ struct Term {
 
     static
     std::vector<Term<T>> toTerms(
-        std::vector<int>& coeffs,
+        std::vector<T>& coeffs,
         std::vector<int>& lits)
     {
         assert(coeffs.size() == lits.size());
@@ -803,7 +803,7 @@ public:
             this->use(var);
             T a = this->coeffs[var];
             this->coeffs[var] = a + b;
-            T cancellation = max(0, max(abs(a), abs(b)) - abs(this->coeffs[var]));
+            T cancellation = max<T>(0, max(abs(a), abs(b)) - abs(this->coeffs[var]));
             this->degree -= cancellation;
         }
 
@@ -840,21 +840,21 @@ public:
             assert(other.loaded == false);
     }
 
-    Inequality(std::vector<Term<T>>&& terms_, int degree_)
+    Inequality(std::vector<Term<T>>&& terms_, T degree_)
         : handler(terms_, degree_)
     {}
 
     Inequality(
-            std::vector<int>& coeffs,
+            std::vector<T>& coeffs,
             std::vector<int>& lits,
-            int degree_)
+            T degree_)
         : Inequality(Term<T>::toTerms(coeffs, lits), degree_)
     {}
 
     Inequality(
-            std::vector<int>&& coeffs,
+            std::vector<T>&& coeffs,
             std::vector<int>&& lits,
-            int degree_)
+            T degree_)
         : Inequality(Term<T>::toTerms(coeffs, lits), degree_)
     {}
 
@@ -1059,22 +1059,23 @@ public:
 template<typename T>
 std::vector<FatInequalityPtr<T>> Inequality<T>::pool;
 
+using CoefType = long long;
 
 // int main(int argc, char const *argv[])
 // {
 //     /* code */
 //     {
-//     Inequality<int> foo({1,1,1},{1,1,1},1);
-//     Inequality<int> baa({1,1,1},{-1,-1,-1},3);
-//     PropEngine<int> p(10);
+//     Inequality<CoefType> foo({1,1,1},{1,1,1},1);
+//     Inequality<CoefType> baa({1,1,1},{-1,-1,-1},3);
+//     PropEngine<CoefType> p(10);
 //     foo.eq(&baa);
 //     foo.implies(&baa);
 //     foo.negated();
-//     Inequality<int> test(baa);
+//     Inequality<CoefType> test(baa);
 //     p.attach(&foo);
 //     p.attachTmp(&baa);
 //     }
-//     Inequality<int> foo({1,1,1},{1,1,1},1);
+//     Inequality<CoefType> foo({1,1,1},{1,1,1},1);
 
 //     std::cout << foo.isContradiction() << std::endl;
 
@@ -1084,9 +1085,6 @@ std::vector<FatInequalityPtr<T>> Inequality<T>::pool;
 //     std::cout << test << std::endl;
 //     return 0;
 // }
-
-
-
 
 #ifdef PY_BINDINGS
     PYBIND11_MODULE(constraints, m){
@@ -1102,32 +1100,31 @@ std::vector<FatInequalityPtr<T>> Inequality<T>::pool;
                     delete static_cast<py::scoped_ostream_redirect *>(sor);
                 });
 
-        py::class_<PropEngine<int>>(m, "PropEngine")
+        py::class_<PropEngine<CoefType>>(m, "PropEngine")
             .def(py::init<int>())
-            .def("attach", &PropEngine<int>::attach)
-            .def("detach", &PropEngine<int>::detach)
-            .def("attachTmp", &PropEngine<int>::attachTmp)
-            .def("reset", &PropEngine<int>::reset)
-            .def("checkSat", &PropEngine<int>::checkSat)
-            .def("printStats", &PropEngine<int>::printStats);
+            .def("attach", &PropEngine<CoefType>::attach)
+            .def("detach", &PropEngine<CoefType>::detach)
+            .def("attachTmp", &PropEngine<CoefType>::attachTmp)
+            .def("reset", &PropEngine<CoefType>::reset)
+            .def("checkSat", &PropEngine<CoefType>::checkSat)
+            .def("printStats", &PropEngine<CoefType>::printStats);
 
 
-        py::class_<Inequality<int>>(m, "CppInequality")
-            .def(py::init<std::vector<int>&, std::vector<int>&, int>())
-            .def("saturate", &Inequality<int>::saturate)
-            .def("divide", &Inequality<int>::divide)
-            .def("multiply", &Inequality<int>::multiply)
-            .def("add", &Inequality<int>::add)
-            .def("contract", &Inequality<int>::contract)
-            .def("copy", &Inequality<int>::copy)
-            .def("implies", &Inequality<int>::implies)
-            // .def("expand", &Inequality<int>::expand)
-            .def("contract", &Inequality<int>::contract)
-            .def("negated", &Inequality<int>::negated)
-            .def("__eq__", &Inequality<int>::eq)
-            .def("__repr__", &Inequality<int>::repr)
-            .def("toString", &Inequality<int>::toString)
-            .def("isContradiction", &Inequality<int>::isContradiction);
+        py::class_<Inequality<CoefType>>(m, "CppInequality")
+            .def(py::init<std::vector<CoefType>&, std::vector<int>&, CoefType>())
+            .def("saturate", &Inequality<CoefType>::saturate)
+            .def("divide", &Inequality<CoefType>::divide)
+            .def("multiply", &Inequality<CoefType>::multiply)
+            .def("add", &Inequality<CoefType>::add)
+            .def("copy", &Inequality<CoefType>::copy)
+            .def("implies", &Inequality<CoefType>::implies)
+            // .def("expand", &Inequality<CoefType>::expand)
+            .def("contract", &Inequality<CoefType>::contract)
+            .def("negated", &Inequality<CoefType>::negated)
+            .def("__eq__", &Inequality<CoefType>::eq)
+            .def("__repr__", &Inequality<CoefType>::repr)
+            .def("toString", &Inequality<CoefType>::toString)
+            .def("isContradiction", &Inequality<CoefType>::isContradiction);
 
         py::add_ostream_redirect(m, "ostream_redirect");
     }

@@ -17,12 +17,6 @@ def geq(terms, degree):
 
 
 class TestCpp(unittest.TestCase):
-    def testCppTrue(self):
-        assert constraints.nonzero([1,2,3,4])
-
-    def testCppFalse(self):
-        assert not constraints.nonzero([1,2,0,3,4])
-
     def testConstruction_1(self):
         a = Inequality([1,2], [1,2], 1)
         assert not a.isContradiction()

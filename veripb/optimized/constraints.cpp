@@ -65,13 +65,6 @@ public:
     }
 };
 
-bool nonzero(std::vector<int> aList){
-    for (auto &item: aList)
-        if (item == 0)
-            return false;
-    return true;
-}
-
 template<typename T>
 T divideAndRoundUp(T value, T divisor) {
     return (value + divisor - 1) / divisor;
@@ -478,7 +471,7 @@ public:
         other.ineq = nullptr;
     }
 
-    FixedSizeInequalityHandler(std::vector<Term<T>>& terms, int degree) {
+    FixedSizeInequalityHandler(std::vector<Term<T>>& terms, T degree) {
         void* addr = malloc(terms.size());
         ineq = new (addr) FixedSizeInequality<T>(terms, degree);
     }
@@ -1089,9 +1082,6 @@ using CoefType = long long;
 #ifdef PY_BINDINGS
     PYBIND11_MODULE(constraints, m){
         m.doc() = "Efficient implementation for linear combinations of constraints.";
-        m.def("nonzero", &nonzero,
-              "Test function",
-              py::arg("aList"));
         m.attr("redirect_output") =
             py::capsule(
                 new py::scoped_ostream_redirect(),

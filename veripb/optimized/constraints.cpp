@@ -964,7 +964,28 @@ public:
     std::string toString(std::function<std::string(int)> varName) {
         contract();
         std::stringstream s;
-        for (Term<T> &term: *ineq) {
+        struct SortData{
+            Term<T>* t;
+            std::string s;
+            long long i;
+        };
+        std::vector<SortData> toSort;
+        toSort.reserve(ineq->size());
+        for(Term<T> &term: *ineq){
+            std::string name = varName(term.lit.var());
+            size_t splitIdx = name.find_last_not_of("0123456789")+1;
+            std::string pre = name.substr(0,splitIdx);
+            std::string post = name.substr(splitIdx,30);
+            long long num = 0;
+            if(!post.empty()) num = std::stoll(post);
+            toSort.emplace_back(SortData{&term,pre,num});
+        }
+        std::sort(toSort.begin(), toSort.end(), [](const SortData& x, const SortData& y)->bool{
+            return x.s<y.s || (x.s==y.s && x.i<y.i);
+        });
+
+        for (SortData& x: toSort) {
+            Term<T>& term = *x.t;
             using namespace std;
             s << term.coeff << " ";
             if (term.lit.isNegated()) {

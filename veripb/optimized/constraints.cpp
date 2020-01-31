@@ -1052,7 +1052,9 @@ public:
 template<typename T>
 std::vector<FatInequalityPtr<T>> Inequality<T>::pool;
 
-using CoefType = long long;
+using CoefType = int;
+// use the following line istead to increas precision.
+// using CoefType = long long;
 
 // int main(int argc, char const *argv[])
 // {

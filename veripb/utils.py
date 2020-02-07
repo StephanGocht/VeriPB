@@ -84,7 +84,13 @@ def runUI(*args, **kwargs):
         run(*args, **kwargs)
     except InvalidProof as e:
         print("Verification failed.")
+        line = getattr(e, "lineInFile", None)
+        where = ""
+        if line is not None:
+            print("Failed in proof file line %i."%(line))
         hint = str(e)
+
+
         if len(hint) > 0:
             print("Hint: %s" %(str(e)))
         return 1

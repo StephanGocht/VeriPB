@@ -163,6 +163,52 @@ class Verifier():
     def detach(self, constraint):
         self.context.propEngine.detach(constraint)
 
+    def handleRule(self, ruleNum, rule):
+        if self.settings.progressBar:
+            printProgressBar(ruleNum,self.context.ruleCount,start_time,length=50)
+
+        didPrint = False
+
+        if isinstance(rule, IsContradiction):
+            self.foundContradiction = True
+
+        antecedents = self.antecedents(rule.antecedentIDs(), ruleNum)
+        constraints = rule.compute(antecedents, self.context)
+
+        for i, constraint in enumerate(constraints):
+            lineNum = len(self.db) + i
+            self.attach(constraint)
+            if self.settings.trace and ruleNum > 0:
+                didPrint = True
+                print("  ConstraintId %(line)03d: %(ineq)s"%{
+                    "line": lineNum,
+                    "ineq": self.context.ineqFactory.toString(constraint)
+                })
+
+        self.db.extend(constraints)
+
+        deletedConstraints = list(rule.deleteConstraints())
+        if self.settings.trace and len(deletedConstraints) > 0:
+            didPrint = True
+            print("  ConstraintId  - : deleting %(ineq)s"%{
+                "ineq": ", ".join(map(str,deletedConstraints))
+            })
+
+        for i in deletedConstraints:
+            self.detach(self.db[i])
+
+            # clean constraint to supress superficial warning
+            constraint = None
+            refcount = sys.getrefcount(self.db[i])
+            if (refcount > 2):
+                logging.warn("Internal Warning: refcount of "
+                    "deleted constraint too large (is %i), memory will "
+                    "not be freed."%(refcount))
+            self.db[i] = None
+
+        if not didPrint == True and self.settings.trace and ruleNum > 0:
+            print("  ConstraintId  - : check passed")
+
     def __call__(self, rules):
         self.db = list()
         self.foundContradiction = False
@@ -175,52 +221,11 @@ class Verifier():
             start_time = time.time()
 
         for ruleNum, rule in enumerate(itertools.chain([DummyRule()], rules)):
-
-            if self.settings.progressBar:
-                printProgressBar(ruleNum,self.context.ruleCount,start_time,length=50)
-
-            didPrint = False
-
-            if isinstance(rule, IsContradiction):
-                self.foundContradiction = True
-
-            antecedents = self.antecedents(rule.antecedentIDs(), ruleNum)
-            constraints = rule.compute(antecedents, self.context)
-
-            for i, constraint in enumerate(constraints):
-                lineNum = len(self.db) + i
-                self.attach(constraint)
-                if self.settings.trace and ruleNum > 0:
-                    didPrint = True
-                    print("  ConstraintId %(line)03d: %(ineq)s"%{
-                        "line": lineNum,
-                        "ineq": self.context.ineqFactory.toString(constraint)
-                    })
-
-            self.db.extend(constraints)
-
-            deletedConstraints = list(rule.deleteConstraints())
-            if self.settings.trace and len(deletedConstraints) > 0:
-                didPrint = True
-                print("  ConstraintId  - : deleting %(ineq)s"%{
-                    "ineq": ", ".join(map(str,deletedConstraints))
-                })
-
-            for i in deletedConstraints:
-                self.detach(self.db[i])
-
-                # clean constraint to supress superficial warning
-                constraint = None
-                refcount = sys.getrefcount(self.db[i])
-                if (refcount > 2):
-                    logging.warn("Internal Warning: refcount of "
-                        "deleted constraint too large (is %i), memory will "
-                        "not be freed."%(refcount))
-                self.db[i] = None
-
-            if not didPrint == True and self.settings.trace and ruleNum > 0:
-                print("  ConstraintId  - : check passed")
-
+            try:
+                self.handleRule(ruleNum, rule)
+            except InvalidProof as e:
+                e.lineInFile = rule.lineInFile
+                raise e
 
         if self.settings.trace:
             print("=== end trace ===")
@@ -228,3 +233,7 @@ class Verifier():
 
         if not self.foundContradiction:
             logging.warn("The provided proof did not claim contradiction.")
+
+        if getattr(self.context, "usesAssumptions", False):
+            logging.warn("Proof is based on unjustified assumptions.")
+

@@ -125,6 +125,41 @@ class DeleteConstraints(Rule):
         return self.toDelete
 
 @register_rule
+class Assumption(Rule):
+    Id = "a"
+
+    @classmethod
+    def parse(cls, line, context):
+        with WordParser(line) as words:
+            parser = OPBParser(
+                    ineqFactory = context.ineqFactory,
+                    allowEq = False)
+            ineq = parser.parseConstraint(words)
+
+        return cls(ineq[0])
+
+    def __init__(self, constraint):
+        self.constraint = constraint
+
+    def numConstraints(self):
+        return 1
+
+    def antecedentIDs(self):
+        return []
+
+    def __eq__(self, other):
+        return self.constraint == other.constraint and self.Id == other.Id
+
+    def isGoal(self):
+        return False
+
+    @TimedFunction.time("ReverseUnitPropagation::compute")
+    def compute(self, antecedents, context):
+        context.usesAssumptions = True
+        return [self.constraint]
+
+
+@register_rule
 class ReverseUnitPropagation(Rule):
     Id = "u"
 

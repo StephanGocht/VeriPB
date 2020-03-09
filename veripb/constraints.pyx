@@ -159,12 +159,12 @@ class PyInequality():
     def normalize(self):
         occurs = set()
         for term in self.terms:
-            if term.coefficient < 0:
-                if abs(term.variable) in occurs:
-                    raise ValueError("Variable occurs twice, currently not supported.")
-                else:
-                    occurs.add(abs(term.variable))
+            if abs(term.variable) in occurs:
+                raise ValueError("Variable occurs twice, currently not supported.")
+            else:
+                occurs.add(abs(term.variable))
 
+            if term.coefficient < 0:
                 term.variable = -term.variable
                 term.coefficient = abs(term.coefficient)
                 self.degree += self.variableUpperBounds[abs(term.variable)] * term.coefficient

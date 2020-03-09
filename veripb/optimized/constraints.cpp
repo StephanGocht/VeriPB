@@ -334,12 +334,18 @@ private:
 
 public:
     void clearWatches(PropEngine<T>& prop) {
-        for (Term<T>& term: *this) {
-            for (auto& w: prop.watchlist[term.lit]) {
-                if (w.ineq == this) {
-                    w.ineq = nullptr;
-                }
-            }
+        for (size_t i = 0; i < this->watchSize; i++) {
+            auto& ws = prop.watchlist[terms[i].lit];
+            ws.erase(
+                std::remove_if(
+                    ws.begin(),
+                    ws.end(),
+                    [this](auto& watch){
+                        return watch.ineq == this;
+                    }
+                ),
+                ws.end()
+            );
         }
     }
 
@@ -587,8 +593,28 @@ public:
                     next->ineq->template updateWatch<false>(*this, falsifiedLit);
                 }
             }
+
             current.qhead += 1;
         }
+
+        while (current.qhead < trail.size()) {
+            Lit falsifiedLit = ~trail[current.qhead];
+            WatchList& ws = watchlist[falsifiedLit];
+
+            ws.erase(
+                std::remove_if(
+                    ws.begin(),
+                    ws.end(),
+                    [](WatchedType& watch){
+                        return watch.ineq == nullptr;
+                    }
+                ),
+                ws.end()
+            );
+
+            current.qhead += 1;
+        }
+
         if (permanent) {
             base = current;
         }

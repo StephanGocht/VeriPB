@@ -165,7 +165,7 @@ class Verifier():
 
     def handleRule(self, ruleNum, rule):
         if self.settings.progressBar:
-            printProgressBar(ruleNum,self.context.ruleCount,start_time,length=50)
+            printProgressBar(ruleNum,self.context.ruleCount,self.start_time,length=50)
 
         didPrint = False
 
@@ -218,7 +218,7 @@ class Verifier():
             print("=== begin trace ===")
 
         if self.settings.progressBar:
-            start_time = time.time()
+            self.start_time = time.time()
 
         for ruleNum, rule in enumerate(itertools.chain([DummyRule()], rules)):
             try:

@@ -61,7 +61,7 @@ Formula Format
 
 The formula is provided in `OPB <http://www.cril.univ-artois.fr/PB12/format.pdf>`_ format. A short overview can be
 found
-`here <https://github.com/elffersj/roundingsat/blob/proof_logging/InputFormats.md>`_.
+`here <https://gitlab.com/miao_research/roundingsat/-/blob/master/InputFormats.md>`_.
 
 The verifier also supports an extension to OPB, which allows to use
 arbitrary variable names instead of x1, x2, ... Variable names must

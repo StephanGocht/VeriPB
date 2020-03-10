@@ -67,21 +67,23 @@ def run(formulaFile, rulesFile, settings = None, arbitraryPrecision = False):
         if settings.progressBar:
             context.ruleCount = ruleParser.numRules(rulesFile)
         rules = ruleParser.parse(rules, rulesFile, dumpLine = settings.trace)
-        verify(rules)
+        return verify(rules)
     except ParseError as e:
         e.fileName = rulesFile.name
         raise e
+    finally:
+        TimedFunction.print_stats()
+        context.propEngine.printStats()
 
-    TimedFunction.print_stats()
-    context.propEngine.printStats()
-
-    if profile:
-        pr.disable()
-        convert2kcachegrind(pr.getstats(), 'pyprof.callgrind')
+        if profile:
+            pr.disable()
+            convert2kcachegrind(pr.getstats(), 'pyprof.callgrind')
 
 def runUI(*args, **kwargs):
     try:
-        run(*args, **kwargs)
+        result = run(*args, **kwargs)
+        result.print()
+
     except InvalidProof as e:
         print("Verification failed.")
         line = getattr(e, "lineInFile", None)
@@ -94,23 +96,25 @@ def runUI(*args, **kwargs):
         if len(hint) > 0:
             print("Hint: %s" %(str(e)))
         return 1
+
     except ParseError as e:
         logging.error(e)
-        exit(1)
+        return 1
+
     except NotImplementedError as e:
         logging.error("Not Implemented: %s" % str(e))
-        exit(1)
+        return 1
+
     except Exception as e:
         if logging.getLogger().getEffectiveLevel() != logging.DEBUG:
             logging.error("Sorry, there was an internal error. Please rerun with debugging "
                 "and make a bug report.")
-            exit(1)
+            return 1
         else:
             print("Sorry, there was an internal error. Because you are running in "
                 "debug mode I will give you the exception.")
             raise e
-    else:
-        print("Verification succeeded.")
+
     return 0
 
 

@@ -153,7 +153,7 @@ class Assumption(Rule):
     def isGoal(self):
         return False
 
-    @TimedFunction.time("ReverseUnitPropagation::compute")
+    @TimedFunction.time("Assumption::compute")
     def compute(self, antecedents, context):
         context.usesAssumptions = True
         return [self.constraint]

@@ -53,6 +53,21 @@ def printProgressBar (iteration, total, start_time, prefix = '', suffix = '', de
     if iteration == total:
         print(file=stream)
 
+class VerificationResult():
+    def __init__(self):
+        self.isSuccessfull = False
+        self.usesAssumptions = False
+        self.containsContradiction = False
+
+    def print(self):
+        if not self.containsContradiction:
+            logging.warn("The provided proof did not claim contradiction.")
+
+        if self.usesAssumptions:
+            logging.warn("Proof is based on unjustified assumptions.")
+
+        print("Verification succeeded.")
+
 class Verifier():
     """
     Class to veryfi a complete proof.
@@ -170,7 +185,7 @@ class Verifier():
         didPrint = False
 
         if isinstance(rule, IsContradiction):
-            self.foundContradiction = True
+            self.result.containsContradiction = True
 
         antecedents = self.antecedents(rule.antecedentIDs(), ruleNum)
         constraints = rule.compute(antecedents, self.context)
@@ -211,7 +226,7 @@ class Verifier():
 
     def __call__(self, rules):
         self.db = list()
-        self.foundContradiction = False
+        self.result = VerificationResult()
 
         if self.settings.trace:
             print()
@@ -227,13 +242,10 @@ class Verifier():
                 e.lineInFile = rule.lineInFile
                 raise e
 
+        self.result.usesAssumptions = getattr(self.context, "usesAssumptions", False)
+
         if self.settings.trace:
             print("=== end trace ===")
             print()
 
-        if not self.foundContradiction:
-            logging.warn("The provided proof did not claim contradiction.")
-
-        if getattr(self.context, "usesAssumptions", False):
-            logging.warn("Proof is based on unjustified assumptions.")
-
+        return self.result

@@ -61,7 +61,7 @@ class TestInequality(unittest.TestCase):
         assert a.implies(b)
 
     def test_implies_5_f(self):
-        a = geq([(5, 1), (1,2), (1,3), (1,3)], 3)
+        a = geq([(5, 1), (1,2), (1,3), (1,4)], 3)
         b = geq([(1,1)], 1)
         assert(not a.implies(b))
 

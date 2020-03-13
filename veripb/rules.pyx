@@ -382,7 +382,7 @@ class ReversePolishNotation(Rule):
                     #     if word == 0:
                     #         raise ValueError("Got 0, which should only be used to terminate sequence.")
 
-            if stackSize < 0:
+            if stackSize <= 0:
                 raise ValueError("Trying to pop from empty stack in reverse polish notation.")
 
             return word

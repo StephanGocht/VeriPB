@@ -342,7 +342,8 @@ class IneqFactory():
         assert(name == name.strip())
         if len(name) >= 2 \
                 and (ord(name[0]) in range(ord("A"), ord("Z")) \
-                    or ord(name[0]) in range(ord("a"), ord("z"))):
+                    or ord(name[0]) in range(ord("a"), ord("z"))) \
+                and ";" not in name and "=" not in name:
             return True
         else:
             return False
@@ -352,7 +353,7 @@ class IneqFactory():
             return self.num[name]
         except KeyError:
             if not self.isVarName(name):
-                raise ValueError("Expected variablename, got %s"%(name))
+                raise ValueError("Expected variablename, got '%s'"%(name))
 
             self.names.append(name)
             num = len(self.names)

@@ -364,7 +364,10 @@ TLDR;
 
 ::
 
+    * new solution
     v [literal] [literal] ...
+    * new optimal value
+    o [literal] [literal] ...
 
 (v) solution
 ------------
@@ -386,3 +389,31 @@ variable names with ``~`` as prefix to indicate negation, check that:
 If the check is successful then the clause consisting of the negation
 of all literals is added with ConstraintId := IDmax + 1. If the check
 is not successful then verification fails.
+
+(o) optimal value
+-----------------
+
+::
+
+    o [literal] [literal] ...
+    o x1 ~x2
+
+This rule can only be used if the OPB file specifies an objective
+function :math:`f(x)`, i.e., it contains a line of the form::
+
+    min: [coefficient] [literal] [coefficient] [literal] ...
+
+Given a partial assignment :math:`\rho` in form of a list of ``[literal]``, i.e.
+variable names with ``~`` as prefix to indicate negation, check that:
+
+ * every variable that occurs in the objective function is set
+
+ * after unit propagation we are left with a full assignment, i.e. an
+   assignment that assigns all variables that are mentioned in a
+   constraint in the formula or the proof
+
+ * the full assignment does not violate any constraint
+
+If the check is successful then the constraint :math:`f(x) \leq
+f(\rho) - 1` is added with ConstraintId := IDmax + 1. If the check is
+not successful then verification fails.

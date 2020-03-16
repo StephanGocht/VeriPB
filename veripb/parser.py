@@ -2,8 +2,10 @@ import logging
 import veripb.constraints
 import mmap
 import re
+import itertools
 
 from veripb.constraints import Term
+from collections import defaultdict
 
 from functools import partial
 from veripb.exceptions import ParseError
@@ -119,6 +121,46 @@ def flatten(constraintList):
             result.append(c)
     return result
 
+
+class TermsUntil():
+    def __init__(self, endWords, iterator, ineqFactory):
+        self.iterator = iterator
+        self.endWords = endWords
+        self.lastWord = None
+        self.ineqFactory = ineqFactory
+
+    def parseLit(self, s):
+        if s[0] == "~":
+            return -self.ineqFactory.name2Num(s[1:])
+        else:
+            return self.ineqFactory.name2Num(s)
+
+    def __next__(self):
+        try:
+            a = next(self.iterator)
+        except StopIteration:
+            raise ParseError("Expected %s."%\
+                (",".join(map(lambda x: "'%s'"%(str(x)), self.endWords))))
+
+        if a in self.endWords:
+            self.lastWord = a
+            raise StopIteration
+
+        a = int(a)
+
+        try:
+            b = next(self.iterator)
+        except StopIteration:
+            raise ParseError("Expected literal.")
+
+        b = self.parseLit(b)
+
+        return (a,b)
+
+
+    def __iter__(self):
+        return self
+
 class OPBParser():
     def __init__(self, ineqFactory, allowEq = True):
         self.ineqFactory = ineqFactory
@@ -127,6 +169,7 @@ class OPBParser():
     @TimedFunction.time("OPBParser::parse")
     def parse(self, formulaFile):
         lines = iter(enumerate(formulaFile, start = 1))
+        self.objective = None
 
         try:
             lineNum, line = next(lines)
@@ -151,7 +194,16 @@ class OPBParser():
             logging.warn("Number of variables did not match,"\
                 " using %i instead."%(self.ineqFactory.numVars()))
 
-        return ((numVar, numC), constraints)
+
+        if self.objective is False:
+            self.objective = None
+
+        return {
+                "numVariables": numVar,
+                "numConstraints": numC,
+                "constraints": constraints,
+                "objective": self.objective
+            }
 
     def parseHeader(self, line):
         with WordParser(line) as words:
@@ -165,13 +217,37 @@ class OPBParser():
             return (numVar, numC)
 
     def parseLine(self, line):
-        if len(line) == 0 or line[0] == "*":
+        if len(line.strip()) == 0 or line[0] == "*":
             return []
         else:
             with WordParser(line) as words:
+                if self.objective is None:
+                    peek = next(words)
+                    if peek == "min:":
+                        self.parseObjective(words)
+                        return []
+                    else:
+                        words.putback(peek)
+                        self.objective = False
+
                 result = self.parseOPB(words)
                 words.expectEnd()
                 return result
+
+    def parseObjective(self, words):
+        self.objective = dict()
+
+        it = TermsUntil([";"], words, self.ineqFactory)
+        for coeff, lit in it:
+                if lit < 0:
+                    lit = -lit
+                    coeff = -coeff
+
+                if lit in self.objective:
+                    raise ValueError("Literal occuring twice in objective.")
+                else:
+                    self.objective[lit] = coeff
+
 
     def parseConstraint(self, words):
         ineq = self.parseOPB(words)
@@ -190,20 +266,13 @@ class OPBParser():
 
         return [self.ineqFactory.fromTerms([Term(1,self.ineqFactory.intlit2int(l)) for l in lits], 1)]
 
-    def parseOPB(self, words):
-        def parseVar(s):
-            if s[0] == "~":
-                return -self.ineqFactory.name2Num(s[1:])
-            else:
-                return self.ineqFactory.name2Num(s)
-        it = iter(words)
-        terms = list()
-        nxt = next(it)
-        while (nxt not in [">=","="]):
-            terms.append((int(nxt), parseVar(next(it))))
-            nxt = next(it)
 
-        op = nxt
+
+    def parseOPB(self, words):
+        it = iter(words)
+        termIt = TermsUntil([">=","="], it, self.ineqFactory)
+        terms = list(termIt)
+        op = termIt.lastWord
         if op == "=" and not self.allowEq:
             return ValueError("Equality not allowed, only >= is allowed here.")
 
@@ -253,7 +322,12 @@ class CNFParser():
             logging.warn("Number of variables did not match,"\
                 " using %i instead."%(self.ineqFactory.numVars()))
 
-        return ((numVar, numC), constraints)
+        return {
+                "numVariables": numVar,
+                "numConstraints": numC,
+                "constraints": constraints,
+                "objective": None
+            }
 
     def parseHeader(self, line):
         with WordParser(line) as words:
@@ -316,6 +390,9 @@ class WordParser():
             if issubclass(exec_type, StopIteration) \
                     and exec_value.value is self:
                 self.expectedWord()
+
+    def putback(self, word):
+        self.wordIter = itertools.chain([word], self.wordIter)
 
     def raiseParseError(self, wordNum, error):
         column = None

@@ -270,10 +270,16 @@ class ConstraintImpliesGetImplied(ConstraintImplies):
 
 
 class ContradictionCheckFailed(InvalidProof):
-    pass
+    def __str__(self):
+        result = "Constraint is not a contradiction. "
+        result += super().__str__()
+        return result
 
 class SolutionCheckFailed(InvalidProof):
-    pass
+    def __str__(self):
+        result = "Provided assignment is contradicting or does not propagate to solution. "
+        result += super().__str__()
+        return result
 
 @register_rule
 class Solution(Rule):
@@ -300,8 +306,68 @@ class Solution(Rule):
         if not context.propEngine.checkSat(self.partialAssignment):
             raise SolutionCheckFailed()
 
-        # implement check
         return [context.ineqFactory.fromTerms([Term(1, -lit) for lit in self.partialAssignment], 1)]
+
+    def numConstraints(self):
+        return 1
+
+    def antecedentIDs(self):
+        return []
+
+    def isGoal(self):
+        return True
+
+    def deleteConstraints(self):
+        return []
+
+class ObjectiveNotFullyAssigned(InvalidProof):
+    def __str__(self):
+        result = "Provided assignment doesn't assign all variables in the objective. "
+        result += super().__str__()
+        return result
+
+@register_rule
+class ObjectiveBound(Rule):
+    Id = "o"
+
+    @classmethod
+    def parse(cls, line, context):
+        def lit2int(name):
+            if name[0] == "~":
+                return -context.ineqFactory.name2Num(name[1:])
+            else:
+                return context.ineqFactory.name2Num(name)
+
+        with WordParser(line) as words:
+            result = list(map(lit2int, words))
+
+        return cls(result)
+
+    def __init__(self, partialAssignment):
+        self.partialAssignment = partialAssignment
+
+    @TimedFunction.time("ObjectiveBound::compute")
+    def compute(self, antecedents, context):
+        if not context.propEngine.checkSat(self.partialAssignment):
+            raise SolutionCheckFailed()
+
+        objValue = 0
+        numFoundValues = 0
+        for lit in self.partialAssignment:
+            if abs(lit) in context.objective:
+                numFoundValues += 1
+                if lit > 0:
+                    objValue += context.objective[lit]
+
+        if len(context.objective) != numFoundValues:
+            raise ObjectiveNotFullyAssigned()
+
+        # obj <= objvalue - 1
+        lowerBound = context.ineqFactory.fromTerms(
+            [Term(-coeff, lit) for lit, coeff in context.objective.items()],
+            -(objValue - 1))
+
+        return [lowerBound]
 
     def numConstraints(self):
         return 1

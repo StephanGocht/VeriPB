@@ -46,8 +46,8 @@ def run(formulaFile, rulesFile, settings = None, arbitraryPrecision = False):
 
     try:
         formula = OPBParser(context.ineqFactory).parse(formulaFile)
-        numVars, numConstraints = formula[0]
-        context.formula = formula[1]
+        context.formula = formula["constraints"]
+        context.objective = formula["objective"]
     except ParseError as e:
         e.fileName = formulaFile.name
         raise e
@@ -55,7 +55,7 @@ def run(formulaFile, rulesFile, settings = None, arbitraryPrecision = False):
     if arbitraryPrecision:
         context.propEngine = PropEngine()
     else:
-        context.propEngine = CppPropEngine(numVars)
+        context.propEngine = CppPropEngine(formula["numVariables"])
 
 
     verify = Verifier(

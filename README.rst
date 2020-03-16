@@ -25,7 +25,11 @@ If you want to use VeriPB, e.g. because you need it for your
 cutting-edge research or to compare it to other tools, I highly
 encourage you to get in contact with me.
 
+Table of Contents
+=================
 .. contents::
+   :depth: 2
+   :backlinks: none
 
 Installation
 ============

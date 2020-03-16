@@ -25,6 +25,8 @@ If you want to use VeriPB, e.g. because you need it for your
 cutting-edge research or to compare it to other tools, I highly
 encourage you to get in contact with me.
 
+.. contents::
+
 Installation
 ============
 
@@ -417,3 +419,35 @@ variable names with ``~`` as prefix to indicate negation, check that:
 If the check is successful then the constraint :math:`f(x) \leq
 f(\rho) - 1` is added with ConstraintId := IDmax + 1. If the check is
 not successful then verification fails.
+
+Debugging and for Development Only
+==================================
+
+TLDR;
+----
+
+::
+
+    * add constraint as unchecked assumption
+    a [OPB style constraint]
+
+(a) unchecked assumption
+------------------------
+
+::
+
+    * add constraint as unchecked assumption
+    a [OPB style constraint]
+
+Adds the given constraint without any checks. The constraint gets
+ConstraintId := IDmax + 1. Proofs that contain this rule are not
+valid, because it allows adding any constraint. For example one could
+simply add contradiction directly.
+
+This rule is intended to be used during solver development, when not
+all aspects of the solver have implemented proof logging, yet. For
+example, imagine that the solver knows by some fancy algorithm that it
+is OK to add a constraint C, however proof logging for the derivation
+of C is not implemented yet. Using this rule we can simply add C
+without providing a derivation and check with VeriPB that all other
+derivations that are already implemented are correct.

@@ -455,8 +455,13 @@ class ReversePolishNotation(Rule):
 
         with WordParser(line) as words:
             sequence = list(map(f, words))
-        if sequence[-1] == 0:
-            sequence.pop()
+
+            if sequence[-1] == 0:
+                sequence.pop()
+                stackSize -= 1
+
+            if stackSize != 1:
+                raise ValueError("Stack should contain exactly one element at end of polish notation.");
         return cls(sequence)
 
     class AntecedentIterator():

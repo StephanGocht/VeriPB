@@ -10,7 +10,6 @@ setup(
     license='MIT',
     packages=['veripb'],
     install_requires=[
-        "recordclass",
         "cppimport",
         "cython"
     ],

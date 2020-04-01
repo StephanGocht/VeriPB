@@ -1,4 +1,3 @@
-from recordclass import structclass
 import cppimport
 
 def copysign(a, b):
@@ -7,7 +6,18 @@ def copysign(a, b):
     else:
         return -abs(a)
 
-Term = structclass("Term","coefficient variable")
+class Term:
+    def __init__(self, coeff, var):
+        self.coefficient = coeff
+        self.variable = var
+
+    def __iter__(self):
+        return iter((self.coefficient, self.variable))
+
+    def __eq__(self, other):
+        return self.coefficient == other.coefficient \
+            and self.variable == other.variable
+
 
 class AllBooleanUpperBound():
     """
@@ -19,7 +29,7 @@ class AllBooleanUpperBound():
 
 class LazyInequality():
     """
-    Essentially the same interface as Inequality but postpones some
+    Essentially the same interface as PyInequality but postpones some
     of the operations.
     """
 
@@ -30,7 +40,9 @@ class LazyInequality():
 
     @property
     def terms(self):
-        return map(self.applyTerm, self.constraint.terms)
+        return filter(
+            lambda x: x.coefficient > 0,
+            map(self.applyTerm, self.constraint.terms))
 
     @property
     def degree(self):
@@ -67,21 +79,33 @@ class LazyInequality():
         return result.add(other)
 
     def resolve(self, other, resolvedVar):
-        result = Inequality(self.terms, self.degree)
+        result = PyInequality(self.terms, self.degree)
         return result.resolve(other, resolvedVar)
 
     def contract(self):
         pass
 
     def negated(self):
-        result = Inequality(self.terms, self.degree)
+        result = PyInequality(self.terms, self.degree)
         return result.negated()
 
     def copy(self):
         return LazyInequality(self)
 
+    def __eq__(self, other):
+        return PyInequality(self.terms, self.degree) == other
+
     def __repr__(self):
         return str(PyInequality(self.terms, self.degree))
+
+    def toString(self, varNameMapping):
+        return PyInequality(self.terms, self.degree).toString(varNameMapping)
+
+    def isContradiction(self):
+        return PyInequality(self.terms, self.degree).isContradiction()
+
+    def implies(self, other):
+        return PyInequality(self.terms, self.degree).implies(other)
 
 class PyInequality():
     """
@@ -104,6 +128,7 @@ class PyInequality():
         self.variableUpperBounds = variableUpperBounds
         self.normalize()
 
+
     @property
     def dict(self):
         self._expand()
@@ -115,7 +140,7 @@ class PyInequality():
         return self._terms
 
     @terms.setter
-    def set_terms(self, l):
+    def terms(self, l):
         self.contract()
         self._terms = l
 
@@ -134,12 +159,12 @@ class PyInequality():
     def normalize(self):
         occurs = set()
         for term in self.terms:
-            if term.coefficient < 0:
-                if abs(term.variable) in occurs:
-                    raise ValueError("Variable occurs twice, currently not supported.")
-                else:
-                    occurs.add(abs(term.variable))
+            if abs(term.variable) in occurs:
+                raise ValueError("Variable occurs twice, currently not supported.")
+            else:
+                occurs.add(abs(term.variable))
 
+            if term.coefficient < 0:
                 term.variable = -term.variable
                 term.coefficient = abs(term.coefficient)
                 self.degree += self.variableUpperBounds[abs(term.variable)] * term.coefficient
@@ -176,6 +201,7 @@ class PyInequality():
             term.coefficient = min(
                 term.coefficient,
                 self.degree)
+        self.terms = [x for x in self.terms if x.coefficient > 0]
         return self
 
     def divide(self, d):
@@ -192,8 +218,8 @@ class PyInequality():
 
     def resolve(self, other, resolvedVar):
         # todo: clean up. this is ugly
-        # we do not know if we have a lazy inequality or not
-        other = Inequality(other.terms, other.degree)
+        # we do not know if we have a lazy PyInequality or not
+        other = PyInequality(other.terms, other.degree)
 
         if self.degree != 1 or other.degree != 1:
             # todo: find a good implementation for this case
@@ -254,12 +280,15 @@ class PyInequality():
         return self.degree == other.degree \
             and sorted(self.terms, key = key) == sorted(other.terms, key = key)
 
-    def toOPB(self):
+    def toOPB(self, varNameMapping = None):
+        if varNameMapping == None:
+            varNameMapping = lambda x: "x%i"%(x)
+
         def term2str(term):
             if term.variable < 0:
-                return "%+i ~x%i"%(term.coefficient, -term.variable)
+                return "%+i ~%s"%(term.coefficient, varNameMapping(-term.variable))
             else:
-                return "%+i x%i"%(term.coefficient, term.variable)
+                return "%+i %s"%(term.coefficient, varNameMapping(term.variable))
 
         return " ".join(
             map(term2str, self.terms)) + \
@@ -267,6 +296,9 @@ class PyInequality():
 
     def __str__(self):
         return self.toOPB()
+
+    def toString(self, varNameMapping):
+        return self.toOPB(varNameMapping)
 
     def __repr__(self):
         return str(self)
@@ -282,6 +314,9 @@ class IneqFactory():
     def __init__(self):
         self.names = list()
         self.num = dict()
+
+    def litAxiom(self, lit):
+        return PyInequality([Term(1, lit)], 0)
 
     def fromTerms(self, terms, degree):
         return PyInequality([Term(a,l) for a,l in terms], degree)
@@ -307,7 +342,8 @@ class IneqFactory():
         assert(name == name.strip())
         if len(name) >= 2 \
                 and (ord(name[0]) in range(ord("A"), ord("Z")) \
-                    or ord(name[0]) in range(ord("a"), ord("z"))):
+                    or ord(name[0]) in range(ord("a"), ord("z"))) \
+                and ";" not in name and "=" not in name:
             return True
         else:
             return False
@@ -317,7 +353,7 @@ class IneqFactory():
             return self.num[name]
         except KeyError:
             if not self.isVarName(name):
-                raise ValueError("Expected variablename, got %s"%(name))
+                raise ValueError("Expected variablename, got '%s'"%(name))
 
             self.names.append(name)
             num = len(self.names)
@@ -340,6 +376,25 @@ def terms2lists(terms):
     return zip(*[(a,l) for a,l in terms]) \
         if len(terms) > 0 else ([],[])
 
+class PropEngine:
+    def attach(self, ineq):
+        pass
+
+    def detach(self, ineq):
+        pass
+
+    def attachTmp(self, ineq):
+        raise NotImplementedError("arbitrary precision unit propagation")
+
+    def reset(self, ineq):
+        pass
+
+    def checkSat(self, v):
+        raise NotImplementedError("arbitrary precision solution check")
+
+    def printStats(self):
+        pass
+
 class CppIneqFactory(IneqFactory):
     def litAxiom(self, lit):
         return CppInequality([1], [lit], 0)
@@ -347,5 +402,3 @@ class CppIneqFactory(IneqFactory):
     def fromTerms(self, terms, degree):
         ineq = super().fromTerms(terms, degree)
         return CppInequality(*terms2lists(ineq.terms), ineq.degree)
-
-newDefaultFactory = CppIneqFactory

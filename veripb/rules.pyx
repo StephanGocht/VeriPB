@@ -127,6 +127,41 @@ class DeleteConstraints(Rule):
         return self.toDelete
 
 @register_rule
+class Assumption(Rule):
+    Id = "a"
+
+    @classmethod
+    def parse(cls, line, context):
+        with WordParser(line) as words:
+            parser = OPBParser(
+                    ineqFactory = context.ineqFactory,
+                    allowEq = False)
+            ineq = parser.parseConstraint(words)
+
+        return cls(ineq[0])
+
+    def __init__(self, constraint):
+        self.constraint = constraint
+
+    def numConstraints(self):
+        return 1
+
+    def antecedentIDs(self):
+        return []
+
+    def __eq__(self, other):
+        return self.constraint == other.constraint and self.Id == other.Id
+
+    def isGoal(self):
+        return False
+
+    @TimedFunction.time("Assumption::compute")
+    def compute(self, antecedents, context):
+        context.usesAssumptions = True
+        return [self.constraint]
+
+
+@register_rule
 class ReverseUnitPropagation(Rule):
     Id = "u"
 
@@ -254,10 +289,16 @@ class ConstraintImpliesGetImplied(ConstraintImplies):
 
 
 class ContradictionCheckFailed(InvalidProof):
-    pass
+    def __str__(self):
+        result = "Constraint is not a contradiction. "
+        result += super().__str__()
+        return result
 
 class SolutionCheckFailed(InvalidProof):
-    pass
+    def __str__(self):
+        result = "Provided assignment is contradicting or does not propagate to solution. "
+        result += super().__str__()
+        return result
 
 @register_rule
 class Solution(Rule):
@@ -284,8 +325,68 @@ class Solution(Rule):
         if not context.propEngine.checkSat(self.partialAssignment):
             raise SolutionCheckFailed()
 
-        # implement check
         return [context.ineqFactory.fromTerms([Term(1, -lit) for lit in self.partialAssignment], 1)]
+
+    def numConstraints(self):
+        return 1
+
+    def antecedentIDs(self):
+        return []
+
+    def isGoal(self):
+        return True
+
+    def deleteConstraints(self):
+        return []
+
+class ObjectiveNotFullyAssigned(InvalidProof):
+    def __str__(self):
+        result = "Provided assignment doesn't assign all variables in the objective. "
+        result += super().__str__()
+        return result
+
+@register_rule
+class ObjectiveBound(Rule):
+    Id = "o"
+
+    @classmethod
+    def parse(cls, line, context):
+        def lit2int(name):
+            if name[0] == "~":
+                return -context.ineqFactory.name2Num(name[1:])
+            else:
+                return context.ineqFactory.name2Num(name)
+
+        with WordParser(line) as words:
+            result = list(map(lit2int, words))
+
+        return cls(result)
+
+    def __init__(self, partialAssignment):
+        self.partialAssignment = partialAssignment
+
+    @TimedFunction.time("ObjectiveBound::compute")
+    def compute(self, antecedents, context):
+        if not context.propEngine.checkSat(self.partialAssignment):
+            raise SolutionCheckFailed()
+
+        objValue = 0
+        numFoundValues = 0
+        for lit in self.partialAssignment:
+            if abs(lit) in context.objective:
+                numFoundValues += 1
+                if lit > 0:
+                    objValue += context.objective[lit]
+
+        if len(context.objective) != numFoundValues:
+            raise ObjectiveNotFullyAssigned()
+
+        # obj <= objvalue - 1
+        lowerBound = context.ineqFactory.fromTerms(
+            [Term(-coeff, lit) for lit, coeff in context.objective.items()],
+            -(objValue - 1))
+
+        return [lowerBound]
 
     def numConstraints(self):
         return 1
@@ -366,15 +467,20 @@ class ReversePolishNotation(Rule):
                     #     if word == 0:
                     #         raise ValueError("Got 0, which should only be used to terminate sequence.")
 
-            if stackSize < 0:
+            if stackSize <= 0:
                 raise ValueError("Trying to pop from empty stack in reverse polish notation.")
 
             return word
 
         with WordParser(line) as words:
             sequence = list(map(f, words))
-        if sequence[-1] == 0:
-            sequence.pop()
+
+            if sequence[-1] == 0:
+                sequence.pop()
+                stackSize -= 1
+
+            if stackSize != 1:
+                raise ValueError("Stack should contain exactly one element at end of polish notation.");
         return cls(sequence)
 
     class AntecedentIterator():
@@ -494,6 +600,34 @@ class LoadFormula(Rule):
 
     def numConstraints(self):
         return self._numConstraints
+
+    def antecedentIDs(self):
+        return []
+
+@register_rule
+class LoadAxiom(Rule):
+    Id = "l"
+
+    @classmethod
+    def parse(cls, line, context):
+        with WordParser(line) as words:
+            num = words.nextInt()
+            words.expectEnd()
+            return cls(num)
+
+    def __init__(self, axiomId):
+        self._axiomId = axiomId
+
+    @TimedFunction.time("LoadAxiom::compute")
+    def compute(self, antecedents, context):
+        try:
+            return [context.formula[self._axiomId - 1]]
+        except IndexError as e:
+            raise InvalidProof("Trying to load non existing axiom.")
+
+
+    def numConstraints(self):
+        return 1
 
     def antecedentIDs(self):
         return []

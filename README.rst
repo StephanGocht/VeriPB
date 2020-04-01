@@ -25,6 +25,12 @@ If you want to use VeriPB, e.g. because you need it for your
 cutting-edge research or to compare it to other tools, I highly
 encourage you to get in contact with me.
 
+Table of Contents
+=================
+.. contents::
+   :depth: 2
+   :backlinks: none
+
 Installation
 ============
 
@@ -61,7 +67,7 @@ Formula Format
 
 The formula is provided in `OPB <http://www.cril.univ-artois.fr/PB12/format.pdf>`_ format. A short overview can be
 found
-`here <https://github.com/elffersj/roundingsat/blob/proof_logging/InputFormats.md>`_.
+`here <https://gitlab.com/miao_research/roundingsat/-/blob/master/InputFormats.md>`_.
 
 The verifier also supports an extension to OPB, which allows to use
 arbitrary variable names instead of x1, x2, ... Variable names must
@@ -98,11 +104,13 @@ Introduction
 ----
 
 There are multiple rules, which are described in more detail below.
-Each rule can create an arbitrary number of constraints (including
-none). The verifier keeps a database of constraints and each
-constraint is assigned an index, called ConstraintId, starting from 1
-and increasing by one for every added constraint. Rules can reference
-other constraints by their ConstraintId.
+Every rule has to be written on one line and no line may contain more
+than one rule. Each rule can create an arbitrary number of
+constraints (including none). The verifier keeps a database of
+constraints and each constraint is assigned an index, called
+ConstraintId, starting from 1 and increasing by one for every added
+constraint. Rules can reference other constraints by their
+ConstraintId.
 
 In what follows we will use IDmax to refer to the largest used ID
 before a rule is executed.
@@ -362,7 +370,10 @@ TLDR;
 
 ::
 
+    * new solution
     v [literal] [literal] ...
+    * new optimal value
+    o [literal] [literal] ...
 
 (v) solution
 ------------
@@ -384,3 +395,63 @@ variable names with ``~`` as prefix to indicate negation, check that:
 If the check is successful then the clause consisting of the negation
 of all literals is added with ConstraintId := IDmax + 1. If the check
 is not successful then verification fails.
+
+(o) optimal value
+-----------------
+
+::
+
+    o [literal] [literal] ...
+    o x1 ~x2
+
+This rule can only be used if the OPB file specifies an objective
+function :math:`f(x)`, i.e., it contains a line of the form::
+
+    min: [coefficient] [literal] [coefficient] [literal] ...
+
+Given a partial assignment :math:`\rho` in form of a list of ``[literal]``, i.e.
+variable names with ``~`` as prefix to indicate negation, check that:
+
+ * every variable that occurs in the objective function is set
+
+ * after unit propagation we are left with a full assignment, i.e. an
+   assignment that assigns all variables that are mentioned in a
+   constraint in the formula or the proof
+
+ * the full assignment does not violate any constraint
+
+If the check is successful then the constraint :math:`f(x) \leq
+f(\rho) - 1` is added with ConstraintId := IDmax + 1. If the check is
+not successful then verification fails.
+
+Debugging and for Development Only
+==================================
+
+TLDR;
+----
+
+::
+
+    * add constraint as unchecked assumption
+    a [OPB style constraint]
+
+(a) unchecked assumption
+------------------------
+
+::
+
+    * add constraint as unchecked assumption
+    a [OPB style constraint]
+
+Adds the given constraint without any checks. The constraint gets
+ConstraintId := IDmax + 1. Proofs that contain this rule are not
+valid, because it allows adding any constraint. For example one could
+simply add contradiction directly.
+
+This rule is intended to be used during solver development, when not
+all aspects of the solver have implemented proof logging, yet. For
+example, imagine that the solver knows by some fancy algorithm that it
+is OK to add a constraint C, however proof logging for the derivation
+of C is not implemented yet. Using this rule we can simply add C
+without providing a derivation and check with VeriPB that all other
+derivations that are already implemented are correct.

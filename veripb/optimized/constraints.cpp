@@ -65,13 +65,6 @@ public:
     }
 };
 
-bool nonzero(std::vector<int> aList){
-    for (auto &item: aList)
-        if (item == 0)
-            return false;
-    return true;
-}
-
 template<typename T>
 T divideAndRoundUp(T value, T divisor) {
     return (value + divisor - 1) / divisor;
@@ -214,7 +207,7 @@ struct Term {
 
     static
     std::vector<Term<T>> toTerms(
-        std::vector<int>& coeffs,
+        std::vector<T>& coeffs,
         std::vector<int>& lits)
     {
         assert(coeffs.size() == lits.size());
@@ -368,12 +361,18 @@ private:
 
 public:
     void clearWatches(PropEngine<T>& prop) {
-        for (Term<T>& term: *this) {
-            for (auto& w: prop.watchlist[term.lit]) {
-                if (w.ineq == this) {
-                    w.ineq = nullptr;
+        for (size_t i = 0; i < this->watchSize; i++) {
+            auto& ws = prop.watchlist[terms[i].lit];
+            ws.erase(
+                std::remove_if(
+                    ws.begin(),
+                    ws.end(),
+                    [this](auto& watch){
+                        return watch.ineq == this;
                 }
-            }
+                ),
+                ws.end()
+            );
         }
     }
 
@@ -599,7 +598,7 @@ public:
         other.ineq = nullptr;
     }
 
-    FixedSizeInequalityHandler(std::vector<Term<T>>& terms, int degree) {
+    FixedSizeInequalityHandler(std::vector<Term<T>>& terms, T degree) {
         void* addr = malloc(terms.size());
         ineq = new (addr) FixedSizeInequality<T>(terms, degree);
     }
@@ -703,7 +702,7 @@ public:
             << std::fixed << std::setprecision(3)
             << static_cast<float>(cumDbMem) / 1024 / 1024 / 1024 << " GB" << std::endl;
 
-        std::cerr << "maixmal used database memory: "
+        std::cerr << "maximal used database memory: "
             << std::fixed << std::setprecision(3)
             << static_cast<float>(maxDbMem) / 1024 / 1024 / 1024 << " GB" << std::endl;
     }
@@ -742,8 +741,28 @@ public:
                     next->ineq->template updateWatch<false>(*this, falsifiedLit);
                 }
             }
+
             current.qhead += 1;
         }
+
+        while (current.qhead < trail.size()) {
+            Lit falsifiedLit = ~trail[current.qhead];
+            WatchList& ws = watchlist[falsifiedLit];
+
+            ws.erase(
+                std::remove_if(
+                    ws.begin(),
+                    ws.end(),
+                    [](WatchedType& watch){
+                        return watch.ineq == nullptr;
+                    }
+                ),
+                ws.end()
+            );
+
+            current.qhead += 1;
+        }
+
     }
 
     bool checkSat(std::vector<int>& lits) {
@@ -811,9 +830,9 @@ public:
                 assert(unattached.back() == ineq);
                 unattached.pop_back();
             } else {
-            ineq->clearWatches(*this);
+                ineq->clearWatches(*this);
+            }
         }
-    }
     }
 
     /*
@@ -860,7 +879,7 @@ public:
         }
 
         if (current.conflict) {
-            // std::cout << "rup check succeded" << std::endl;
+            std::cout << "rup check succeded" << std::endl;
             return true;
         } else if (w.size() == 0) {
             std::cout << "rup check failed" << std::endl;
@@ -1028,7 +1047,7 @@ public:
             this->use(var);
             T a = this->coeffs[var];
             this->coeffs[var] = a + b;
-            T cancellation = max(0, max(abs(a), abs(b)) - abs(this->coeffs[var]));
+            T cancellation = max<T>(0, max(abs(a), abs(b)) - abs(this->coeffs[var]));
             this->degree -= cancellation;
         }
 
@@ -1065,21 +1084,21 @@ public:
             assert(other.loaded == false);
     }
 
-    Inequality(std::vector<Term<T>>&& terms_, int degree_)
+    Inequality(std::vector<Term<T>>&& terms_, T degree_)
         : handler(terms_, degree_)
     {}
 
     Inequality(
-            std::vector<int>& coeffs,
+            std::vector<T>& coeffs,
             std::vector<int>& lits,
-            int degree_)
+            T degree_)
         : Inequality(Term<T>::toTerms(coeffs, lits), degree_)
     {}
 
     Inequality(
-            std::vector<int>&& coeffs,
+            std::vector<T>&& coeffs,
             std::vector<int>&& lits,
-            int degree_)
+            T degree_)
         : Inequality(Term<T>::toTerms(coeffs, lits), degree_)
     {}
 
@@ -1115,10 +1134,19 @@ public:
     Inequality* saturate(){
         assert(!frozen);
         contract();
+
         for (Term<T>& term: *ineq) {
             using namespace std;
             term.coeff = min(term.coeff, ineq->degree);
         }
+
+        if (ineq->degree <= 0 && ineq->size() > 0) {
+            // nasty hack to shrink the constraint as this should not
+            // happen frequently anyway.
+            expand();
+            contract();
+        }
+
         return this;
     }
 
@@ -1255,19 +1283,22 @@ public:
 template<typename T>
 std::vector<FatInequalityPtr<T>> Inequality<T>::pool;
 
+using CoefType = int;
+// use the following line istead to increas precision.
+// using CoefType = long long;
 
 int main(int argc, char const *argv[])
 {
     {
-    Inequality<int> foo({1,1,1},{1,2,3},1);
-    Inequality<int> baa({1,1,1},{-1,-2,-3},3);
-    PropEngine<int> p(10);
-    foo.eq(&baa);
-    foo.implies(&baa);
-    foo.negated();
-    Inequality<int> test(baa);
-    p.attach(&foo);
-    baa.ratCheck({1}, p);
+        Inequality<int> foo({1,1,1},{1,2,3},1);
+        Inequality<int> baa({2,1,1},{-1,-2,-3},2);
+        PropEngine<int> p(10);
+        // foo.eq(&baa);
+        // foo.implies(&baa);
+        // foo.negated();
+        // Inequality<int> test(baa);
+        p.attach(&foo);
+        baa.ratCheck({-1}, p);
     }
     Inequality<int> foo({1,1,1},{1,1,1},1);
 
@@ -1280,15 +1311,9 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
-
-
-
 #ifdef PY_BINDINGS
     PYBIND11_MODULE(constraints, m){
         m.doc() = "Efficient implementation for linear combinations of constraints.";
-        m.def("nonzero", &nonzero,
-              "Test function",
-              py::arg("aList"));
         m.attr("redirect_output") =
             py::capsule(
                 new py::scoped_ostream_redirect(),
@@ -1297,34 +1322,34 @@ int main(int argc, char const *argv[])
                     delete static_cast<py::scoped_ostream_redirect *>(sor);
                 });
 
-        py::class_<PropEngine<int>>(m, "PropEngine")
-            .def(py::init<int>())
-            .def("attach", &PropEngine<int>::attach)
-            .def("detach", &PropEngine<int>::detach)
-            .def("reset", &PropEngine<int>::reset)
-            .def("checkSat", &PropEngine<int>::checkSat)
-            .def("increaseNumVarsTo", &PropEngine<int>::increaseNumVarsTo)
-            .def("printStats", &PropEngine<int>::printStats);
+        py::class_<PropEngine<CoefType>>(m, "PropEngine")
+            .def(py::init<CoefType>())
+            .def("attach", &PropEngine<CoefType>::attach)
+            .def("detach", &PropEngine<CoefType>::detach)
+            .def("reset", &PropEngine<CoefType>::reset)
+            .def("checkSat", &PropEngine<CoefType>::checkSat)
+            .def("increaseNumVarsTo", &PropEngine<CoefType>::increaseNumVarsTo)
+            .def("printStats", &PropEngine<CoefType>::printStats);
 
 
-        py::class_<Inequality<int>>(m, "CppInequality")
-            .def(py::init<std::vector<int>&, std::vector<int>&, int>())
-            .def("saturate", &Inequality<int>::saturate)
-            .def("divide", &Inequality<int>::divide)
-            .def("multiply", &Inequality<int>::multiply)
-            .def("add", &Inequality<int>::add)
-            .def("contract", &Inequality<int>::contract)
-            .def("copy", &Inequality<int>::copy)
-            .def("implies", &Inequality<int>::implies)
-            .def("expand", &Inequality<int>::expand)
-            .def("contract", &Inequality<int>::contract)
-            .def("negated", &Inequality<int>::negated)
-            .def("ratCheck", &Inequality<int>::ratCheck)
-            .def("__eq__", &Inequality<int>::eq)
-            .def("__repr__", &Inequality<int>::repr)
-            .def("toString", &Inequality<int>::toString)
-            .def("toOPB", &Inequality<int>::repr)
-            .def("isContradiction", &Inequality<int>::isContradiction);
+        py::class_<Inequality<CoefType>>(m, "CppInequality")
+            .def(py::init<std::vector<CoefType>&, std::vector<CoefType>&, CoefType>())
+            .def("saturate", &Inequality<CoefType>::saturate)
+            .def("divide", &Inequality<CoefType>::divide)
+            .def("multiply", &Inequality<CoefType>::multiply)
+            .def("add", &Inequality<CoefType>::add)
+            .def("contract", &Inequality<CoefType>::contract)
+            .def("copy", &Inequality<CoefType>::copy)
+            .def("implies", &Inequality<CoefType>::implies)
+            .def("expand", &Inequality<CoefType>::expand)
+            .def("contract", &Inequality<CoefType>::contract)
+            .def("negated", &Inequality<CoefType>::negated)
+            .def("ratCheck", &Inequality<CoefType>::ratCheck)
+            .def("__eq__", &Inequality<CoefType>::eq)
+            .def("__repr__", &Inequality<CoefType>::repr)
+            .def("toString", &Inequality<CoefType>::toString)
+            .def("toOPB", &Inequality<CoefType>::repr)
+            .def("isContradiction", &Inequality<CoefType>::isContradiction);
 
         py::add_ostream_redirect(m, "ostream_redirect");
     }

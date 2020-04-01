@@ -1,7 +1,11 @@
 import argparse
 import logging
 
-import pyximport; pyximport.install(language_level=3)
+import os
+import pyximport; pyximport.install(
+    language_level=3,
+    build_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)), "__pycache__/pyximport")
+)
 
 from veripb import InvalidProof
 from veripb import ParseError
@@ -12,8 +16,8 @@ from veripb.rules import registered_rules
 from veripb.rules import TimedFunction
 from veripb.parser import RuleParser
 from veripb.exceptions import ParseError
-from veripb.optimized.constraints import PropEngine
-from veripb.constraints import newDefaultFactory
+from veripb.optimized.constraints import PropEngine as CppPropEngine
+from veripb.constraints import PropEngine,CppIneqFactory,IneqFactory
 from time import perf_counter
 
 profile = False
@@ -23,30 +27,40 @@ if profile:
     from pyprof2calltree import convert as convert2kcachegrind
     from guppy import hpy
 
-def run(formulaFile, rulesFile, settings = None, drat = False):
+def run(formulaFile, rulesFile, settings = None, drat=False, arbitraryPrecision = False):
     if profile:
         pr = cProfile.Profile()
         pr.enable()
+
+    if settings == None:
+        settings = Verifier.Settings()
 
     TimedFunction.startTotalTimer()
 
     rules = list(registered_rules)
 
     context = Context()
-    context.ineqFactory = newDefaultFactory()
+    if arbitraryPrecision:
+        context.ineqFactory = IneqFactory()
+    else:
+        context.ineqFactory = CppIneqFactory()
 
     try:
         if not drat:
             formula = OPBParser(context.ineqFactory).parse(formulaFile)
         else:
             formula = CNFParser(context.ineqFactory).parse(formulaFile)
-        numVars, numConstraints = formula[0]
-        context.formula = formula[1]
+        context.formula = formula["constraints"]
+        context.objective = formula["objective"]
     except ParseError as e:
         e.fileName = formulaFile.name
         raise e
 
-    context.propEngine = PropEngine(numVars)
+    if arbitraryPrecision:
+        context.propEngine = PropEngine()
+    else:
+        context.propEngine = CppPropEngine(formula["numVariables"])
+
 
     verify = Verifier(
         context = context,
@@ -54,47 +68,62 @@ def run(formulaFile, rulesFile, settings = None, drat = False):
 
     try:
         if not drat:
-            rules = RuleParser(context).parse(rules, rulesFile)
+            ruleParser = RuleParser(context)
+            rules = ruleParser.parse(rules, rulesFile, dumpLine = settings.trace)
         else:
-            rules = DRATParser(context).parse(rulesFile)
-        verify(rules)
+            ruleParser = DRATParser(context)
+            rules = ruleParser.parse(rulesFile)
+
+        if settings.progressBar:
+            context.ruleCount = ruleParser.numRules(rulesFile)
+        return verify(rules)
     except ParseError as e:
         e.fileName = rulesFile.name
         raise e
+    finally:
+        TimedFunction.print_stats()
+        context.propEngine.printStats()
 
-    TimedFunction.print_stats()
-    context.propEngine.printStats()
+        if profile:
+            pr.disable()
+            convert2kcachegrind(pr.getstats(), 'pyprof.callgrind')
 
-    if profile:
-        pr.disable()
-        convert2kcachegrind(pr.getstats(), 'pyprof.callgrind')
-
-def runUI(*args):
+def runUI(*args, **kwargs):
     try:
-        run(*args)
+        result = run(*args, **kwargs)
+        result.print()
+
     except InvalidProof as e:
         print("Verification failed.")
+        line = getattr(e, "lineInFile", None)
+        where = ""
+        if line is not None:
+            print("Failed in proof file line %i."%(line))
         hint = str(e)
+
+
         if len(hint) > 0:
             print("Hint: %s" %(str(e)))
         return 1
+
     except ParseError as e:
         logging.error(e)
-        exit(1)
+        return 1
+
     except NotImplementedError as e:
-        logging.error(e)
-        exit(1)
+        logging.error("Not Implemented: %s" % str(e))
+        return 1
+
     except Exception as e:
         if logging.getLogger().getEffectiveLevel() != logging.DEBUG:
             logging.error("Sorry, there was an internal error. Please rerun with debugging "
                 "and make a bug report.")
-            exit(1)
+            return 1
         else:
-            print("Sorry, there was an internal error. Because you are runing in "
-                "debug mod I will give you the exception.")
+            print("Sorry, there was an internal error. Because you are running in "
+                "debug mode I will give you the exception.")
             raise e
-    else:
-        print("Verification succeeded.")
+
     return 0
 
 
@@ -123,6 +152,14 @@ def run_cmd_main():
     )
 
 
+    p.add_argument("--arbitraryPrecision",
+        action="store_true",
+        default=False,
+        help="Turn on arbitrary precision. Experimental, does not work with unit propagation or solution checking.")
+    p.add_argument("--no-arbitraryPrecision",
+        action="store_false",
+        help="Turn off arbitrary precision.")
+
     Verifier.Settings.addArgParser(p)
 
     args = p.parse_args()
@@ -131,4 +168,4 @@ def run_cmd_main():
 
     logging.basicConfig(level=args.loglevel)
 
-    return runUI(args.formula, args.derivation, verifyerSettings, args.drat)
+    return runUI(args.formula, args.derivation, verifyerSettings, drat = args.drat, arbitraryPrecision = args.arbitraryPrecision)

@@ -5,9 +5,9 @@ from math import copysign
 from env import veripb
 
 from veripb.constraints import Term
-from veripb.constraints import newDefaultFactory
+from veripb.constraints import CppIneqFactory as IneqFactory
 
-ineqFactory = newDefaultFactory()
+ineqFactory = IneqFactory()
 
 def toTerms(terms):
     return list(map(lambda x: Term(x[0], x[1]), terms))
@@ -61,7 +61,7 @@ class TestInequality(unittest.TestCase):
         assert a.implies(b)
 
     def test_implies_5_f(self):
-        a = geq([(5, 1), (1,2), (1,3), (1,3)], 3)
+        a = geq([(5, 1), (1,2), (1,3), (1,4)], 3)
         b = geq([(1,1)], 1)
         assert(not a.implies(b))
 

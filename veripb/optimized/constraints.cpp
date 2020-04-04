@@ -35,6 +35,9 @@ setup_pybind11(cfg)
 #define assert(x) ((void)(!(x) && assert_handler(#x, __FILE__, __LINE__)))
 #endif
 
+template <typename T>
+T _abs(const T& x){ return x<0?-x:x; }
+
 class assertion_error: public std::runtime_error {
 public:
     assertion_error(const std::string& what_arg):
@@ -93,7 +96,7 @@ private:
 
 public:
     explicit Lit(int t)
-        : value((std::abs(t) << 1) + (t < 0 ? 1 : 0))
+        : value((_abs(t) << 1) + (t < 0 ? 1 : 0))
     {}
 
     Lit(Var var, bool isNegated)
@@ -175,9 +178,9 @@ template<typename T>
 T cpsign(T a, Lit b) {
     using namespace std;
     if (b.isNegated()) {
-        return -abs(a);
+        return -_abs(a);
     } else {
-        return abs(a);
+        return _abs(a);
     }
 }
 
@@ -784,7 +787,7 @@ public:
             T coeff = this->coeffs[var];
             Lit lit(var, coeff < 0);
             using namespace std;
-            coeff = abs(coeff);
+            coeff = _abs(coeff);
 
             if (coeff > 0) {
                 assert(pos != ineq.end());
@@ -822,7 +825,7 @@ public:
             this->use(var);
             T a = this->coeffs[var];
             this->coeffs[var] = a + b;
-            T cancellation = max<T>(0, max(abs(a), abs(b)) - abs(this->coeffs[var]));
+            T cancellation = max<T>(0, max<T>(_abs(a), _abs(b)) - _abs(this->coeffs[var]));
             this->degree -= cancellation;
         }
 
@@ -1078,9 +1081,27 @@ public:
 template<typename T>
 std::vector<FatInequalityPtr<T>> Inequality<T>::pool;
 
-using CoefType = int;
-// use the following line istead to increas precision.
+// use one of the following lines to customize the precision.
+// using CoefType = int;
 // using CoefType = long long;
+using CoefType = __int128;
+
+std::ostream& operator<<(std::ostream& os, __int128 x) {
+  if (x < 0) {
+    os << "-";
+    x = -x;
+  }
+  uint64_t tenPow18 = 1000000000000000000;
+  uint64_t x1 = x % tenPow18;
+  x /= tenPow18;
+  if (x > 0) {
+    uint64_t x2 = x % tenPow18;
+    x /= tenPow18;
+    if (x > 0) os << (short)x;
+    os << x2;
+  }
+  return os << x1;
+}
 
 // int main(int argc, char const *argv[])
 // {

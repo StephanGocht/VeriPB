@@ -198,9 +198,9 @@ struct Term {
         return (this->coeff == other.coeff) && (this->lit == other.lit);
     }
 
-    static
-    std::vector<Term<T>> toTerms(
-        std::vector<T>& coeffs,
+    template<typename CoefTypeExtern>
+    static std::vector<Term<T>> toTerms(
+        std::vector<CoefTypeExtern>& coeffs,
         std::vector<int>& lits)
     {
         assert(coeffs.size() == lits.size());
@@ -208,7 +208,7 @@ struct Term {
         std::vector<Term<T>> result;
         result.reserve(size);
         for (size_t i = 0; i < size; i++) {
-            result.emplace_back(coeffs[i], Lit(lits[i]));
+            result.emplace_back(static_cast<T>(coeffs[i]), Lit(lits[i]));
         }
         return result;
     }
@@ -866,10 +866,11 @@ public:
         : handler(terms_, degree_)
     {}
 
+    template<typename CoeffTypeExtern>
     Inequality(
-            std::vector<T>& coeffs,
+            std::vector<CoeffTypeExtern>& coeffs,
             std::vector<int>& lits,
-            T degree_)
+            CoeffTypeExtern degree_)
         : Inequality(Term<T>::toTerms(coeffs, lits), degree_)
     {}
 
@@ -928,7 +929,9 @@ public:
         return this;
     }
 
-    Inequality* divide(T divisor){
+    template<typename CoefTypeExtern>
+    Inequality* divide(CoefTypeExtern _divisor){
+        T divisor = static_cast<T>(_divisor);
         assert(!frozen);
         contract();
         ineq->degree = divideAndRoundUp(ineq->degree, divisor);
@@ -938,7 +941,9 @@ public:
         return this;
     }
 
-    Inequality* multiply(T factor){
+    template<typename CoefTypeExtern>
+    Inequality* multiply(CoefTypeExtern _factor){
+        T factor = static_cast<T>(_factor);
         assert(!frozen);
         contract();
         ineq->degree *= factor;
@@ -1085,6 +1090,7 @@ std::vector<FatInequalityPtr<T>> Inequality<T>::pool;
 // using CoefType = int;
 // using CoefType = long long;
 using CoefType = __int128;
+using CoefTypeExtern = long long;
 
 std::ostream& operator<<(std::ostream& os, __int128 x) {
   if (x < 0) {
@@ -1150,10 +1156,10 @@ std::ostream& operator<<(std::ostream& os, __int128 x) {
 
 
         py::class_<Inequality<CoefType>>(m, "CppInequality")
-            .def(py::init<std::vector<CoefType>&, std::vector<int>&, CoefType>())
+            .def(py::init<std::vector<CoefTypeExtern>&, std::vector<int>&, CoefTypeExtern>())
             .def("saturate", &Inequality<CoefType>::saturate)
-            .def("divide", &Inequality<CoefType>::divide)
-            .def("multiply", &Inequality<CoefType>::multiply)
+            .def("divide", &Inequality<CoefType>::divide<CoefTypeExtern>)
+            .def("multiply", &Inequality<CoefType>::multiply<CoefTypeExtern>)
             .def("add", &Inequality<CoefType>::add)
             .def("copy", &Inequality<CoefType>::copy)
             .def("implies", &Inequality<CoefType>::implies)

@@ -1092,21 +1092,10 @@ std::vector<FatInequalityPtr<T>> Inequality<T>::pool;
 using CoefType = __int128;
 using CoefTypeExtern = long long;
 
-std::ostream& operator<<(std::ostream& os, __int128 x) {
-  if (x < 0) {
-    os << "-";
-    x = -x;
-  }
-  uint64_t tenPow18 = 1000000000000000000;
-  uint64_t x1 = x % tenPow18;
-  x /= tenPow18;
-  if (x > 0) {
-    uint64_t x2 = x % tenPow18;
-    x /= tenPow18;
-    if (x > 0) os << (short)x;
-    os << x2;
-  }
-  return os << x1;
+std::ostream& operator<<(std::ostream& os, __int128 x){
+	if(x<0) return os << "-" << -x;
+	if(x<10) return  os << (char)(x+'0');
+	return os << x/10 << (char)(x%10+'0');
 }
 
 // int main(int argc, char const *argv[])

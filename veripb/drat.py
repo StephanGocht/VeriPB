@@ -97,4 +97,6 @@ class DRATParser(RuleParserBase):
     commentChar = "c"
 
     def parse(self, file):
-        return [LoadFormula(len(self.context.formula))] + super().parse([DRATDeletion], file, defaultRule = DRAT)
+        yield LoadFormula(len(self.context.formula))
+        for x in super().parse([DRATDeletion], file, defaultRule = DRAT):
+            yield x

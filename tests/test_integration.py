@@ -11,7 +11,7 @@ class TestIntegration(unittest.TestCase):
         print("veripb %s %s"%(formulaPath, proofPath))
         with formulaPath.open() as formula:
             with proofPath.open() as proof:
-                run(formula, proof, arbitraryPrecision = False)
+                run(formula, proof)
 
     def correct_proof(self, formulaPath):
         self.run_single(formulaPath)

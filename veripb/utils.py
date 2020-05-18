@@ -27,36 +27,103 @@ if profile:
     from pyprof2calltree import convert as convert2kcachegrind
     from guppy import hpy
 
-def run(formulaFile, rulesFile, settings = None, drat=False, arbitraryPrecision = False):
+class Settings():
+    def __init__(self, preset = None):
+        self.setPreset(type(self).defaults(), unchecked = True)
+
+        if preset is not None:
+            self.setPreset(preset)
+
+    def setPreset(self, preset, unchecked = False):
+        for key, value in preset.items():
+            if unchecked or hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                raise ValueError("Got unknown setting %s."%key)
+
+    @staticmethod
+    def defaults():
+        return {
+            "drat": False,
+            "cnf": False,
+            "arbitraryPrecision": False
+        }
+
+    def computeNumUse(self):
+        return self.lazy or not self.disableDeletion
+
+    @classmethod
+    def addArgParser(cls, parser, name = "misc"):
+        defaults = cls.defaults()
+        group = parser.add_argument_group(name)
+
+        group.add_argument(
+            '--drat',
+            help="Process CNF with DRAT proof.",
+            action="store_true", dest=name+".drat", default=False
+        )
+
+        group.add_argument(
+            '--cnf',
+            help="Process CNF with PB proof.",
+            action="store_true", dest=name+".cnf", default=False
+        )
+
+        group.add_argument("--arbitraryPrecision",
+            action="store_true",
+            default=defaults["arbitraryPrecision"],
+            help="Turn on arbitrary precision. Experimental, does not work with unit propagation or solution checking.",
+            dest=name+".arbitraryPrecision")
+        group.add_argument("--no-arbitraryPrecision",
+            action="store_false",
+            help="Turn off arbitrary precision.",
+            dest=name+".arbitraryPrecision")
+
+    @classmethod
+    def extract(cls, result, name = "misc"):
+        preset = dict()
+        defaults = cls.defaults()
+        for key in defaults:
+            try:
+                preset[key] = getattr(result, name + "." + key)
+            except AttributeError:
+                pass
+        return cls(preset)
+
+    def __repr__(self):
+        return type(self).__name__ + repr(vars(self))
+
+def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings()):
     if profile:
         pr = cProfile.Profile()
         pr.enable()
 
-    if settings == None:
-        settings = Verifier.Settings()
+    if verifierSettings == None:
+        verifierSettings = Verifier.Settings()
 
     TimedFunction.startTotalTimer()
 
     rules = list(registered_rules)
 
     context = Context()
-    if arbitraryPrecision:
+    if miscSettings.arbitraryPrecision:
         context.ineqFactory = IneqFactory()
     else:
         context.ineqFactory = CppIneqFactory()
 
     try:
-        if not drat:
-            formula = OPBParser(context.ineqFactory).parse(formulaFile)
-        else:
+        if miscSettings.drat or miscSettings.cnf:
             formula = CNFParser(context.ineqFactory).parse(formulaFile)
+        else:
+            formula = OPBParser(context.ineqFactory).parse(formulaFile)
+
         context.formula = formula["constraints"]
         context.objective = formula["objective"]
     except ParseError as e:
         e.fileName = formulaFile.name
         raise e
 
-    if arbitraryPrecision:
+    if miscSettings.arbitraryPrecision:
         context.propEngine = PropEngine()
     else:
         context.propEngine = CppPropEngine(formula["numVariables"])
@@ -64,17 +131,17 @@ def run(formulaFile, rulesFile, settings = None, drat=False, arbitraryPrecision 
 
     verify = Verifier(
         context = context,
-        settings = settings)
+        settings = verifierSettings)
 
     try:
-        if not drat:
+        if not miscSettings.drat:
             ruleParser = RuleParser(context)
-            rules = ruleParser.parse(rules, rulesFile, dumpLine = settings.trace)
+            rules = ruleParser.parse(rules, rulesFile, dumpLine = verifierSettings.trace)
         else:
             ruleParser = DRATParser(context)
             rules = ruleParser.parse(rulesFile)
 
-        if settings.progressBar:
+        if verifierSettings.progressBar:
             context.ruleCount = ruleParser.numRules(rulesFile)
         return verify(rules)
     except ParseError as e:
@@ -145,27 +212,15 @@ def run_cmd_main():
         help="Be verbose",
         action="store_const", dest="loglevel", const=logging.INFO,
     )
-    p.add_argument(
-        '--drat',
-        help="Process CNF with DRAT proof.",
-        action="store_true", dest="drat", default=False
-    )
-
-
-    p.add_argument("--arbitraryPrecision",
-        action="store_true",
-        default=False,
-        help="Turn on arbitrary precision. Experimental, does not work with unit propagation or solution checking.")
-    p.add_argument("--no-arbitraryPrecision",
-        action="store_false",
-        help="Turn off arbitrary precision.")
 
     Verifier.Settings.addArgParser(p)
+    Settings.addArgParser(p)
 
     args = p.parse_args()
 
     verifyerSettings = Verifier.Settings.extract(args)
+    miscSettings = Settings.extract(args)
 
     logging.basicConfig(level=args.loglevel)
 
-    return runUI(args.formula, args.derivation, verifyerSettings, drat = args.drat, arbitraryPrecision = args.arbitraryPrecision)
+    return runUI(args.formula, args.derivation, verifyerSettings, miscSettings)

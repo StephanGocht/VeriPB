@@ -863,7 +863,7 @@ public:
                 a.assign(lit);
             }
             if (!redundant.isSatisfied(a)) {
-                std::cout << "given assignment does not satisfy constraint" << std::endl;
+                // std::cout << "given assignment does not satisfy constraint" << std::endl;
                 return false;
             }
         }
@@ -879,23 +879,24 @@ public:
         }
 
         if (current.conflict) {
-            std::cout << "rup check succeded" << std::endl;
+            // std::cout << "rup check succeded" << std::endl;
             return true;
         } else if (w.size() == 0) {
-            std::cout << "rup check failed" << std::endl;
+            // std::cout << "rup check failed" << std::endl;
             return false;
         }
 
         for (Lit lit: w) {
             for (const FixedSizeInequality<T>* ineq: occurs[~lit]) {
-                std::cout << "checking constraint" << std::endl;
-                if (redundant.implies(*ineq)) {
-                    std::cout << "  ...syntactic implication check succeded" << std::endl;
+                FixedSizeInequalityHandler<T> implied(*ineq);
+                implied->restrictBy(a);
+
+                // std::cout << "checking constraint" << std::endl;
+                if (negated->implies(*implied)) {
+                    // std::cout << "  ...syntactic implication check succeded" << std::endl;
                     continue;
                 } else {
                     AutoReset autoReset(*this);
-                    FixedSizeInequalityHandler<T> implied(*ineq);
-                    implied->restrictBy(a);
                     implied->negate();
 
                     while (!current.conflict
@@ -906,17 +907,17 @@ public:
                     }
 
                     if (!current.conflict) {
-                        std::cout << "  ...rup check failed" << std::endl;
+                        // std::cout << "  ...rup check failed" << std::endl;
                         return false;
                     } else {
-                        std::cout << "  ...rup check succeded" << std::endl;
+                        // std::cout << "  ...rup check succeded" << std::endl;
                         continue;
                     }
                 }
             }
         }
 
-        std::cout << "checking all implications succeded" << std::endl;
+        // std::cout << "checking all implications succeded" << std::endl;
         return true;
     }
 

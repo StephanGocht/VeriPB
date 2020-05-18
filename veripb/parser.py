@@ -298,6 +298,8 @@ class CNFParser():
         lines = iter(enumerate(formulaFile, start = 1))
 
         numVar, numC = None, None
+
+        lineNum = 0
         for lineNum, line in lines:
             if not self.isEmpty(line):
                 try:
@@ -308,7 +310,7 @@ class CNFParser():
                 break
 
         if numVar is None:
-            raise ParseError("Expected header." ,line = len(lines) + 1)
+            raise ParseError("Expected header." ,line = lineNum + 1)
 
         constraints = list()
         for lineNum, line in lines:

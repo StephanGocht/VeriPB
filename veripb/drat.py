@@ -1,5 +1,6 @@
 from veripb.rules import Rule, EmptyRule, ReverseUnitPropagation, LoadFormula
 from veripb.parser import RuleParserBase, WordParser
+from veripb.exceptions import ParseError, InvalidProof
 
 class DRATClauseFinder():
     @classmethod
@@ -17,7 +18,7 @@ class DRATClauseFinder():
     def add(self, lits):
         clause = tuple(sorted(lits))
         if clause in self.clauses:
-            raise ValueError("Doublicate clauses are not supported.")
+            raise ParseError("Dublicate clauses are not supported.", column = 0)
         self.clauses[clause] = self.maxId
         self.maxId += 1
 
@@ -32,6 +33,43 @@ class DRATClauseFinder():
             del self.clauses[clause]
         return Id
 
+class FindCheckFailed(InvalidProof):
+    def __init__(self, expected):
+        self.expected = expected
+
+def parseIntList(words):
+    lits = list()
+    try:
+        nxt = int(next(words))
+        while (nxt != 0):
+            lits.append(nxt)
+            nxt = int(next(words))
+    except StopIteration:
+        raise ValueError("Expected 0 at end of constraint.")
+
+    return lits
+
+class DRATFind(EmptyRule):
+    Id = "f"
+
+    @classmethod
+    def parse(cls, line, context):
+        with WordParser(line) as words:
+            lits = parseIntList(words)
+        return cls(lits)
+
+    def __init__(self, lits):
+        self.lits = lits
+
+    def compute(self, antecedents, context = None):
+        clauseFinder = DRATClauseFinder.get(context)
+        ClauseId = clauseFinder.find(self.lits)
+        if ClauseId is None:
+            raise FindCheckFailed(self.lits)
+
+        return []
+
+
 class DRATDeletion(EmptyRule):
     Id = "d"
 
@@ -44,28 +82,21 @@ class DRATDeletion(EmptyRule):
 
     @classmethod
     def parse(cls, line, context):
-        lits = list()
         with WordParser(line) as words:
-            try:
-                nxt = int(next(words))
-                while (nxt != 0):
-                    lits.append(nxt)
-                    nxt = int(next(words))
-            except StopIteration:
-                raise ValueError("Expected 0 at end of constraint.")
+            lits = parseIntList(words)
 
         clauseFinder = DRATClauseFinder.get(context)
-        Id = clauseFinder.find(lits)
+        ClauseId = clauseFinder.find(lits)
 
-        return cls(Id)
+        return cls(ClauseId)
 
-    def __init__(self, Id):
-        self.Id = Id
+    def __init__(self, ClauseId):
+        self.ClauseId = ClauseId
 
     def deleteConstraints(self):
-        if self.Id is not None:
+        if self.ClauseId is not None:
             # print("delete", self.Id)
-            return [self.Id]
+            return [self.ClauseId]
         else:
             return []
 
@@ -73,13 +104,8 @@ class DRATDeletion(EmptyRule):
 class DRAT(ReverseUnitPropagation):
     @classmethod
     def parse(cls, line, context):
-        lits = list()
         with WordParser(line) as words:
-            for w in words:
-                if w == "0":
-                    break
-                else:
-                    lits.append(int(w))
+            lits = parseIntList(words)
 
         clauseFinder = DRATClauseFinder.get(context)
         clauseFinder.add(lits)
@@ -98,5 +124,5 @@ class DRATParser(RuleParserBase):
 
     def parse(self, file):
         yield LoadFormula(len(self.context.formula))
-        for x in super().parse([DRATDeletion], file, defaultRule = DRAT):
+        for x in super().parse([DRATDeletion, DRATFind], file, defaultRule = DRAT):
             yield x

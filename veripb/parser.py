@@ -64,6 +64,8 @@ class RuleParserBase():
             except ParseError as e:
                 e.line = lineNum
                 raise e
+        else:
+            lineNum = 0
 
         for line in lines:
             idSize = defaultIdSize
@@ -92,7 +94,8 @@ class RuleParserBase():
 
                 except veripb.ParseError as e:
                     e.line = lineNum
-                    e.column += idSize
+                    if e.column is not None:
+                        e.column += idSize
                     raise e
 
 class RuleParser(RuleParserBase):

@@ -215,7 +215,9 @@ class ReverseUnitPropagation(Rule):
         if success:
             return [self.constraint]
         else:
-            raise ReverseUnitPropagationFailed("Failed to show '%s' by reverse unit propagation."%(str(self.constraint)))
+            raise ReverseUnitPropagationFailed(
+                "Failed to show '%s' by reverse unit propagation."%(
+                    context.ineqFactory.toString(self.constraint)))
 
 class CompareToConstraint(Rule):
     @classmethod

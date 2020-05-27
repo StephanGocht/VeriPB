@@ -135,6 +135,19 @@ public:
     };
 };
 
+inline std::ostream& operator<<(std::ostream& os, const Var& v) {
+    os << "x" << v.value;
+    return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const Lit& v) {
+    if (v.isNegated()) {
+        os << "~";
+    }
+    os << v.var();
+    return os;
+}
+
 /*
  * some syntactic suggar to prevent us from accidentally using Var to
  * go in to a Lit inexed vector and vice versa.
@@ -220,6 +233,12 @@ struct Term {
         return result;
     }
 };
+
+template<typename T>
+inline std::ostream& operator<<(std::ostream& os, const Term<T>& term) {
+    os << term.coeff << " " << term.lit;
+    return os;
+}
 
 template<typename T>
 bool orderByVar(T &a, T &b) {
@@ -378,6 +397,7 @@ public:
 
     template<bool autoInit>
     void updateWatch(PropEngine<T>& prop, Lit falsifiedLit = Lit::Undef()) {
+        // std::cout << "updateWatch: " << *this << std::endl;
         bool init = autoInit && (watchSize == 0);
         if (init) {
             computeWatchSize();
@@ -543,6 +563,15 @@ public:
         return terms + size();
     }
 };
+
+template<typename T>
+inline std::ostream& operator<<(std::ostream& os, const FixedSizeInequality<T>& v) {
+    for (const Term<T>& term: v) {
+        os << term << " + ";
+    };
+    os << " >= " << v.degree;
+    return os;
+}
 
 struct PropState {
     size_t qhead = 0;
@@ -725,6 +754,8 @@ public:
     void propagate() {
         while (current.qhead < trail.size() and !current.conflict) {
             Lit falsifiedLit = ~trail[current.qhead];
+            // std::cout << "propagating: " << trail[current.qhead] << std::endl;
+
             WatchList& ws = watchlist[falsifiedLit];
             WatchList wsTmp;
             wsTmp.reserve(ws.size());

@@ -2,9 +2,12 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 #include <cctype>
+
+typedef std::string_view string_view;
 
 // todo: fix this!!!
 #include "constraints.cpp"
@@ -58,7 +61,7 @@ class WordIter {
 public:
     FileInfo fileInfo;
     std::string line;
-    std::string word;
+    string_view word;
     size_t start = 0;
     size_t endPos = 0;
     size_t nextStart = 0;
@@ -66,15 +69,16 @@ public:
 
     void next() {
         start = nextStart;
-        if (start != std::string::npos) {
+        if (start != string_view::npos) {
             endPos = line.find_first_of(" ", start);
-            if (endPos == std::string::npos) {
+            if (endPos == string_view::npos) {
                 nextStart = endPos;
+                endPos = line.size();
             } else {
                 nextStart = line.find_first_not_of(" ", endPos);
             }
 
-            word = line.substr(start, endPos - start);
+            word = string_view(&line.data()[start], endPos - start);
         } else {
             word = "";
         }
@@ -149,22 +153,26 @@ public:
         }
     }
 
-    const std::string& get(){
+    const string_view& get(){
         return word;
     }
-    const std::string& operator*() const {return word;};
-    const std::string* operator->() const {return &word;};
+    const string_view& operator*() const {return word;};
+    const string_view* operator->() const {return &word;};
 
     WordIter& operator++() {
         next();
         return *this;
     }
 
+    bool hasNext() const {
+        return start != string_view::npos;
+    }
+
     friend bool operator==(const WordIter& a, const WordIter& b) {
         if (a.isEnd) {
-            return (b.start == std::string::npos);
+            return (b.start == string_view::npos);
         } else if (b.isEnd) {
-            return (a.start == std::string::npos);
+            return (a.start == string_view::npos);
         } else {
             return (a.line == b.line) and (a.start == b.start) and (a.endPos == b.endPos);
         }
@@ -202,36 +210,39 @@ T parseCoeff(const WordIter& it){
 template<typename T>
 T parseCoeff(const WordIter& it, size_t start, size_t length);
 
-int parseInt(const WordIter& it, std::string msg, size_t start, size_t length) {
-    assert(it->size() >= start + length);
+int parseInt(const WordIter& word, std::string msg, size_t start, size_t length) {
+    assert(word->size() >= start + length);
     assert(length > 0);
-    if (it == WordIter::end) {
-        throw ParseError(it, "Expected coefficient.");
+
+    if (!word.hasNext()) {
+        throw ParseError(word, "Expected Number.");
     }
+
+    const char* it = word->data() + start;
+    const char* end = word->data() + start + length;
+
     bool negated = false;
-    if ((*it)[start] == '+') {
-        start += 1;
-        length -= 1;
-        if (length == 0) {
-            throw ParseError(it, "Expected coefficient, got '+'");
-        }
-    } else if ((*it)[start] == '-') {
+    if (*it == '+') {
+        it += 1;
+    } else if (*it == '-') {
         negated = true;
-        start += 1;
-        length -= 1;
+        it += 1;
     }
-    if (length > 9) {
-        throw ParseError(it, "Coefficient too large.");
+
+    if (it == end) {
+        throw ParseError(word, "Expected Number, only got sign.");
+    } else if (end - it > 9) {
+        throw ParseError(word, "Number too large.");
     }
 
     int res = 0;
-    const std::string& s = *it;
-    for (size_t i = start; i < start + length; i++) {
-        if (s[i] < '0'|| s[i] > '9') {
-            throw ParseError(it, "Expected number.");
-        }
+    for (; it != end; ++it) {
+        char chr = *it - '0';
         res *= 10;
-        res += s[i] - '0';
+        res += chr;
+        if (chr > 9) {
+            throw ParseError(word, "Expected number.");
+        }
     }
     if (negated) {
         res = -res;
@@ -265,6 +276,10 @@ public:
         return num2name[num - 1];
     }
 
+    Var getVar(const WordIter& it, size_t start, size_t size) {
+        return Var(parseInt(it, "", 1, size - 1));
+    }
+
     Var getVar(const std::string& name) {
         return Var(std::stoi(name.substr(1, name.size() - 1)));
     }
@@ -278,7 +293,7 @@ public:
     //     return Var(result.first->second + 1);
     // }
 
-    bool isLit(const std::string& name) {
+    bool isLit(const string_view& name) {
         if (name.size() < 1) {
             return false;
         }
@@ -290,7 +305,7 @@ public:
         }
     }
 
-    bool isVar(const std::string& name, size_t pos = 0) {
+    bool isVar(const string_view& name, size_t pos = 0) {
         if (name.size() >= 2
                 && std::isalpha(name[pos])) {
             return true;
@@ -306,14 +321,12 @@ Lit parseLit(const WordIter& it, VariableNameManager& mngr) {
     }
 
     bool isNegated = ((*it)[0] == '~');
-    std::string varName;
+    size_t start = 0;
     if (isNegated) {
-        varName = it->substr(1, it->size() - 1);
-    } else {
-        varName = *it;
+        start += 1;
     }
 
-    return Lit(mngr.getVar(varName), isNegated);
+    return Lit(mngr.getVar(it, start, it->size() - start), isNegated);
 }
 
 
@@ -372,7 +385,7 @@ public:
     std::array<Inequality<T>*, 2> parseConstraint(WordIter& it, bool geqOnly = false) {
         terms.clear();
         while (it != WordIter::end) {
-            const std::string& word = *it;
+            const string_view& word = *it;
             if (word == ">=" || word == "=") {
                 break;
             }
@@ -395,7 +408,7 @@ public:
             throw ParseError(it, "Expected degree.");
         }
         assert(it->size() != 0);
-        const std::string& rhs = *it;
+        const string_view& rhs = *it;
         T degree;
         if (rhs[rhs.size() - 1] == ';') {
             degree = parseCoeff<T>(it, 0, rhs.size() - 1);

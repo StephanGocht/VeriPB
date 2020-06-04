@@ -331,10 +331,38 @@ Lit parseLit(const WordIter& it, VariableNameManager& mngr) {
 
 
 
+class VarDouplicateDetection {
+    std::vector<bool> contained;
+    std::vector<Var> used;
+
+public:
+    bool add(Var var) {
+        used.push_back(var);
+        size_t idx = static_cast<size_t>(var);
+        if (idx >= contained.size()) {
+            contained.resize(idx + 1);
+        }
+        bool result = contained[idx];
+        contained[idx] = true;
+        return result;
+    }
+
+    void clear() {
+        for (Var var: used) {
+            contained[var] = false;
+        }
+        used.clear();
+    }
+};
+
+
+
 template<typename T>
 class OPBParser {
     VariableNameManager& variableNameManager;
     std::vector<Term<T>> terms;
+    VarDouplicateDetection duplicateDetection;
+
     int numVar = 0;
     int numC = 0;
 
@@ -394,7 +422,10 @@ public:
             T coeff = parseCoeff<T>(it, 0, it->size());
             ++it;
             Lit lit = parseLit(it, variableNameManager);
-            ++it;
+            if (duplicateDetection.add(lit.var())) {
+                std::cout << lit.var() << std::endl;
+                throw ParseError(it, "Douplicated variables are not supported in constraints.");
+            }
 
             if (coeff < 0) {
                 coeff = -coeff;
@@ -406,7 +437,10 @@ public:
             }
 
             terms.emplace_back(coeff, lit);
+            ++it;
         }
+
+        duplicateDetection.clear();
 
         it.expectOneOf({">=", "="});
         bool isEq = (*it == "=");

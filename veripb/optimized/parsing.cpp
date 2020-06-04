@@ -6,11 +6,18 @@
 #include <unordered_map>
 #include <vector>
 #include <cctype>
+#include "constraints.h"
 
-typedef std::string_view string_view;
+#ifdef PY_BINDINGS
+    #include <pybind11/pybind11.h>
+    #include <pybind11/stl.h>
+    #include <pybind11/iostream.h>
+    #include <pybind11/functional.h>
+    namespace py = pybind11;
+#endif
 
-// todo: fix this!!!
-#include "constraints.cpp"
+
+using std::string_view;
 
 struct FileInfo {
     FileInfo(std::string _fileName)
@@ -65,7 +72,7 @@ public:
     size_t start = 0;
     size_t endPos = 0;
     size_t nextStart = 0;
-    bool isEnd = false;
+    bool isEndIt = false;
 
     void next() {
         start = nextStart;
@@ -85,7 +92,7 @@ public:
     }
 
 private:
-    WordIter():fileInfo("WordIter::EndItterator"){isEnd = true;}
+    WordIter():fileInfo("WordIter::EndItterator"){isEndIt = true;}
 
 public:
     static WordIter end;
@@ -164,14 +171,14 @@ public:
         return *this;
     }
 
-    bool hasNext() const {
+    bool isEnd() const {
         return start != string_view::npos;
     }
 
     friend bool operator==(const WordIter& a, const WordIter& b) {
-        if (a.isEnd) {
+        if (a.isEndIt) {
             return (b.start == string_view::npos);
-        } else if (b.isEnd) {
+        } else if (b.isEndIt) {
             return (a.start == string_view::npos);
         } else {
             return (a.line == b.line) and (a.start == b.start) and (a.endPos == b.endPos);
@@ -214,7 +221,7 @@ int parseInt(const WordIter& word, std::string msg, size_t start, size_t length)
     assert(word->size() >= start + length);
     assert(length > 0);
 
-    if (!word.hasNext()) {
+    if (!word.isEnd()) {
         throw ParseError(word, "Expected Number.");
     }
 
@@ -271,27 +278,45 @@ class VariableNameManager {
     std::unordered_map<std::string, int> name2num;
     std::vector<std::string> num2name;
 
+    bool allowArbitraryNames = false;
+
 public:
+    VariableNameManager(bool _allowArbitraryNames)
+        : allowArbitraryNames(_allowArbitraryNames)
+    {}
+
+    size_t pyGetVar(std::string name) {
+        return getVar(name);
+    }
+
+    std::string pyGetName(size_t num) {
+        return getName(Var(num));
+    }
+
     std::string getName(Var num) {
         return num2name[num - 1];
     }
 
     Var getVar(const WordIter& it, size_t start, size_t size) {
-        return Var(parseInt(it, "", 1, size - 1));
+        if (!allowArbitraryNames) {
+            return Var(parseInt(it, "", start + 1, size - 1));
+        } else {
+            return getVar(std::string(it->data() + start, size));
+        }
     }
 
     Var getVar(const std::string& name) {
-        return Var(std::stoi(name.substr(1, name.size() - 1)));
+        if (allowArbitraryNames) {
+            return Var(std::stoi(name.substr(1, name.size() - 1)));
+        } else {
+            auto result = name2num.insert(std::make_pair(name, num2name.size()));
+            bool newName = result.second;
+            if (newName) {
+                num2name.push_back(name);
+            }
+            return Var(result.first->second + 1);
+        }
     }
-
-    // Var getVar(const std::string& name) {
-    //     auto result = name2num.insert(std::make_pair(name, num2name.size()));
-    //     bool newName = result.second;
-    //     if (newName) {
-    //         num2name.push_back(name);
-    //     }
-    //     return Var(result.first->second + 1);
-    // }
 
     bool isLit(const string_view& name) {
         if (name.size() < 1) {
@@ -372,21 +397,21 @@ public:
     {}
 
 
-    std::vector<Inequality<T>*> parse(std::ifstream& f, const std::string& fileName) {
+    std::vector<std::unique_ptr<Inequality<T>>> parse(std::ifstream& f, const std::string& fileName) {
         WordIter it(fileName);
         if (!WordIter::getline(f, it)) {
             throw ParseError(it, "Expected OPB header.");
         }
         parseHeader(it);
 
-        std::vector<Inequality<T>*> result;
+        std::vector<std::unique_ptr<Inequality<T>>> result;
 
         while (WordIter::getline(f, it)) {
             if (it != WordIter::end && ((*it)[0] != '*')) {
                 std::array<Inequality<T>*, 2> res = parseConstraint(it);
-                result.push_back(res[0]);
+                result.emplace_back(res[0]);
                 if (res[1] != nullptr) {
-                    result.push_back(res[1]);
+                    result.emplace_back(res[1]);
                 }
             }
         }
@@ -480,6 +505,12 @@ public:
     }
 };
 
+ std::vector<std::unique_ptr<Inequality<CoefType>>> parseOpb(std::string fileName, VariableNameManager& varMgr) {
+    std::ifstream f(fileName);
+    OPBParser<CoefType> parser(varMgr);
+    return parser.parse(f, fileName);
+}
+
 
 int main(int argc, char const *argv[])
 {
@@ -487,30 +518,25 @@ int main(int argc, char const *argv[])
     std::ifstream f(fileName);
 
 
-    VariableNameManager manager;
+    VariableNameManager manager(false);
     OPBParser<int> parser(manager);
     try {
         std::cout << parser.parse(f, fileName).size() << std::endl;
     } catch (const ParseError& e) {
         std::cout << e.what() << std::endl;
     }
-    // try {
-    //     int i = 0;
-    //     WordIter it(argv[1]);
-    //     while (WordIter::getline(f, it)) {
-    //         while (it != WordIter::endIt) {
-    //             // std::cout << *it << std::endl;
-    //             i+= it->size();
-    //             // word = *it;
-    //             // if (i > 10) {
-    //             //     throw ParseError(it, "test parse error");
-    //             // }
-    //             ++it;
-    //         }
-    //     }
-    //     std::cout << i << std::endl;
-    // } catch (const ParseError& e) {
-    //     std::cout << e.what() << std::endl;
-    // }
     return 0;
 }
+
+#ifdef PY_BINDINGS
+void init_parsing(py::module &m){
+    m.doc() = "Efficient implementation for parsing opb and pbp files.";
+    m.def("parseOpb", &parseOpb, "Parse opb file");
+
+
+    py::class_<VariableNameManager>(m, "VariableNameManager")
+        .def(py::init<bool>())
+        .def("getVar", &VariableNameManager::pyGetVar)
+        .def("getName", &VariableNameManager::pyGetName);
+}
+#endif

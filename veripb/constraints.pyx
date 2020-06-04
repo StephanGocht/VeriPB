@@ -1,4 +1,4 @@
-import cppimport
+from veripb.optimized.constraints import CppInequality
 
 def copysign(a, b):
     if b >= 0:
@@ -305,10 +305,6 @@ class PyInequality():
 
     def copy(self):
         return LazyInequality(self)
-
-optimized = cppimport.imp("veripb.optimized.constraints")
-CppInequality = optimized.CppInequality
-
 
 class IneqFactory():
     def __init__(self):

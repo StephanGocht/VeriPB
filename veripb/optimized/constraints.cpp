@@ -5,7 +5,6 @@ setup_pybind11(cfg)
 %>
 */
 
-#undef NDEBUG
 
 #ifdef PY_BINDINGS
     #include <pybind11/pybind11.h>
@@ -859,7 +858,7 @@ public:
             assert(other.loaded == false);
     }
 
-    Inequality(std::vector<Term<T>>&& terms_, T degree_)
+    Inequality(std::vector<Term<T>>& terms_, T degree_)
         : handler(terms_, degree_)
     {}
 

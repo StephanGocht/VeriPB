@@ -384,6 +384,8 @@ public:
 
     std::array<Inequality<T>*, 2> parseConstraint(WordIter& it, bool geqOnly = false) {
         terms.clear();
+
+        T degreeOffset = 0;
         while (it != WordIter::end) {
             const string_view& word = *it;
             if (word == ">=" || word == "=") {
@@ -393,6 +395,15 @@ public:
             ++it;
             Lit lit = parseLit(it, variableNameManager);
             ++it;
+
+            if (coeff < 0) {
+                coeff = -coeff;
+                degreeOffset += coeff;
+                if (degreeOffset < 0) {
+                    throw ParseError(it, "Overflow due to normalization.");
+                }
+                lit = ~lit;
+            }
 
             terms.emplace_back(coeff, lit);
         }
@@ -419,7 +430,19 @@ public:
             ++it;
         }
 
-        return {nullptr, nullptr};
+        T normalizedDegree = degree + degreeOffset;
+        if (degree > normalizedDegree) {
+            throw ParseError(it, "Overflow due to normalization.");
+        }
+
+        Inequality<T>* geq = new Inequality<T>(terms, degree);
+        Inequality<T>* leq = nullptr;
+        if (isEq) {
+            leq = new Inequality<T>(*geq);
+            leq = leq->negated();
+        }
+
+        return {geq, leq};
     }
 };
 

@@ -150,7 +150,9 @@ class Verifier():
 
     def antecedents(self, ids, ruleNum):
         if ids == "all":
-            return (c for c in self.db if c is not None)
+            for c in self.db:
+                if c is not None:
+                    yield c
         else:
             for i in ids:
                 if i >= len(self.db):
@@ -207,11 +209,14 @@ class Verifier():
                     "ineq": self.context.ineqFactory.toString(constraint)
                 })
             if self.settings.proofGraph is not None and ruleNum > 0:
+                ids = rule.antecedentIDs()
+                if ids == "all":
+                    ids = (i for (i,c) in enumerate(self.db) if c is not None and i > 0)
                 f = self.settings.proofGraph
                 print("%(ineq)s ; %(line)d = %(antecedents)s"%{
                         "line": lineNum,
                         "ineq": self.context.ineqFactory.toString(constraint),
-                        "antecedents": " ".join(map(str,rule.antecedentIDs()))
+                        "antecedents": " ".join(map(str,ids))
                     }, file=f)
 
         self.db.extend(constraints)

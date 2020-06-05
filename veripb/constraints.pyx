@@ -351,10 +351,20 @@ class IneqFactory():
             if not self.isVarName(name):
                 raise ValueError("Expected variablename, got '%s'"%(name))
 
-            self.names.append(name)
-            num = len(self.names)
-            self.num[name] = num
-            return num
+            freeNames = True
+
+            if freeNames:
+                self.names.append(name)
+                num = len(self.names)
+                self.num[name] = num
+                return num
+
+            else:
+                value = int(name[1:])
+                for i in range(len(self.names), value):
+                    self.names.append("x%i"%(i + 1))
+                return value
+
 
     def num2Name(self, num):
         return self.names[num - 1]

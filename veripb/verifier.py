@@ -7,6 +7,7 @@ from veripb.timed_function import TimedFunction
 import sys
 import logging
 import time
+import argparse
 
 class Context():
     pass
@@ -99,6 +100,7 @@ class Verifier():
                 "isInvariantsOn": False,
                 "trace": False,
                 "progressBar": False,
+                "proofGraph": None
             }
 
         def computeNumUse(self):
@@ -121,6 +123,11 @@ class Verifier():
                 action="store_true",
                 default=False,
                 help="Print a trace of derived constraints.")
+
+            group.add_argument("--proofGraph", dest = name+".proofGraph",
+                type=argparse.FileType('w'),
+                default=defaults["proofGraph"],
+                help="Write proof graph to given file.")
 
             group.add_argument("--progressBar", dest = name+".progressBar",
                 action="store_true",
@@ -199,6 +206,13 @@ class Verifier():
                     "line": lineNum,
                     "ineq": self.context.ineqFactory.toString(constraint)
                 })
+            if self.settings.proofGraph is not None and ruleNum > 0:
+                f = self.settings.proofGraph
+                print("%(ineq)s ; %(line)d = %(antecedents)s"%{
+                        "line": lineNum,
+                        "ineq": self.context.ineqFactory.toString(constraint),
+                        "antecedents": " ".join(map(str,rule.antecedentIDs()))
+                    }, file=f)
 
         self.db.extend(constraints)
 

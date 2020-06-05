@@ -16,6 +16,7 @@ from veripb.parser import RuleParser
 from veripb.exceptions import ParseError
 from veripb.optimized.constraints import PropEngine as CppPropEngine
 from veripb.optimized.parsing import parseOpb
+from veripb.parser import OPBParser
 from veripb.constraints import PropEngine,CppIneqFactory,IneqFactory
 from time import perf_counter
 
@@ -57,9 +58,14 @@ def run(formulaFile, rulesFile, settings = None, arbitraryPrecision = False):
         context.ineqFactory = CppIneqFactory()
 
     try:
-        formula = loadFormula(formulaFile.name, context.ineqFactory.varNameMgr)
-        context.formula = formula.getConstraints()
-        context.objective = objectiveToDict(formula)
+        if arbitraryPrecision:
+            formula = OPBParser(context.ineqFactory).parse(formulaFile)
+            context.formula = formula["constraints"]
+            context.objective = formula["objective"]
+        else:
+            formula = loadFormula(formulaFile.name, context.ineqFactory.varNameMgr)
+            context.formula = formula.getConstraints()
+            context.objective = objectiveToDict(formula)
     except ParseError as e:
         e.fileName = formulaFile.name
         raise e

@@ -310,7 +310,7 @@ class PyInequality():
 
 class IneqFactory():
     def __init__(self):
-        freeNames = False
+        freeNames = True
         self.varNameMgr = VariableNameManager(freeNames)
 
     def litAxiom(self, lit):

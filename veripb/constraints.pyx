@@ -1,4 +1,6 @@
 from veripb.optimized.constraints import CppInequality
+from veripb.optimized.parsing import VariableNameManager
+
 
 def copysign(a, b):
     if b >= 0:
@@ -308,8 +310,8 @@ class PyInequality():
 
 class IneqFactory():
     def __init__(self):
-        self.names = list()
-        self.num = dict()
+        freeNames = False
+        self.varNameMgr = VariableNameManager(freeNames)
 
     def litAxiom(self, lit):
         return PyInequality([Term(1, lit)], 0)
@@ -345,32 +347,14 @@ class IneqFactory():
             return False
 
     def name2Num(self, name):
-        try:
-            return self.num[name]
-        except KeyError:
-            if not self.isVarName(name):
-                raise ValueError("Expected variablename, got '%s'"%(name))
-
-            freeNames = True
-
-            if freeNames:
-                self.names.append(name)
-                num = len(self.names)
-                self.num[name] = num
-                return num
-
-            else:
-                value = int(name[1:])
-                for i in range(len(self.names), value):
-                    self.names.append("x%i"%(i + 1))
-                return value
-
+        assert(self.isVarName(name))
+        return self.varNameMgr.getVar(name)
 
     def num2Name(self, num):
-        return self.names[num - 1]
+        return self.varNameMgr.getName(num)
 
     def numVars(self):
-        return len(self.names)
+        return self.varNameMgr.maxVar()
 
     def toString(self, constraint):
         def f(num):

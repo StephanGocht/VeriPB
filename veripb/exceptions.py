@@ -15,5 +15,9 @@ class ParseError(Exception):
         s += " " + str(self.error)
         return s
 
+class DirectParseError(ParseError):
+    def __str__(self):
+        return str(self.error)
+
 class InvalidProof(Exception):
     pass

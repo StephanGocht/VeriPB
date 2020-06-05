@@ -116,6 +116,13 @@ public:
         return value;
     }
 
+    explicit operator int() const {
+        int result = var();
+        assert(result != 0);
+        if (isNegated()) {result = -result;}
+        return result;
+    }
+
     static Lit Undef() {
         return Lit(0);
     };

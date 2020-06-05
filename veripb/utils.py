@@ -10,12 +10,12 @@ import pyximport; pyximport.install(
 from veripb import InvalidProof
 from veripb import ParseError
 from veripb.verifier import Verifier, Context
-from veripb.parser import OPBParser
 from veripb.rules import registered_rules
-from veripb.rules import TimedFunction
+from veripb.timed_function import TimedFunction
 from veripb.parser import RuleParser
 from veripb.exceptions import ParseError
 from veripb.optimized.constraints import PropEngine as CppPropEngine
+from veripb.optimized.parsing import parseOpb
 from veripb.constraints import PropEngine,CppIneqFactory,IneqFactory
 from time import perf_counter
 
@@ -25,6 +25,18 @@ if profile:
     import cProfile
     from pyprof2calltree import convert as convert2kcachegrind
     from guppy import hpy
+
+@TimedFunction.time("LoadFormula")
+def loadFormula(file, varMgr):
+    return parseOpb(file, varMgr)
+
+def objectiveToDict(formula):
+    if (formula.hasObjective):
+        coeffs = formula.objectiveCoeffs
+        variables = formula.objectiveVars
+        return {var: coeff for (coeff,var) in zip(coeffs, variables)}
+    else:
+        return None
 
 def run(formulaFile, rulesFile, settings = None, arbitraryPrecision = False):
     if profile:
@@ -45,9 +57,9 @@ def run(formulaFile, rulesFile, settings = None, arbitraryPrecision = False):
         context.ineqFactory = CppIneqFactory()
 
     try:
-        formula = OPBParser(context.ineqFactory).parse(formulaFile)
-        context.formula = formula["constraints"]
-        context.objective = formula["objective"]
+        formula = loadFormula(formulaFile.name, context.ineqFactory.varNameMgr)
+        context.formula = formula.getConstraints()
+        context.objective = objectiveToDict(formula)
     except ParseError as e:
         e.fileName = formulaFile.name
         raise e
@@ -55,7 +67,7 @@ def run(formulaFile, rulesFile, settings = None, arbitraryPrecision = False):
     if arbitraryPrecision:
         context.propEngine = PropEngine()
     else:
-        context.propEngine = CppPropEngine(formula["numVariables"])
+        context.propEngine = CppPropEngine(formula.maxVar)
 
 
     verify = Verifier(

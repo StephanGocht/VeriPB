@@ -1,4 +1,4 @@
-import cppimport
+from veripb.optimized.constraints import CppInequality
 
 def copysign(a, b):
     if b >= 0:
@@ -306,11 +306,6 @@ class PyInequality():
     def copy(self):
         return LazyInequality(self)
 
-optimized = cppimport.imp("veripb.optimized.constraints")
-# from veripb.optimized import constraints as optimized
-CppInequality = optimized.CppInequality
-
-
 class IneqFactory():
     def __init__(self):
         self.names = list()
@@ -356,7 +351,7 @@ class IneqFactory():
             if not self.isVarName(name):
                 raise ValueError("Expected variablename, got '%s'"%(name))
 
-            freeNames = False
+            freeNames = True
 
             if freeNames:
                 self.names.append(name)

@@ -2,12 +2,22 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 #include <cctype>
+#include "constraints.h"
 
-// todo: fix this!!!
-#include "constraints.cpp"
+#ifdef PY_BINDINGS
+    #include <pybind11/pybind11.h>
+    #include <pybind11/stl.h>
+    #include <pybind11/iostream.h>
+    #include <pybind11/functional.h>
+    namespace py = pybind11;
+#endif
+
+
+using std::string_view;
 
 struct FileInfo {
     FileInfo(std::string _fileName)
@@ -58,30 +68,31 @@ class WordIter {
 public:
     FileInfo fileInfo;
     std::string line;
-    std::string word;
+    string_view word;
     size_t start = 0;
     size_t endPos = 0;
     size_t nextStart = 0;
-    bool isEnd = false;
+    bool isEndIt = false;
 
     void next() {
         start = nextStart;
-        if (start != std::string::npos) {
+        if (start != string_view::npos) {
             endPos = line.find_first_of(" ", start);
-            if (endPos == std::string::npos) {
+            if (endPos == string_view::npos) {
                 nextStart = endPos;
+                endPos = line.size();
             } else {
                 nextStart = line.find_first_not_of(" ", endPos);
             }
 
-            word = line.substr(start, endPos - start);
+            word = string_view(&line.data()[start], endPos - start);
         } else {
             word = "";
         }
     }
 
 private:
-    WordIter():fileInfo("WordIter::EndItterator"){isEnd = true;}
+    WordIter():fileInfo("WordIter::EndItterator"){isEndIt = true;}
 
 public:
     static WordIter end;
@@ -149,22 +160,26 @@ public:
         }
     }
 
-    const std::string& get(){
+    const string_view& get(){
         return word;
     }
-    const std::string& operator*() const {return word;};
-    const std::string* operator->() const {return &word;};
+    const string_view& operator*() const {return word;};
+    const string_view* operator->() const {return &word;};
 
     WordIter& operator++() {
         next();
         return *this;
     }
 
+    bool isEnd() const {
+        return start != string_view::npos;
+    }
+
     friend bool operator==(const WordIter& a, const WordIter& b) {
-        if (a.isEnd) {
-            return (b.start == std::string::npos);
-        } else if (b.isEnd) {
-            return (a.start == std::string::npos);
+        if (a.isEndIt) {
+            return (b.start == string_view::npos);
+        } else if (b.isEndIt) {
+            return (a.start == string_view::npos);
         } else {
             return (a.line == b.line) and (a.start == b.start) and (a.endPos == b.endPos);
         }
@@ -202,36 +217,39 @@ T parseCoeff(const WordIter& it){
 template<typename T>
 T parseCoeff(const WordIter& it, size_t start, size_t length);
 
-int parseInt(const WordIter& it, std::string msg, size_t start, size_t length) {
-    assert(it->size() >= start + length);
+int parseInt(const WordIter& word, std::string msg, size_t start, size_t length) {
+    assert(word->size() >= start + length);
     assert(length > 0);
-    if (it == WordIter::end) {
-        throw ParseError(it, "Expected coefficient.");
+
+    if (!word.isEnd()) {
+        throw ParseError(word, "Expected Number.");
     }
+
+    const char* it = word->data() + start;
+    const char* end = word->data() + start + length;
+
     bool negated = false;
-    if ((*it)[start] == '+') {
-        start += 1;
-        length -= 1;
-        if (length == 0) {
-            throw ParseError(it, "Expected coefficient, got '+'");
-        }
-    } else if ((*it)[start] == '-') {
+    if (*it == '+') {
+        it += 1;
+    } else if (*it == '-') {
         negated = true;
-        start += 1;
-        length -= 1;
+        it += 1;
     }
-    if (length > 9) {
-        throw ParseError(it, "Coefficient too large.");
+
+    if (it == end) {
+        throw ParseError(word, "Expected Number, only got sign.");
+    } else if (end - it > 9) {
+        throw ParseError(word, "Number too large.");
     }
 
     int res = 0;
-    const std::string& s = *it;
-    for (size_t i = start; i < start + length; i++) {
-        if (s[i] < '0'|| s[i] > '9') {
-            throw ParseError(it, "Expected number.");
-        }
+    for (; it != end; ++it) {
+        char chr = *it - '0';
         res *= 10;
-        res += s[i] - '0';
+        res += chr;
+        if (chr > 9) {
+            throw ParseError(word, "Expected number.");
+        }
     }
     if (negated) {
         res = -res;
@@ -260,25 +278,47 @@ class VariableNameManager {
     std::unordered_map<std::string, int> name2num;
     std::vector<std::string> num2name;
 
+    bool allowArbitraryNames = false;
+
 public:
+    VariableNameManager(bool _allowArbitraryNames)
+        : allowArbitraryNames(_allowArbitraryNames)
+    {}
+
+    size_t pyGetVar(std::string name) {
+        return getVar(name);
+    }
+
+    std::string pyGetName(size_t num) {
+        return getName(Var(num));
+    }
+
     std::string getName(Var num) {
         return num2name[num - 1];
     }
 
-    Var getVar(const std::string& name) {
-        return Var(std::stoi(name.substr(1, name.size() - 1)));
+    Var getVar(const WordIter& it, size_t start, size_t size) {
+        if (!allowArbitraryNames) {
+            return Var(parseInt(it, "", start + 1, size - 1));
+        } else {
+            return getVar(std::string(it->data() + start, size));
+        }
     }
 
-    // Var getVar(const std::string& name) {
-    //     auto result = name2num.insert(std::make_pair(name, num2name.size()));
-    //     bool newName = result.second;
-    //     if (newName) {
-    //         num2name.push_back(name);
-    //     }
-    //     return Var(result.first->second + 1);
-    // }
+    Var getVar(const std::string& name) {
+        if (allowArbitraryNames) {
+            return Var(std::stoi(name.substr(1, name.size() - 1)));
+        } else {
+            auto result = name2num.insert(std::make_pair(name, num2name.size()));
+            bool newName = result.second;
+            if (newName) {
+                num2name.push_back(name);
+            }
+            return Var(result.first->second + 1);
+        }
+    }
 
-    bool isLit(const std::string& name) {
+    bool isLit(const string_view& name) {
         if (name.size() < 1) {
             return false;
         }
@@ -290,7 +330,7 @@ public:
         }
     }
 
-    bool isVar(const std::string& name, size_t pos = 0) {
+    bool isVar(const string_view& name, size_t pos = 0) {
         if (name.size() >= 2
                 && std::isalpha(name[pos])) {
             return true;
@@ -306,15 +346,39 @@ Lit parseLit(const WordIter& it, VariableNameManager& mngr) {
     }
 
     bool isNegated = ((*it)[0] == '~');
-    std::string varName;
+    size_t start = 0;
     if (isNegated) {
-        varName = it->substr(1, it->size() - 1);
-    } else {
-        varName = *it;
+        start += 1;
     }
 
-    return Lit(mngr.getVar(varName), isNegated);
+    return Lit(mngr.getVar(it, start, it->size() - start), isNegated);
 }
+
+
+
+class VarDouplicateDetection {
+    std::vector<bool> contained;
+    std::vector<Var> used;
+
+public:
+    bool add(Var var) {
+        used.push_back(var);
+        size_t idx = static_cast<size_t>(var);
+        if (idx >= contained.size()) {
+            contained.resize(idx + 1);
+        }
+        bool result = contained[idx];
+        contained[idx] = true;
+        return result;
+    }
+
+    void clear() {
+        for (Var var: used) {
+            contained[var] = false;
+        }
+        used.clear();
+    }
+};
 
 
 
@@ -322,6 +386,8 @@ template<typename T>
 class OPBParser {
     VariableNameManager& variableNameManager;
     std::vector<Term<T>> terms;
+    VarDouplicateDetection duplicateDetection;
+
     int numVar = 0;
     int numC = 0;
 
@@ -331,21 +397,21 @@ public:
     {}
 
 
-    std::vector<Inequality<T>*> parse(std::ifstream& f, const std::string& fileName) {
+    std::vector<std::unique_ptr<Inequality<T>>> parse(std::ifstream& f, const std::string& fileName) {
         WordIter it(fileName);
         if (!WordIter::getline(f, it)) {
             throw ParseError(it, "Expected OPB header.");
         }
         parseHeader(it);
 
-        std::vector<Inequality<T>*> result;
+        std::vector<std::unique_ptr<Inequality<T>>> result;
 
         while (WordIter::getline(f, it)) {
             if (it != WordIter::end && ((*it)[0] != '*')) {
                 std::array<Inequality<T>*, 2> res = parseConstraint(it);
-                result.push_back(res[0]);
+                result.emplace_back(res[0]);
                 if (res[1] != nullptr) {
-                    result.push_back(res[1]);
+                    result.emplace_back(res[1]);
                 }
             }
         }
@@ -371,18 +437,35 @@ public:
 
     std::array<Inequality<T>*, 2> parseConstraint(WordIter& it, bool geqOnly = false) {
         terms.clear();
+
+        T degreeOffset = 0;
         while (it != WordIter::end) {
-            const std::string& word = *it;
+            const string_view& word = *it;
             if (word == ">=" || word == "=") {
                 break;
             }
             T coeff = parseCoeff<T>(it, 0, it->size());
             ++it;
             Lit lit = parseLit(it, variableNameManager);
-            ++it;
+            if (duplicateDetection.add(lit.var())) {
+                std::cout << lit.var() << std::endl;
+                throw ParseError(it, "Douplicated variables are not supported in constraints.");
+            }
+
+            if (coeff < 0) {
+                coeff = -coeff;
+                degreeOffset += coeff;
+                if (degreeOffset < 0) {
+                    throw ParseError(it, "Overflow due to normalization.");
+                }
+                lit = ~lit;
+            }
 
             terms.emplace_back(coeff, lit);
+            ++it;
         }
+
+        duplicateDetection.clear();
 
         it.expectOneOf({">=", "="});
         bool isEq = (*it == "=");
@@ -395,7 +478,7 @@ public:
             throw ParseError(it, "Expected degree.");
         }
         assert(it->size() != 0);
-        const std::string& rhs = *it;
+        const string_view& rhs = *it;
         T degree;
         if (rhs[rhs.size() - 1] == ';') {
             degree = parseCoeff<T>(it, 0, rhs.size() - 1);
@@ -406,9 +489,27 @@ public:
             ++it;
         }
 
-        return {nullptr, nullptr};
+        T normalizedDegree = degree + degreeOffset;
+        if (degree > normalizedDegree) {
+            throw ParseError(it, "Overflow due to normalization.");
+        }
+
+        Inequality<T>* geq = new Inequality<T>(terms, degree);
+        Inequality<T>* leq = nullptr;
+        if (isEq) {
+            leq = new Inequality<T>(*geq);
+            leq = leq->negated();
+        }
+
+        return {geq, leq};
     }
 };
+
+ std::vector<std::unique_ptr<Inequality<CoefType>>> parseOpb(std::string fileName, VariableNameManager& varMgr) {
+    std::ifstream f(fileName);
+    OPBParser<CoefType> parser(varMgr);
+    return parser.parse(f, fileName);
+}
 
 
 int main(int argc, char const *argv[])
@@ -417,30 +518,25 @@ int main(int argc, char const *argv[])
     std::ifstream f(fileName);
 
 
-    VariableNameManager manager;
+    VariableNameManager manager(false);
     OPBParser<int> parser(manager);
     try {
         std::cout << parser.parse(f, fileName).size() << std::endl;
     } catch (const ParseError& e) {
         std::cout << e.what() << std::endl;
     }
-    // try {
-    //     int i = 0;
-    //     WordIter it(argv[1]);
-    //     while (WordIter::getline(f, it)) {
-    //         while (it != WordIter::endIt) {
-    //             // std::cout << *it << std::endl;
-    //             i+= it->size();
-    //             // word = *it;
-    //             // if (i > 10) {
-    //             //     throw ParseError(it, "test parse error");
-    //             // }
-    //             ++it;
-    //         }
-    //     }
-    //     std::cout << i << std::endl;
-    // } catch (const ParseError& e) {
-    //     std::cout << e.what() << std::endl;
-    // }
     return 0;
 }
+
+#ifdef PY_BINDINGS
+void init_parsing(py::module &m){
+    m.doc() = "Efficient implementation for parsing opb and pbp files.";
+    m.def("parseOpb", &parseOpb, "Parse opb file");
+
+
+    py::class_<VariableNameManager>(m, "VariableNameManager")
+        .def(py::init<bool>())
+        .def("getVar", &VariableNameManager::pyGetVar)
+        .def("getName", &VariableNameManager::pyGetName);
+}
+#endif

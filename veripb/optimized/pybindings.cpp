@@ -13,15 +13,10 @@ setup_pybind11(cfg)
     #include <pybind11/iostream.h>
     #include <pybind11/functional.h>
     namespace py = pybind11;
-#endif
 
-// void init_constraints(py::module &);
-// void init_parsing(py::module &);
+    void init_constraints(py::module &);
+    void init_parsing(py::module &);
 
-void init_constraints(py::module &);
-void init_parsing(py::module &);
-
-#ifdef PY_BINDINGS
     PYBIND11_MODULE(pybindings, m){
         py::module constraints = m.def_submodule("constraints");
         init_constraints(constraints);

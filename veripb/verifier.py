@@ -7,6 +7,7 @@ from veripb.timed_function import TimedFunction
 import sys
 import logging
 import time
+import argparse
 
 class Context():
     pass
@@ -99,6 +100,7 @@ class Verifier():
                 "isInvariantsOn": False,
                 "trace": False,
                 "progressBar": False,
+                "proofGraph": None
             }
 
         def computeNumUse(self):
@@ -122,6 +124,11 @@ class Verifier():
                 default=False,
                 help="Print a trace of derived constraints.")
 
+            group.add_argument("--proofGraph", dest = name+".proofGraph",
+                type=argparse.FileType('w'),
+                default=defaults["proofGraph"],
+                help="Write proof graph to given file.")
+
             group.add_argument("--progressBar", dest = name+".progressBar",
                 action="store_true",
                 default=False,
@@ -143,7 +150,9 @@ class Verifier():
 
     def antecedents(self, ids, ruleNum):
         if ids == "all":
-            return (c for c in self.db if c is not None)
+            for c in self.db:
+                if c is not None:
+                    yield c
         else:
             for i in ids:
                 if i >= len(self.db):
@@ -199,6 +208,16 @@ class Verifier():
                     "line": lineNum,
                     "ineq": self.context.ineqFactory.toString(constraint)
                 })
+            if self.settings.proofGraph is not None and ruleNum > 0:
+                ids = rule.antecedentIDs()
+                if ids == "all":
+                    ids = (i for (i,c) in enumerate(self.db) if c is not None and i > 0)
+                f = self.settings.proofGraph
+                print("%(ineq)s ; %(line)d = %(antecedents)s"%{
+                        "line": lineNum,
+                        "ineq": self.context.ineqFactory.toString(constraint),
+                        "antecedents": " ".join(map(str,ids))
+                    }, file=f)
 
         self.db.extend(constraints)
 

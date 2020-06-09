@@ -293,6 +293,10 @@ public:
         return getName(Var(num));
     }
 
+    size_t maxVar() {
+        return num2name.size();
+    }
+
     std::string getName(Var num) {
         return num2name[num - 1];
     }
@@ -306,7 +310,7 @@ public:
     }
 
     Var getVar(const std::string& name) {
-        if (allowArbitraryNames) {
+        if (!allowArbitraryNames) {
             return Var(std::stoi(name.substr(1, name.size() - 1)));
         } else {
             auto result = name2num.insert(std::make_pair(name, num2name.size()));
@@ -381,6 +385,34 @@ public:
 };
 
 
+template<typename T>
+class Formula {
+private:
+    std::vector<std::unique_ptr<Inequality<T>>> constraints;
+
+public:
+    bool hasObjective = false;
+    std::vector<size_t> objectiveVars;
+    std::vector<T> objectiveCoeffs;
+
+    size_t maxVar;
+    size_t claimedNumC;
+    size_t claimedNumVar;
+
+    std::vector<Inequality<T>*> getConstraints() {
+        std::vector<Inequality<T>*> result;
+        result.reserve(constraints.size());
+        for (auto& ptr: constraints) {
+            result.push_back(ptr.get());
+        }
+        return result;
+    }
+
+    void add(std::unique_ptr<Inequality<T>>&& constraint) {
+        constraints.emplace_back(std::move(constraint));
+    }
+};
+
 
 template<typename T>
 class OPBParser {
@@ -388,8 +420,7 @@ class OPBParser {
     std::vector<Term<T>> terms;
     VarDouplicateDetection duplicateDetection;
 
-    int numVar = 0;
-    int numC = 0;
+    std::unique_ptr<Formula<T>> formula;
 
 public:
     OPBParser(VariableNameManager& mngr):
@@ -397,26 +428,35 @@ public:
     {}
 
 
-    std::vector<std::unique_ptr<Inequality<T>>> parse(std::ifstream& f, const std::string& fileName) {
+    std::unique_ptr<Formula<T>> parse(std::ifstream& f, const std::string& fileName) {
+        formula = std::make_unique<Formula<T>>();
         WordIter it(fileName);
         if (!WordIter::getline(f, it)) {
             throw ParseError(it, "Expected OPB header.");
         }
         parseHeader(it);
 
-        std::vector<std::unique_ptr<Inequality<T>>> result;
-
+        bool checkedObjective = false;
         while (WordIter::getline(f, it)) {
             if (it != WordIter::end && ((*it)[0] != '*')) {
-                std::array<Inequality<T>*, 2> res = parseConstraint(it);
-                result.emplace_back(res[0]);
+                if (!checkedObjective) {
+                    checkedObjective = true;
+                    if (*it == "min:") {
+                        ++it;
+                        parseObjective(it);
+                        continue;
+                    }
+                }
+
+                auto res = parseConstraint(it);
+                formula->add(std::move(res[0]));
                 if (res[1] != nullptr) {
-                    result.emplace_back(res[1]);
+                    formula->add(std::move(res[1]));
                 }
             }
         }
 
-        return result;
+        return std::move(formula);
     }
 
     void parseHeader(WordIter& it) {
@@ -424,18 +464,37 @@ public:
         ++it;
         it.expect("#variable=");
         ++it;
-        numVar = parseInt(it, "Expected number of variables.");
+        formula->claimedNumVar = parseInt(it, "Expected number of variables.");
         ++it;
         it.expect("#constraint=");
         ++it;
-        numC = parseInt(it, "Expected number of constraints.");
+        formula->claimedNumC = parseInt(it, "Expected number of constraints.");
         ++it;
         if (it != WordIter::end) {
             throw ParseError(it, "Expected end of header line.");
         }
     }
 
-    std::array<Inequality<T>*, 2> parseConstraint(WordIter& it, bool geqOnly = false) {
+    void parseObjective(WordIter& it) {
+        formula->hasObjective = true;
+        while (it != WordIter::end && *it != ";") {
+            T coeff = parseCoeff<T>(it, 0, it->size());
+            ++it;
+            Lit lit = parseLit(it, variableNameManager);
+
+            if (lit.isNegated()) {
+                coeff = -coeff;
+                lit = ~lit;
+            }
+
+            formula->objectiveCoeffs.push_back(coeff);
+            formula->objectiveVars.push_back(lit.var());
+
+            ++it;
+        }
+    }
+
+    std::array<std::unique_ptr<Inequality<T>>, 2> parseConstraint(WordIter& it, bool geqOnly = false) {
         terms.clear();
 
         T degreeOffset = 0;
@@ -447,6 +506,9 @@ public:
             T coeff = parseCoeff<T>(it, 0, it->size());
             ++it;
             Lit lit = parseLit(it, variableNameManager);
+            if (formula) {
+                formula->maxVar = std::max(formula->maxVar, static_cast<size_t>(lit.var()));
+            }
             if (duplicateDetection.add(lit.var())) {
                 std::cout << lit.var() << std::endl;
                 throw ParseError(it, "Douplicated variables are not supported in constraints.");
@@ -494,26 +556,34 @@ public:
             throw ParseError(it, "Overflow due to normalization.");
         }
 
-        Inequality<T>* geq = new Inequality<T>(terms, degree);
-        Inequality<T>* leq = nullptr;
+        std::unique_ptr<Inequality<T>> geq = std::make_unique<Inequality<T>>(terms, normalizedDegree);
+        std::unique_ptr<Inequality<T>> leq = nullptr;
         if (isEq) {
-            leq = new Inequality<T>(*geq);
-            leq = leq->negated();
+            normalizedDegree = -normalizedDegree;
+            for (Term<T>& term:terms) {
+                normalizedDegree += term.coeff;
+                term.lit = ~term.lit;
+            }
+
+            leq = std::make_unique<Inequality<T>>(terms, normalizedDegree);
         }
 
-        return {geq, leq};
+        return {std::move(geq), std::move(leq)};
     }
 };
 
- std::vector<std::unique_ptr<Inequality<CoefType>>> parseOpb(std::string fileName, VariableNameManager& varMgr) {
+template<typename T>
+std::unique_ptr<Formula<T>> parseOpb(std::string fileName, VariableNameManager& varMgr) {
     std::ifstream f(fileName);
     OPBParser<CoefType> parser(varMgr);
-    return parser.parse(f, fileName);
+    std::unique_ptr<Formula<T>> result = parser.parse(f, fileName);
+    return result;
 }
-
 
 int main(int argc, char const *argv[])
 {
+
+    std::cout << "start reading file..." << std::endl;
     std::string fileName(argv[1]);
     std::ifstream f(fileName);
 
@@ -521,7 +591,7 @@ int main(int argc, char const *argv[])
     VariableNameManager manager(false);
     OPBParser<int> parser(manager);
     try {
-        std::cout << parser.parse(f, fileName).size() << std::endl;
+        std::cout << parser.parse(f, fileName)->getConstraints().size() << std::endl;
     } catch (const ParseError& e) {
         std::cout << e.what() << std::endl;
     }
@@ -531,12 +601,32 @@ int main(int argc, char const *argv[])
 #ifdef PY_BINDINGS
 void init_parsing(py::module &m){
     m.doc() = "Efficient implementation for parsing opb and pbp files.";
-    m.def("parseOpb", &parseOpb, "Parse opb file");
+    m.def("parseOpb", &parseOpb<CoefType>, "Parse opb file");
 
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const ParseError &e) {
+            py::object pyParseError = py::module::import("veripb.exceptions").attr("DirectParseError");
+            PyErr_SetString(pyParseError.ptr(), e.what());
+        }
+    });
 
     py::class_<VariableNameManager>(m, "VariableNameManager")
         .def(py::init<bool>())
+        .def("maxVar", &VariableNameManager::maxVar)
         .def("getVar", &VariableNameManager::pyGetVar)
         .def("getName", &VariableNameManager::pyGetName);
+
+    py::class_<Formula<CoefType>>(m, "Formula")
+        .def(py::init<>())
+        .def("getConstraints", &Formula<CoefType>::getConstraints,
+            py::return_value_policy::reference_internal)
+        .def_readonly("maxVar", &Formula<CoefType>::maxVar)
+        .def_readonly("claimedNumC", &Formula<CoefType>::claimedNumC)
+        .def_readonly("claimedNumVar", &Formula<CoefType>::claimedNumVar)
+        .def_readonly("hasObjective", &Formula<CoefType>::hasObjective)
+        .def_readonly("objectiveVars", &Formula<CoefType>::objectiveVars)
+        .def_readonly("objectiveCoeffs", &Formula<CoefType>::objectiveCoeffs);
 }
 #endif

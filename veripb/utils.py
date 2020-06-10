@@ -30,7 +30,12 @@ if profile:
 
 @TimedFunction.time("LoadFormula")
 def loadFormula(file, varMgr):
-    return parseOpb(file, varMgr)
+    formula = parseOpb(file, varMgr)
+    return {
+        "numVariables": formula.maxVar,
+        "constraints": formula.getConstraints(),
+        "objective": objectiveToDict(formula)
+    }
 
 def objectiveToDict(formula):
     if (formula.hasObjective):
@@ -125,22 +130,23 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
         context.ineqFactory = CppIneqFactory()
 
     try:
-        formula = OPBParser(context.ineqFactory).parse(formulaFile)
-
-        context.formula = formula["constraints"]
-        context.objective = formula["objective"]
+        if miscSettings.drat or miscSettings.cnf:
+            formula = CNFParser(context.ineqFactory).parse(formulaFile)
+        elif miscSettings.arbitraryPrecision:
+            formula = OPBParser(context.ineqFactory).parse(formulaFile)
         else:
             formula = loadFormula(formulaFile.name, context.ineqFactory.varNameMgr)
-            context.formula = formula.getConstraints()
-            context.objective = objectiveToDict(formula)
     except ParseError as e:
         e.fileName = formulaFile.name
         raise e
 
+    context.formula = formula["constraints"]
+    context.objective = formula["objective"]
+
     if miscSettings.arbitraryPrecision:
         context.propEngine = PropEngine()
     else:
-        context.propEngine = CppPropEngine(formula.maxVar)
+        context.propEngine = CppPropEngine(formula["numVariables"])
 
 
     verify = Verifier(

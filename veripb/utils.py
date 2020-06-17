@@ -233,14 +233,6 @@ def run_cmd_main():
         action="store_const", dest="loglevel", const=logging.INFO,
     )
 
-    p.add_argument("--arbitraryPrecision",
-        action="store_true",
-        default=False,
-        help="Turn on arbitrary precision. Experimental, does not work with unit propagation or solution checking.")
-    p.add_argument("--no-arbitraryPrecision",
-        action="store_false",
-        help="Turn off arbitrary precision.")
-
     Verifier.Settings.addArgParser(p)
     Settings.addArgParser(p)
 

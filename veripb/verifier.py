@@ -59,9 +59,10 @@ class VerificationResult():
         self.isSuccessfull = False
         self.usesAssumptions = False
         self.containsContradiction = False
+        self.requireUnsat = None
 
     def print(self):
-        if not self.containsContradiction:
+        if not self.containsContradiction and self.requireUnsat is None:
             logging.warn("The provided proof did not claim contradiction.")
 
         if self.usesAssumptions:
@@ -100,7 +101,8 @@ class Verifier():
                 "isInvariantsOn": False,
                 "trace": False,
                 "progressBar": False,
-                "proofGraph": None
+                "proofGraph": None,
+                "requireUnsat": None
             }
 
         def computeNumUse(self):
@@ -118,6 +120,14 @@ class Verifier():
             group.add_argument("--no-invariants", dest=name+".isInvariantsOn",
                 action="store_false",
                 help="Turn off invariant checking.")
+
+            group.add_argument("--requireUnsat", dest=name+".requireUnsat",
+                action="store_true",
+                default=defaults["requireUnsat"],
+                help="Require proof to contain contradiction.")
+            group.add_argument("--no-requireUnsat", dest=name+".requireUnsat",
+                action="store_false",
+                help="Do not require proof to contain contradiction, supress warning.")
 
             group.add_argument("--trace", dest = name+".trace",
                 action="store_true",
@@ -246,6 +256,7 @@ class Verifier():
     def __call__(self, rules):
         self.db = list()
         self.result = VerificationResult()
+        self.result.requireUnsat = self.settings.requireUnsat;
 
         if self.settings.trace:
             print()
@@ -262,6 +273,9 @@ class Verifier():
                 raise e
 
         self.result.usesAssumptions = getattr(self.context, "usesAssumptions", False)
+
+        if self.settings.requireUnsat and not self.result.containsContradiction:
+            raise InvalidProof("Proof does not contain contradiction!")
 
         if self.settings.trace:
             print("=== end trace ===")

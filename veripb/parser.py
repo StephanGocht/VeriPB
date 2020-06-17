@@ -64,6 +64,8 @@ class RuleParserBase():
             except ParseError as e:
                 e.line = lineNum
                 raise e
+            except StopIteration:
+                raise ParseError("Expected Header.")
         else:
             lineNum = 0
 
@@ -110,7 +112,7 @@ class RuleParser(RuleParserBase):
             words.expectExact("pseudo-Boolean")
             words.expectExact("proof")
             words.expectExact("version")
-            version = next(words)
+            version = words.expectNext("Expected version number.")
             major, minor = map(int, version.split("."))
             if major != 1 or minor < 0 or 1 < minor:
                 raise ValueError("Unsupported version.")
@@ -225,7 +227,10 @@ class OPBParser():
         else:
             with WordParser(line) as words:
                 if self.objective is None:
-                    peek = next(words)
+                    try:
+                        peek = next(words)
+                    except StopIteration:
+                        return []
                     if peek == "min:":
                         self.parseObjective(words)
                         return []
@@ -279,12 +284,18 @@ class OPBParser():
         if op == "=" and not self.allowEq:
             return ValueError("Equality not allowed, only >= is allowed here.")
 
-        degree = next(it)
+        try:
+            degree = next(it)
+        except StopIteration:
+            raise ValueError("Expected degree.")
         if degree[-1] == ";":
             degree = int(degree[:-1])
         else:
             degree = int(degree)
-            if (next(it) != ";"):
+            try:
+                if (next(it) != ";"):
+                    raise ValueError("Expecting ; at the end of the constraint.")
+            except StopIteration:
                 raise ValueError("Expecting ; at the end of the constraint.")
 
         result = [self.ineqFactory.fromTerms(terms, degree)]
@@ -324,7 +335,7 @@ class CNFParser():
                 raise e
 
         if self.ineqFactory.numVars() != numVar:
-            logging.warn("Number of variables did not match,"\
+            logging.warning("Number of variables did not match,"\
                 " using %i instead."%(self.ineqFactory.numVars()))
 
         return {
@@ -416,7 +427,7 @@ class WordParser():
     def expectedWord(self):
         self.raiseParseError(len(self.words), "Expected another word.")
 
-    def next(self, what = None):
+    def expectNext(self, what = None):
         try:
             return next(self.wordIter)
         except StopIteration:
@@ -426,16 +437,15 @@ class WordParser():
                 raise ValueError(what)
 
     def nextInt(self):
-        return int(self.next("Expected integer, got nothing."))
+        return int(self.expectNext("Expected integer, got nothing."))
 
     def expectExact(self, what):
-        nxt = next(self)
+        nxt = self.expectNext("Expected '%s'."%(what))
         if (nxt != what):
             raise ValueError("Expected key word %s, got %s."%(what, nxt))
 
     def expectZero(self):
-        if (next(self) != "0"):
-            raise ValueError("Expected 0.")
+        self.expectExact("0")
 
     def expectEnd(self):
         try:

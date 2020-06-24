@@ -189,11 +189,11 @@ class Verifier():
             context.propEngine = DummyPropEngine()
         self.context = context
 
-    @TimedFunction.time("propEngine::attach")
+    @TimedFunction.time("propEngine.attach")
     def attach(self, constraint):
         self.context.propEngine.attach(constraint)
 
-    @TimedFunction.time("propEngine::detach")
+    @TimedFunction.time("propEngine.detach")
     def detach(self, constraint):
         self.context.propEngine.detach(constraint)
 

@@ -717,15 +717,15 @@ public:
     }
 
     void printStats() {
-        std::cerr << "used database memory: "
+        std::cout << "c statistic: used database memory: "
             << std::fixed << std::setprecision(3)
             << static_cast<float>(dbMem) / 1024 / 1024 / 1024 << " GB" << std::endl;
 
-        std::cerr << "cumulative database memory: "
+        std::cout << "c statistic: cumulative database memory: "
             << std::fixed << std::setprecision(3)
             << static_cast<float>(cumDbMem) / 1024 / 1024 / 1024 << " GB" << std::endl;
 
-        std::cerr << "maximal used database memory: "
+        std::cout << "c statistic: maximal used database memory: "
             << std::fixed << std::setprecision(3)
             << static_cast<float>(maxDbMem) / 1024 / 1024 / 1024 << " GB" << std::endl;
     }

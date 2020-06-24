@@ -49,7 +49,7 @@ class TimedFunction:
         total = 0
         for name, time in cls.times.items():
             total += time
-            logging.info("time in %s: %.2fs"%(name,time))
+            print("c statistic: time %s: %.2fs"%(name,time))
 
-        logging.info("sum time: %.2fs"%(total))
-        logging.info("total time: %.2fs"%(perf_counter() - cls.start))
+        print("c statistic: time tracked: %.2fs"%(total))
+        print("c statistic: time total: %.2fs"%(perf_counter() - cls.start))

@@ -155,7 +155,7 @@ class Assumption(Rule):
     def isGoal(self):
         return False
 
-    @TimedFunction.time("Assumption::compute")
+    @TimedFunction.time("Assumption.compute")
     def compute(self, antecedents, context):
         context.usesAssumptions = True
         return [self.constraint]
@@ -207,7 +207,7 @@ class ReverseUnitPropagation(Rule):
     def isGoal(self):
         return False
 
-    @TimedFunction.time("ReverseUnitPropagation::compute")
+    @TimedFunction.time("ReverseUnitPropagation.compute")
     def compute(self, antecedents, context):
         context.propEngine.increaseNumVarsTo(self.numVars)
         success = self.constraint.ratCheck(self.w, context.propEngine)
@@ -254,7 +254,7 @@ class CompareToConstraint(Rule):
 class ConstraintEquals(CompareToConstraint):
     Id = "e"
 
-    @TimedFunction.time("ConstraintEquals::compute")
+    @TimedFunction.time("ConstraintEquals.compute")
     def compute(self, antecedents, context = None):
         antecedents = list(antecedents)
         if self.constraint != antecedents[0]:
@@ -281,7 +281,7 @@ class ConstraintImplies(CompareToConstraint):
 class ConstraintImpliesGetImplied(ConstraintImplies):
     Id = "j"
 
-    @TimedFunction.time("ConstraintImpliesGetImplied::compute")
+    @TimedFunction.time("ConstraintImpliesGetImplied.compute")
     def compute(self, antecedents, context = None):
         super().compute(antecedents)
         return [self.constraint]
@@ -322,7 +322,7 @@ class Solution(Rule):
     def __init__(self, partialAssignment):
         self.partialAssignment = partialAssignment
 
-    @TimedFunction.time("Solution::compute")
+    @TimedFunction.time("Solution.compute")
     def compute(self, antecedents, context):
         if not context.propEngine.checkSat(self.partialAssignment):
             raise SolutionCheckFailed()
@@ -367,7 +367,7 @@ class ObjectiveBound(Rule):
     def __init__(self, partialAssignment):
         self.partialAssignment = partialAssignment
 
-    @TimedFunction.time("ObjectiveBound::compute")
+    @TimedFunction.time("ObjectiveBound.compute")
     def compute(self, antecedents, context):
         if not context.propEngine.checkSat(self.partialAssignment):
             raise SolutionCheckFailed()
@@ -419,7 +419,7 @@ class IsContradiction(Rule):
     def __init__(self, constraintId):
         self.constraintId = constraintId
 
-    @TimedFunction.time("IsContradiction::compute")
+    @TimedFunction.time("IsContradiction.compute")
     def compute(self, antecedents, context = None):
         antecedents = list(antecedents)
         if not antecedents[0].isContradiction():
@@ -519,7 +519,7 @@ class ReversePolishNotation(Rule):
 
         self.instructions = instructions
 
-    @TimedFunction.time("ReversePolishNotation::compute")
+    @TimedFunction.time("ReversePolishNotation.compute")
     def compute(self, antecedents, context = None):
         antecedents = list(antecedents)
         stack = list()
@@ -596,7 +596,7 @@ class LoadFormula(Rule):
     def __init__(self, numConstraints):
         self._numConstraints = numConstraints
 
-    @TimedFunction.time("LoadFormula::compute")
+    @TimedFunction.time("LoadFormula.compute")
     def compute(self, antecedents, context = None):
         if (len(context.formula) != self._numConstraints):
             raise InvalidProof("Wrong number of constraints")
@@ -622,7 +622,7 @@ class LoadAxiom(Rule):
     def __init__(self, axiomId):
         self._axiomId = axiomId
 
-    @TimedFunction.time("LoadAxiom::compute")
+    @TimedFunction.time("LoadAxiom.compute")
     def compute(self, antecedents, context):
         try:
             return [context.formula[self._axiomId - 1]]

@@ -48,7 +48,7 @@ class RuleParserBase():
         else:
             return False
 
-    @TimedFunction.timeIter("RuleParserBase::parse")
+    @TimedFunction.timeIter("RuleParserBase.parse")
     def parse(self, rules, file, dumpLine = False, defaultRule = None):
         self.rules = {rule.Id: rule for rule in rules}
 
@@ -171,7 +171,7 @@ class OPBParser():
         self.ineqFactory = ineqFactory
         self.allowEq = allowEq
 
-    @TimedFunction.time("OPBParser::parse")
+    @TimedFunction.time("OPBParser.parse")
     def parse(self, formulaFile):
         lines = iter(enumerate(formulaFile, start = 1))
         self.objective = None

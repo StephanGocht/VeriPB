@@ -277,6 +277,7 @@ int parseCoeff<int>(const WordIter& it, size_t start, size_t length) {
 class VariableNameManager {
     std::unordered_map<std::string, int> name2num;
     std::vector<std::string> num2name;
+    size_t _maxVar = 0;
 
     bool allowArbitraryNames = false;
 
@@ -294,7 +295,7 @@ public:
     }
 
     size_t maxVar() {
-        return num2name.size();
+        return std::max(_maxVar, num2name.size());
     }
 
     std::string getName(Var num) {
@@ -303,7 +304,9 @@ public:
 
     Var getVar(const WordIter& it, size_t start, size_t size) {
         if (!allowArbitraryNames) {
-            return Var(parseInt(it, "", start + 1, size - 1));
+            size_t var = parseInt(it, "", start + 1, size - 1);
+            _maxVar = std::max(_maxVar, var);
+            return Var(var);
         } else {
             return getVar(std::string(it->data() + start, size));
         }
@@ -311,7 +314,9 @@ public:
 
     Var getVar(const std::string& name) {
         if (!allowArbitraryNames) {
-            return Var(std::stoi(name.substr(1, name.size() - 1)));
+            size_t var = std::stoi(name.substr(1, name.size() - 1));
+            _maxVar = std::max(_maxVar, var);
+            return Var(var);
         } else {
             auto result = name2num.insert(std::make_pair(name, num2name.size()));
             bool newName = result.second;

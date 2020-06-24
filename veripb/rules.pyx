@@ -424,6 +424,8 @@ class IsContradiction(Rule):
         antecedents = list(antecedents)
         if not antecedents[0].isContradiction():
             raise ContradictionCheckFailed()
+        else:
+            context.containsContradiction = True
         return []
 
     def numConstraints(self):

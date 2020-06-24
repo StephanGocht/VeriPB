@@ -203,9 +203,6 @@ class Verifier():
 
         didPrint = False
 
-        if isinstance(rule, IsContradiction):
-            self.result.containsContradiction = True
-
         antecedents = self.antecedents(rule.antecedentIDs(), ruleNum)
         constraints = rule.compute(antecedents, self.context)
 
@@ -273,6 +270,7 @@ class Verifier():
                 raise e
 
         self.result.usesAssumptions = getattr(self.context, "usesAssumptions", False)
+        self.result.containsContradiction = getattr(self.context, "containsContradiction", False)
 
         if self.settings.requireUnsat and not self.result.containsContradiction:
             raise InvalidProof("Proof does not contain contradiction!")

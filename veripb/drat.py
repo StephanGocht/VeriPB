@@ -116,7 +116,18 @@ class DRAT(ReverseUnitPropagation):
             w = [terms[0][1]]
         else:
             w = []
-        return cls(ineq, w, context.ineqFactory.numVars())
+        isContradiction = (len(lits) == 0)
+        return cls(ineq, w, context.ineqFactory.numVars(), isContradiction)
+
+    def __init__(self, ineq, w, numVars, isContradiction):
+        super().__init__(ineq, w, numVars)
+        self.isContradiction = isContradiction
+
+    def compute(self, antecedents, context):
+        if self.isContradiction:
+            context.containsContradiction = True
+        return super().compute(antecedents, context)
+
 
 
 class DRATParser(RuleParserBase):

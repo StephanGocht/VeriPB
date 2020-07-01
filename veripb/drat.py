@@ -118,20 +118,20 @@ class DRAT(ReverseUnitPropagation):
         with WordParser(line) as words:
             lits = parseIntList(words)
 
-        clauseFinder = DRATClauseFinder.get(context)
-        isNew = clauseFinder.increase(lits)
+            clauseFinder = DRATClauseFinder.get(context)
+            isNew = clauseFinder.increase(lits)
 
-        if isNew:
-            terms = [(1,context.ineqFactory.intlit2int(l)) for l in lits]
-            ineq = context.ineqFactory.fromTerms(terms, 1)
-            if len(lits) > 0:
-                w = [terms[0][1]]
+            if isNew:
+                terms = [(1,context.ineqFactory.intlit2int(l)) for l in lits]
+                ineq = context.ineqFactory.fromTerms(terms, 1)
+                if len(lits) > 0:
+                    w = [terms[0][1]]
+                else:
+                    w = []
+                isContradiction = (len(lits) == 0)
+                return cls(ineq, w, context.ineqFactory.numVars(), isContradiction)
             else:
-                w = []
-            isContradiction = (len(lits) == 0)
-            return cls(ineq, w, context.ineqFactory.numVars(), isContradiction)
-        else:
-            return EmptyRule()
+                return EmptyRule()
 
     def __init__(self, ineq, w, numVars, isContradiction):
         super().__init__(ineq, w, numVars)

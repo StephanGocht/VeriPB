@@ -33,8 +33,12 @@ class TestParsing(unittest.TestCase):
     def test_eq(self):
         res = OPBParser(self.ineqFactory).parseOPB("1 x2 -2 x1 = 2;".split())
 
-        ineq1 = self.ineqFactory.fromTerms([Term(-2,2), Term(1,1)], 2)
-        ineq2 = self.ineqFactory.fromTerms([Term(2,2), Term(-1,1)], -2)
+        if self.ineqFactory.freeNames:
+            ineq1 = self.ineqFactory.fromTerms([Term(-2,2), Term(1,1)], 2)
+            ineq2 = self.ineqFactory.fromTerms([Term(2,2), Term(-1,1)], -2)
+        else:
+            ineq1 = self.ineqFactory.fromTerms([Term(-2,1), Term(1,2)], 2)
+            ineq2 = self.ineqFactory.fromTerms([Term(2,1), Term(-1,2)], -2)
 
         assert res == [ineq1, ineq2]
 

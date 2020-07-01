@@ -10,10 +10,11 @@
 #include <cstdlib>
 #include <iomanip>
 
-using CoefType = int;
+using CoefType = int32_t;
 // use the following line istead to increas precision.
 // using CoefType = long long;
 
+// #undef NDEBUG
 
 #undef assert
 #ifdef NDEBUG
@@ -303,6 +304,11 @@ class PropEngine;
 template<typename T>
 struct WatchInfo {
     FixedSizeInequality<T>* ineq;
+    Lit other;
+
+    WatchInfo()
+        : ineq(nullptr)
+        , other(Lit::Undef()) {}
 };
 
 template<typename T>
@@ -389,8 +395,13 @@ public:
         }
     }
 
+    // returns if the watch is kept
     template<bool autoInit>
-    void updateWatch(PropEngine<T>& prop, Lit falsifiedLit = Lit::Undef()) {
+    bool updateWatch(PropEngine<T>& prop, Lit falsifiedLit = Lit::Undef()) {
+        bool isSat = false;
+        bool keepWatch = false;
+        prop.visit += 1;
+
         // std::cout << "updateWatch: " << *this << std::endl;
         bool init = autoInit && (watchSize == 0);
         if (init) {
@@ -404,6 +415,24 @@ public:
 
         auto& value = prop.assignment.value;
 
+        // if (this->watchSize == 2 && this->degree == 1) {
+        //     if (!init && falsifiedLit != Lit::Undef() && terms[0].lit != falsifiedLit && terms[1].lit != falsifiedLit) {
+        //         return;
+        //     } else  {
+        //         for (int i : {0,1}) {
+        //             if (value[terms[i].lit] == State::True) {
+        //                 WatchInfo<T> w;
+        //                 w.ineq = this;
+        //                 // w.other = terms[i].lit;
+        //                 prop.watch(falsifiedLit, w);
+        //                 return;
+        //             }
+        //         }
+        //     }
+        // }
+
+        Lit blockingLiteral = Lit::Undef();
+
         for (size_t i = 0; i < this->watchSize; i++) {
             if (value[terms[i].lit] == State::False) {
                 Lit old = terms[i].lit;
@@ -413,13 +442,17 @@ public:
                         swap(terms[i], terms[j]);
                         WatchInfo<T> w;
                         w.ineq = this;
+                        w.other = blockingLiteral;
                         prop.watch(terms[i].lit, w);
                         j++;
                         break;
                     }
+                    else if (value[terms[j].lit] == State::True) {
+                        isSat = true;
+                    }
                 }
 
-                if (old != terms[i].lit) {
+                if (old != falsifiedLit && old != terms[i].lit) {
                     for (auto& w: prop.watchlist[old]) {
                         if (w.ineq == this) {
                             w.ineq = nullptr;
@@ -431,25 +464,47 @@ public:
             if (value[terms[i].lit] != State::False) {
                 slack += terms[i].coeff;
             }
-            if (init || terms[i].lit == falsifiedLit) {
-                // we could not swap out watcher, renew watch
+
+            if (init) {
                 WatchInfo<T> w;
                 w.ineq = this;
                 prop.watch(terms[i].lit, w);
             }
+
+            if (terms[i].lit == falsifiedLit) {
+                keepWatch = true;
+            }
+
+            if (std::abs(terms[i].coeff) >= degree) {
+                blockingLiteral = terms[i].lit;
+            }
+        }
+
+        for (;!isSat && j < size(); j++) {
+            if (value[terms[j].lit] == State::True) {
+                isSat = true;
+            }
+        }
+
+        if (isSat) {
+            prop.visit_sat += 1;
         }
 
         if (slack < 0) {
             prop.conflict();
+            prop.visit_required += 1;
         } else if (slack < maxCoeff) {
             for (size_t i = 0; i < this->watchSize; i++) {
                 if (terms[i].coeff > slack
                     && value[terms[i].lit] == State::Unassigned)
                 {
                     prop.enqueue(terms[i].lit);
+                    prop.visit_required += 1;
                 }
             }
         }
+
+        return keepWatch;
     }
 
     void negate() {
@@ -501,27 +556,25 @@ public:
     }
 
     void restrictBy(const Assignment& a){
-        for (Term<T>& term:*this) {
-            this->erase(
-                std::remove_if(
-                    this->begin(),
-                    this->end(),
-                    [this, &a](Term<T>& term){
-                        switch (a[term.lit]) {
-                            case State::True:
-                                this->degree -= term.coeff;
-                                term.coeff = 0;
-                                break;
-                            case State::False:
-                                term.coeff = 0;
-                                break;
-                            default:
-                                break;
-                        }
-                        return term.coeff == 0;
-                    }),
-                this->end());
-        }
+        this->erase(
+            std::remove_if(
+                this->begin(),
+                this->end(),
+                [this, &a](Term<T>& term){
+                    switch (a[term.lit]) {
+                        case State::True:
+                            this->degree -= term.coeff;
+                            term.coeff = 0;
+                            break;
+                        case State::False:
+                            term.coeff = 0;
+                            break;
+                        default:
+                            break;
+                    }
+                    return term.coeff == 0;
+                }),
+            this->end());
     }
 
     void erase(Term<T>* begin, Term<T>* end) {
@@ -706,6 +759,10 @@ public:
     LitIndexedVec<OccursList> occurs;
     LitIndexedVec<Inequality<T>*> unattached;
 
+    long long visit = 0;
+    long long visit_sat = 0;
+    long long visit_required = 0;
+
 
     PropEngine(size_t _nVars)
         : nVars(_nVars)
@@ -713,7 +770,10 @@ public:
         , watchlist(2 * (_nVars + 1))
         , occurs(2 * (_nVars + 1))
     {
-
+        for (auto& ws: watchlist) {
+            ws.reserve(50);
+        }
+        trail.reserve(nVars);
     }
 
     void printStats() {
@@ -728,6 +788,10 @@ public:
         std::cout << "c statistic: maximal used database memory: "
             << std::fixed << std::setprecision(3)
             << static_cast<float>(maxDbMem) / 1024 / 1024 / 1024 << " GB" << std::endl;
+
+        std::cout << "c statistic: visit: " << visit << std::endl;
+        std::cout << "c statistic: visit_sat: " << visit_sat << std::endl;
+        std::cout << "c statistic: visit_required: " << visit_required << std::endl;
     }
 
     void enqueue(Lit lit) {
@@ -751,21 +815,40 @@ public:
             // std::cout << "propagating: " << trail[current.qhead] << std::endl;
 
             WatchList& ws = watchlist[falsifiedLit];
-            WatchList wsTmp;
-            wsTmp.reserve(ws.size());
-            std::swap(ws, wsTmp);
 
             const uint lookAhead = 3;
-            WatchedType* end = wsTmp.data() + wsTmp.size();
-            for (WatchedType* next = wsTmp.data(); next != end; next++) {
+            const WatchedType* end = ws.data() + ws.size();
+            WatchedType* kept = ws.data();
+            WatchedType* next = ws.data();
+            for (; next != end && !current.conflict; next++) {
                 auto fetch = next + lookAhead;
                 if (fetch < end) {
                     __builtin_prefetch(fetch->ineq);
                 }
+                assert(next->other != Lit::Undef() || assignment.value[next->other] == State::Unassigned);
+
+                bool keepWatch = false;
                 if (next->ineq != nullptr) {
-                    next->ineq->template updateWatch<false>(*this, falsifiedLit);
+                    if (assignment.value[next->other] != State::True) {
+                        keepWatch = next->ineq->template updateWatch<false>(*this, falsifiedLit);
+                    } else {
+                        keepWatch = true;
+                    }
+                }
+
+                if (keepWatch) {
+                    *kept = *next;
+                    kept += 1;
                 }
             }
+
+            // in case of conflict copy remaining watches
+            for (; next != end; next++) {
+                *kept = *next;
+                kept += 1;
+            }
+
+            ws.erase(ws.begin() + (kept - ws.data()), ws.end());
 
             current.qhead += 1;
         }

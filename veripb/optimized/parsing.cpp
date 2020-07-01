@@ -299,7 +299,12 @@ public:
     }
 
     std::string getName(Var num) {
-        return num2name[num - 1];
+        if (!allowArbitraryNames) {
+            return "x" + std::to_string(num);
+        } else {
+            return num2name[num - 1];
+        }
+
     }
 
     Var getVar(const WordIter& it, size_t start, size_t size) {

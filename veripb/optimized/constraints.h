@@ -395,11 +395,37 @@ public:
         }
     }
 
+
+    void swapWatch(PropEngine<T>& prop, size_t& i, size_t& j, T& slack, bool& keepWatch, Lit& blockingLiteral, Lit& falsifiedLit) {
+        const Lit old = terms[i].lit;
+        const Lit nw = terms[j].lit;
+        if (old != falsifiedLit) {
+            auto& wl = prop.watchlist[old];
+            for (auto& w: wl) {
+                if (w.ineq == this) {
+                    std::swap(w, wl.back());
+                    wl.pop_back();
+                    break;
+                }
+            }
+        } else {
+            keepWatch = false;
+        }
+
+        std::swap(terms[i], terms[j]);
+
+        WatchInfo<T> w;
+        w.ineq = this;
+        w.other = blockingLiteral;
+        prop.watch(nw, w);
+        slack += terms[i].coeff;
+    }
+
     // returns if the watch is kept
     template<bool autoInit>
     bool updateWatch(PropEngine<T>& prop, Lit falsifiedLit = Lit::Undef()) {
-        bool isSat = false;
-        bool keepWatch = false;
+        // bool isSat = false;
+        bool keepWatch = true;
         prop.visit += 1;
 
         // std::cout << "updateWatch: " << *this << std::endl;
@@ -412,6 +438,7 @@ public:
         T slack = -this->degree;
 
         size_t j = this->watchSize;
+        size_t k = this->watchSize;
 
         auto& value = prop.assignment.value;
 
@@ -435,43 +462,29 @@ public:
 
         for (size_t i = 0; i < this->watchSize; i++) {
             if (value[terms[i].lit] == State::False) {
-                Lit old = terms[i].lit;
+                if (init) {for (;k < size(); k++) {
+                    if (prop.phase[terms[k].lit] == State::True) {
+                        swapWatch(prop,i,k,slack,keepWatch,blockingLiteral,falsifiedLit);
+                        k++;
+                        goto found_new_watch;
+                    }
+                }}
                 for (;j < size(); j++) {
                     if (value[terms[j].lit] != State::False) {
-                        using namespace std;
-                        swap(terms[i], terms[j]);
-                        WatchInfo<T> w;
-                        w.ineq = this;
-                        w.other = blockingLiteral;
-                        prop.watch(terms[i].lit, w);
-                        slack += terms[i].coeff;
+                        swapWatch(prop,i,j,slack,keepWatch,blockingLiteral,falsifiedLit);
                         j++;
-                        break;
-                    }
-                    else if (value[terms[j].lit] == State::True) {
-                        isSat = true;
-                    }
-                }
-
-                if (old != falsifiedLit && old != terms[i].lit) {
-                    for (auto& w: prop.watchlist[old]) {
-                        if (w.ineq == this) {
-                            w.ineq = nullptr;
-                        }
+                        goto found_new_watch;
                     }
                 }
             } else {
                 slack += terms[i].coeff;
             }
 
+            found_new_watch:
             if (init) {
                 WatchInfo<T> w;
                 w.ineq = this;
                 prop.watch(terms[i].lit, w);
-            }
-
-            if (terms[i].lit == falsifiedLit) {
-                keepWatch = true;
             }
 
             if (std::abs(terms[i].coeff) >= degree) {
@@ -479,15 +492,16 @@ public:
             }
         }
 
-        for (;!isSat && j < size(); j++) {
-            if (value[terms[j].lit] == State::True) {
-                isSat = true;
-            }
-        }
+        // for (size_t i = 0; i < size(); i++) {
+        //     if (value[terms[i].lit] == State::True) {
+        //         isSat = true;
+        //         break;
+        //     }
+        // }
 
-        if (isSat) {
-            prop.visit_sat += 1;
-        }
+        // if (isSat) {
+        //     prop.visit_sat += 1;
+        // }
 
         if (slack < 0) {
             prop.conflict();
@@ -754,6 +768,7 @@ private:
 
 public:
     Assignment assignment;
+    Assignment phase;
     LitIndexedVec<WatchList> watchlist;
     LitIndexedVec<OccursList> occurs;
     LitIndexedVec<Inequality<T>*> unattached;
@@ -766,6 +781,7 @@ public:
     PropEngine(size_t _nVars)
         : nVars(_nVars)
         , assignment(_nVars)
+        , phase(_nVars)
         , watchlist(2 * (_nVars + 1))
         , occurs(2 * (_nVars + 1))
     {
@@ -795,6 +811,7 @@ public:
 
     void enqueue(Lit lit) {
         assignment.assign(lit);
+        phase.assign(lit);
         trail.push_back(lit);
     }
 
@@ -803,6 +820,7 @@ public:
         if (nVars < _nVars) {
             this->nVars = _nVars;
             assignment.resize(_nVars);
+            phase.resize(_nVars);
             watchlist.resize(2 * (_nVars + 1));
             occurs.resize(2 * (_nVars + 1));
         }
@@ -815,10 +833,21 @@ public:
 
             WatchList& ws = watchlist[falsifiedLit];
 
+            WatchedType* end = ws.data() + ws.size();
+            WatchedType* it  = ws.data();
+            WatchedType* sat = ws.data();
+            for (; it != end; it++) {
+                if (assignment.value[it->other] == State::True) {
+                    std::swap(*it, *sat);
+                    ++sat;
+                }
+            }
+
+
+            WatchedType* next = &(*sat);
+            WatchedType* kept = next;
+
             const uint lookAhead = 3;
-            const WatchedType* end = ws.data() + ws.size();
-            WatchedType* kept = ws.data();
-            WatchedType* next = ws.data();
             for (; next != end && !current.conflict; next++) {
                 auto fetch = next + lookAhead;
                 if (fetch < end) {
@@ -826,15 +855,7 @@ public:
                 }
                 assert(next->other != Lit::Undef() || assignment.value[next->other] == State::Unassigned);
 
-                bool keepWatch = false;
-                if (next->ineq != nullptr) {
-                    if (assignment.value[next->other] != State::True) {
-                        keepWatch = next->ineq->template updateWatch<false>(*this, falsifiedLit);
-                    } else {
-                        keepWatch = true;
-                    }
-                }
-
+                bool keepWatch = next->ineq->template updateWatch<false>(*this, falsifiedLit);
                 if (keepWatch) {
                     *kept = *next;
                     kept += 1;
@@ -851,25 +872,6 @@ public:
 
             current.qhead += 1;
         }
-
-        while (current.qhead < trail.size()) {
-            Lit falsifiedLit = ~trail[current.qhead];
-            WatchList& ws = watchlist[falsifiedLit];
-
-            ws.erase(
-                std::remove_if(
-                    ws.begin(),
-                    ws.end(),
-                    [](WatchedType& watch){
-                        return watch.ineq == nullptr;
-                    }
-                ),
-                ws.end()
-            );
-
-            current.qhead += 1;
-        }
-
     }
 
     bool checkSat(std::vector<int>& lits) {

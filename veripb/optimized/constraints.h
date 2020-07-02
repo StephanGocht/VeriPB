@@ -312,10 +312,10 @@ struct WatchInfo {
 };
 
 template<typename T>
-class FixedSizeInequality {
+class alignas(64) FixedSizeInequality {
 private:
-    int _size;
-    size_t watchSize = 0;
+    uint32_t _size;
+    uint32_t watchSize = 0;
 
 public:
     T degree;
@@ -444,6 +444,7 @@ public:
                         w.ineq = this;
                         w.other = blockingLiteral;
                         prop.watch(terms[i].lit, w);
+                        slack += terms[i].coeff;
                         j++;
                         break;
                     }
@@ -459,9 +460,7 @@ public:
                         }
                     }
                 }
-            }
-
-            if (value[terms[i].lit] != State::False) {
+            } else {
                 slack += terms[i].coeff;
             }
 

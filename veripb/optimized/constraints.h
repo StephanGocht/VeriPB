@@ -459,6 +459,11 @@ public:
         // }
 
         Lit blockingLiteral = Lit::Undef();
+        if (size() >= 2) {
+            if (std::abs(terms[1].coeff) >= degree) {
+                blockingLiteral = terms[1].lit;
+            }
+        }
 
         for (size_t i = 0; i < this->watchSize; i++) {
             if (value[terms[i].lit] == State::False) {
@@ -833,15 +838,15 @@ public:
 
             WatchList& ws = watchlist[falsifiedLit];
 
-            WatchedType* end = ws.data() + ws.size();
+            const WatchedType* end = ws.data() + ws.size();
             WatchedType* it  = ws.data();
             WatchedType* sat = ws.data();
-            for (; it != end; it++) {
-                if (assignment.value[it->other] == State::True) {
-                    std::swap(*it, *sat);
-                    ++sat;
-                }
-            }
+            // for (; it != end; it++) {
+            //     if (assignment.value[it->other] == State::True) {
+            //         std::swap(*it, *sat);
+            //         ++sat;
+            //     }
+            // }
 
 
             WatchedType* next = &(*sat);
@@ -855,7 +860,10 @@ public:
                 }
                 assert(next->other != Lit::Undef() || assignment.value[next->other] == State::Unassigned);
 
-                bool keepWatch = next->ineq->template updateWatch<false>(*this, falsifiedLit);
+                bool keepWatch = true;
+                if (assignment.value[next->other] != State::True) {
+                    keepWatch = next->ineq->template updateWatch<false>(*this, falsifiedLit);
+                }
                 if (keepWatch) {
                     *kept = *next;
                     kept += 1;

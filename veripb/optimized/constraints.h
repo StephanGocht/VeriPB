@@ -839,8 +839,8 @@ public:
             WatchList& ws = watchlist[falsifiedLit];
 
             const WatchedType* end = ws.data() + ws.size();
-            WatchedType* it  = ws.data();
             WatchedType* sat = ws.data();
+            // WatchedType* it  = ws.data();
             // for (; it != end; it++) {
             //     if (assignment.value[it->other] == State::True) {
             //         std::swap(*it, *sat);

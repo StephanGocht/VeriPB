@@ -396,18 +396,22 @@ public:
     }
 
 
-    void swapWatch(PropEngine<T>& prop, size_t& i, size_t& j, T& slack, bool& keepWatch, Lit& blockingLiteral, Lit& falsifiedLit) {
+    void swapWatch(PropEngine<T>& prop, size_t& i, size_t& j, bool& keepWatch, Lit& blockingLiteral, Lit& falsifiedLit, bool init) {
         const Lit old = terms[i].lit;
         const Lit nw = terms[j].lit;
-        if (old != falsifiedLit) {
+        if (old != falsifiedLit && !init) {
             auto& wl = prop.watchlist[old];
-            for (auto& w: wl) {
+            int found = 0;
+            for (size_t i = 0; i < wl.size(); ++i) {
+                auto& w = wl[i];
                 if (w.ineq == this) {
                     std::swap(w, wl.back());
                     wl.pop_back();
-                    break;
+                    // break;
+                    found += 1;
                 }
             }
+            assert(found == 1);
         } else {
             keepWatch = false;
         }
@@ -418,7 +422,6 @@ public:
         w.ineq = this;
         w.other = blockingLiteral;
         prop.watch(nw, w);
-        slack += terms[i].coeff;
     }
 
     // returns if the watch is kept
@@ -429,7 +432,7 @@ public:
         prop.visit += 1;
 
         // std::cout << "updateWatch: " << *this << std::endl;
-        bool init = autoInit && (watchSize == 0);
+        const bool init = autoInit && (watchSize == 0);
         if (init) {
             computeWatchSize();
             registerOccurence(prop);
@@ -469,27 +472,31 @@ public:
             if (value[terms[i].lit] == State::False) {
                 if (init) {for (;k < size(); k++) {
                     if (prop.phase[terms[k].lit] == State::True) {
-                        swapWatch(prop,i,k,slack,keepWatch,blockingLiteral,falsifiedLit);
+                        swapWatch(prop,i,k,keepWatch,blockingLiteral,falsifiedLit,init);
+                        slack += terms[i].coeff;
                         k++;
                         goto found_new_watch;
                     }
                 }}
                 for (;j < size(); j++) {
                     if (value[terms[j].lit] != State::False) {
-                        swapWatch(prop,i,j,slack,keepWatch,blockingLiteral,falsifiedLit);
+                        swapWatch(prop,i,j,keepWatch,blockingLiteral,falsifiedLit,init);
+                        slack += terms[i].coeff;
                         j++;
                         goto found_new_watch;
                     }
                 }
+
+                found_new_watch:
+                ;
             } else {
                 slack += terms[i].coeff;
-            }
 
-            found_new_watch:
-            if (init) {
-                WatchInfo<T> w;
-                w.ineq = this;
-                prop.watch(terms[i].lit, w);
+                if (init) {
+                    WatchInfo<T> w;
+                    w.ineq = this;
+                    prop.watch(terms[i].lit, w);
+                }
             }
 
             if (std::abs(terms[i].coeff) >= degree) {
@@ -921,10 +928,13 @@ public:
     }
 
     void attach(Inequality<T>* ineq) {
-        dbMem += ineq->mem();
-        cumDbMem += ineq->mem();
-        maxDbMem = std::max(dbMem, maxDbMem);
-        unattached.push_back(ineq);
+        if (!ineq->isAttached) {
+            ineq->isAttached = true;
+            dbMem += ineq->mem();
+            cumDbMem += ineq->mem();
+            maxDbMem = std::max(dbMem, maxDbMem);
+            unattached.push_back(ineq);
+        }
     }
 
     void attachUnattached() {
@@ -938,16 +948,20 @@ public:
 
     void detach(Inequality<T>* ineq) {
         if (ineq != nullptr) {
-            dbMem -= ineq->mem();
-            auto foundIt = std::find(
-                unattached.rbegin(), unattached.rend(), ineq);
+            if (ineq->isAttached) {
+                ineq->isAttached = false;
 
-            if (foundIt != unattached.rend()) {
-                std::swap(*foundIt, unattached.back());
-                assert(unattached.back() == ineq);
-                unattached.pop_back();
-            } else {
-                ineq->clearWatches(*this);
+                dbMem -= ineq->mem();
+                auto foundIt = std::find(
+                    unattached.rbegin(), unattached.rend(), ineq);
+
+                if (foundIt != unattached.rend()) {
+                    std::swap(*foundIt, unattached.back());
+                    assert(unattached.back() == ineq);
+                    unattached.pop_back();
+                } else {
+                    ineq->clearWatches(*this);
+                }
             }
         }
     }
@@ -1197,6 +1211,8 @@ private:
     static std::vector<FatInequalityPtr<T>> pool;
 
 public:
+    bool isAttached = false;
+
     Inequality(Inequality& other)
         : handler(other.handler) {
             assert(other.loaded == false);

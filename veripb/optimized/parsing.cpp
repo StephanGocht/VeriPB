@@ -274,6 +274,11 @@ int parseCoeff<int>(const WordIter& it, size_t start, size_t length) {
     return parseInt(it, "Expected coefficient", start, length);
 }
 
+template<>
+int64_t parseCoeff<int64_t>(const WordIter& it, size_t start, size_t length) {
+    return parseInt(it, "Expected coefficient", start, length);
+}
+
 class VariableNameManager {
     std::unordered_map<std::string, int> name2num;
     std::vector<std::string> num2name;

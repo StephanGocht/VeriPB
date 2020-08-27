@@ -10,9 +10,9 @@
 #include <cstdlib>
 #include <iomanip>
 
-using CoefType = int;
+using CoefType = int32_t;
 // use the following line istead to increas precision.
-// using CoefType = long long;
+// using CoefType = int64_t;
 
 #undef assert
 #ifdef NDEBUG

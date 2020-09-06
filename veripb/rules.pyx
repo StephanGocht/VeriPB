@@ -106,6 +106,9 @@ class DeleteConstraints(Rule):
             if (which[-1] == 0):
                 which = which[:-1]
 
+            if 0 in which:
+                raise ValueError("Can not delete constraint with index 0.")
+
         return cls(which)
 
     def __init__(self, toDelete):

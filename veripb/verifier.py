@@ -9,6 +9,8 @@ import logging
 import time
 import argparse
 
+import gc
+
 class Context():
     pass
 
@@ -238,10 +240,14 @@ class Verifier():
         for i in deletedConstraints:
             self.detach(self.db[i])
 
-            # clean constraint to supress superficial warning
+            # clean up references, to not get spicious warnings
             constraint = None
+            antecedents = None
+
             refcount = sys.getrefcount(self.db[i])
-            if (refcount > 2):
+            if (refcount > 3):
+                # todo: refcount should be at-most 2, except for
+                # constraints that apear in the formula.
                 logging.warn("Internal Warning: refcount of "
                     "deleted constraint too large (is %i), memory will "
                     "not be freed."%(refcount))

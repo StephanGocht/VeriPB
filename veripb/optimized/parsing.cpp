@@ -210,7 +210,7 @@ ParseError::ParseError(const WordIter& it, const std::string& what_arg)
  */
 template<typename T>
 T parseCoeff(const WordIter& it){
-    std::cout  << it->size() << std::endl;
+    // std::cout  << it->size() << std::endl;
     return parseCoeff<T>(it, 0, it->size());
 };
 

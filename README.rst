@@ -36,9 +36,9 @@ Installation
 
 ::
 
-    git clone git@github.com:StephanGocht/VeriPB.git
+    git clone git@gitlab.com:miao_research/VeriPB.git
     cd ./VeriPB
-    pip3 install -e ./
+    pip3 install --user -e ./ 
 
 Run ``veripb --help`` for help. Note that the first call to veripb
 after installation or update will take a while as it is compiling

@@ -1,5 +1,4 @@
 from setuptools import setup, Extension
-from Cython.Build import cythonize
 
 def get_pybind_include():
     """Helper class to determine the pybind11 include path
@@ -15,19 +14,19 @@ ext_modules = [
         'veripb.optimized.pybindings',
         # Sort input source files to ensure bit-for-bit reproducible builds
         # (https://github.com/pybind/python_example/pull/53)
-        ["veripb/optimized/pybindings.cpp",
-         "veripb/optimized/constraints.cpp",
-         "veripb/optimized/parsing.cpp"],
+        ['veripb/optimized/pybindings.cpp',
+         'veripb/optimized/constraints.cpp',
+         'veripb/optimized/parsing.cpp'],
         include_dirs=[
             # Path to pybind11 headers
             get_pybind_include(),
         ],
         extra_compile_args=['--std=c++17', '-DPY_BINDINGS'],
         language='c++'
-    )
+    ),
+    Extension('veripb.constraints', sources=['veripb/constraints.pyx']),
+    Extension('veripb.rules', sources=['veripb/rules.pyx']),
 ]
-
-ext_modules.extend(cythonize("**/*.pyx"))
 
 setup(
     name='veripb',
@@ -38,9 +37,17 @@ setup(
     author_email='stephan@gobro.de',
     license='MIT',
     packages=['veripb'],
+    setup_requires=[
+        # Setuptools 18.0 properly handles Cython extensions.
+        'setuptools>=18.0',
+        'cython',
+        'pybind11'
+    ],
     install_requires=[
-        "cppimport",
-        "cython"
+        'cppimport',
+        'cython',
+        'pyximport',
+        'pybind11'
     ],
     entry_points={
         'console_scripts': [

@@ -2,10 +2,10 @@ import argparse
 import logging
 
 import os
-import pyximport; pyximport.install(
-    language_level=3,
-    build_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)), "__pycache__/pyximport")
-)
+# import pyximport; pyximport.install(
+#     language_level=3,
+#     build_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)), "__pycache__/pyximport")
+# )
 
 from veripb import InvalidProof
 from veripb import ParseError

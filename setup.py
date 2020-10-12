@@ -46,7 +46,7 @@ setup(
     install_requires=[
         'cppimport',
         'cython',
-        'pyximport',
+        # 'pyximport', part of cython, no extra pacage exists
         'pybind11'
     ],
     entry_points={

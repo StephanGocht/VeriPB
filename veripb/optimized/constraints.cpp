@@ -37,7 +37,7 @@ int main(int argc, char const *argv[])
         m.doc() = "Efficient implementation for linear combinations of constraints.";
 
         py::class_<PropEngine<CoefType>>(m, "PropEngine")
-            .def(py::init<CoefType>())
+            .def(py::init<size_t>())
             .def("attach", &PropEngine<CoefType>::attach)
             .def("detach", &PropEngine<CoefType>::detach)
             .def("reset", &PropEngine<CoefType>::reset)

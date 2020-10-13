@@ -6,7 +6,6 @@
 #include <chrono>
 #include <algorithm>
 #include <functional>
-
 #include <cstdlib>
 #include <iomanip>
 
@@ -15,8 +14,8 @@
 
 #include <type_traits>
 
-// using CoefType = mpz_class;
-using CoefType = int;
+using CoefType = mpz_class;
+// using CoefType = int;
 // use the following line istead to increas precision.
 // using CoefType = long long;
 
@@ -64,6 +63,12 @@ T divideAndRoundUp(T value, T divisor) {
     return (value + divisor - 1) / divisor;
 }
 
+namespace std {
+    mpz_class abs(mpz_class num) {
+        return abs(num);
+    }
+}
+
 typedef uint32_t LitData;
 
 class Var {
@@ -83,9 +88,9 @@ class Lit {
 private:
     LitData value;
 
+public:
     Lit(){}
 
-public:
     explicit Lit(int t)
         : value((std::abs(t) << 1) + (t < 0 ? 1 : 0))
     {}
@@ -209,6 +214,8 @@ template<typename T>
 struct Term {
     T coeff;
     Lit lit;
+
+    Term(){}
 
     Term(T coeff_, Lit lit_)
         : coeff(coeff_)
@@ -461,7 +468,7 @@ private:
     }
 
     void registerOccurence(PropEngine<T>& prop) {
-        for (Term<T>& term: *this) {
+        for (Term<T>& term: this->terms) {
             prop.addOccurence(term.lit, *this);
         }
     }
@@ -622,7 +629,7 @@ public:
 
     void negate() {
         this->degree = -this->degree + 1;
-        for (Term<T>& term:*this) {
+        for (Term<T>& term:this->terms) {
             this->degree += term.coeff;
             term.lit = ~term.lit;
         }
@@ -630,12 +637,12 @@ public:
 
     bool implies(const FixedSizeInequality& other) const {
         std::unordered_map<size_t, Term<T>> lookup;
-        for (const Term<T>& term:other) {
+        for (const Term<T>& term:other.terms) {
             lookup.insert(std::make_pair(term.lit.var(), term));
         }
 
         T weakenCost = 0;
-        for (const Term<T>& mine:*this) {
+        for (const Term<T>& mine:this->terms) {
             using namespace std;
             size_t var = mine.lit.var();
 
@@ -660,7 +667,7 @@ public:
 
     bool isSatisfied(const Assignment& a) const {
         T slack = -this->degree;
-        for (const Term<T>& term:*this) {
+        for (const Term<T>& term:this->terms) {
             if (a[term.lit] == State::True) {
                 slack += term.coeff;
             }
@@ -692,26 +699,6 @@ public:
 
     size_t mem() const {
         return sizeof(FixedSizeInequality<T>) + terms.size() * sizeof(Term<T>);
-    }
-
-    size_t size() const {
-        return terms.size();
-    }
-
-    const Term<T>* begin() const {
-        return terms.begin();
-    }
-
-    const Term<T>* end() const {
-        return terms.end();
-    }
-
-    Term<T>* begin() {
-        return terms.begin();;
-    }
-
-    Term<T>* end() {
-        return terms.end();
     }
 };
 
@@ -756,7 +743,7 @@ public:
     size_t capacity = 0;
 
     FixedSizeInequalityHandler(const FixedSizeInequality<T>& copyFrom) {
-        void* addr = malloc(copyFrom.size());
+        void* addr = malloc(copyFrom.terms.size());
         ineq = new (addr) FixedSizeInequality<T>(copyFrom);
     }
 
@@ -1208,7 +1195,7 @@ public:
         bussy = true;
 
         this->degree = ineq.degree;
-        for (Term<T>& term: ineq) {
+        for (Term<T>& term: ineq.terms) {
             T coeff = cpsign(term.coeff, term.lit);
             using namespace std;
 
@@ -1219,7 +1206,7 @@ public:
     void unload(FixedSizeInequality<T>& ineq) {
         bussy = false;
 
-        Term<T>* pos = ineq.begin();
+        auto pos = ineq.terms.begin();
         for (Var var: this->usedList) {
             T coeff = this->coeffs[var];
             Lit lit(var, coeff < 0);
@@ -1227,7 +1214,7 @@ public:
             coeff = abs(coeff);
 
             if (coeff > 0) {
-                assert(pos != ineq.end());
+                assert(pos != ineq.terms.end());
                 pos->coeff = coeff;
                 pos->lit = lit;
                 pos += 1;
@@ -1236,7 +1223,7 @@ public:
             this->coeffs[var] = 0;
             this->used[var] = false;
         }
-        assert(pos == ineq.end());
+        assert(pos == ineq.terms.end());
         this->usedList.clear();
 
         ineq.degree = this->degree;
@@ -1255,7 +1242,7 @@ public:
 
 
     void add(const FixedSizeInequality<T>& other) {
-        for (const Term<T> &term:other) {
+        for (const Term<T> &term:other.terms) {
             using namespace std;
             T b = cpsign(term.coeff, term.lit);
             Var var = term.lit.var();
@@ -1332,7 +1319,7 @@ public:
     void freeze(size_t numVars) {
         contract();
 
-        for (Term<T> term: *ineq) {
+        for (Term<T> term: ineq->terms) {
             assert(term.lit.var() <= numVars);
         }
 
@@ -1356,12 +1343,12 @@ public:
         assert(!frozen);
         contract();
 
-        for (Term<T>& term: *ineq) {
+        for (Term<T>& term: ineq->terms) {
             using namespace std;
             term.coeff = min(term.coeff, ineq->degree);
         }
 
-        if (ineq->degree <= 0 && ineq->size() > 0) {
+        if (ineq->degree <= 0 && ineq->terms.size() > 0) {
             // nasty hack to shrink the constraint as this should not
             // happen frequently anyway.
             expand();
@@ -1375,7 +1362,7 @@ public:
         assert(!frozen);
         contract();
         ineq->degree = divideAndRoundUp(ineq->degree, divisor);
-        for (Term<T>& term: *ineq) {
+        for (Term<T>& term: ineq->terms) {
             term.coeff = divideAndRoundUp(term.coeff, divisor);
         }
         return this;
@@ -1385,7 +1372,7 @@ public:
         assert(!frozen);
         contract();
         ineq->degree *= factor;
-        for (Term<T>& term: *ineq) {
+        for (Term<T>& term: ineq->terms) {
             term.coeff *= factor;
         }
         return this;
@@ -1426,9 +1413,9 @@ public:
     bool eq(Inequality* other) {
         contract();
         other->contract();
-        std::vector<Term<T>> mine(ineq->begin(), ineq->end());
+        std::vector<Term<T>> mine(ineq->terms.begin(), ineq->terms.end());
         sort(mine.begin(), mine.end(), orderByVar<Term<T>>);
-        std::vector<Term<T>> theirs(other->ineq->begin(), other->ineq->end());
+        std::vector<Term<T>> theirs(other->ineq->terms.begin(), other->ineq->terms.end());
         sort(theirs.begin(), theirs.end(), orderByVar<Term<T>>);
         return (mine == theirs) && (ineq->degree == other->ineq->degree);
     }
@@ -1436,7 +1423,7 @@ public:
     std::string toString(std::function<std::string(int)> varName) {
         contract();
         std::stringstream s;
-        for (Term<T> &term: *ineq) {
+        for (Term<T> &term: ineq->terms) {
             using namespace std;
             s << term.coeff << " ";
             if (term.lit.isNegated()) {
@@ -1488,7 +1475,7 @@ public:
     bool isContradiction(){
         contract();
         T slack = -ineq->degree;
-        for (Term<T> term: *ineq) {
+        for (Term<T> term: ineq->terms) {
             slack += term.coeff;
         }
         return slack < 0;

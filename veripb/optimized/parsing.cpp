@@ -590,23 +590,23 @@ std::unique_ptr<Formula<T>> parseOpb(std::string fileName, VariableNameManager& 
     return result;
 }
 
-int main(int argc, char const *argv[])
-{
+// int main(int argc, char const *argv[])
+// {
 
-    std::cout << "start reading file..." << std::endl;
-    std::string fileName(argv[1]);
-    std::ifstream f(fileName);
+//     std::cout << "start reading file..." << std::endl;
+//     std::string fileName(argv[1]);
+//     std::ifstream f(fileName);
 
 
-    VariableNameManager manager(false);
-    OPBParser<int> parser(manager);
-    try {
-        std::cout << parser.parse(f, fileName)->getConstraints().size() << std::endl;
-    } catch (const ParseError& e) {
-        std::cout << e.what() << std::endl;
-    }
-    return 0;
-}
+//     VariableNameManager manager(false);
+//     OPBParser<int> parser(manager);
+//     try {
+//         std::cout << parser.parse(f, fileName)->getConstraints().size() << std::endl;
+//     } catch (const ParseError& e) {
+//         std::cout << e.what() << std::endl;
+//     }
+//     return 0;
+// }
 
 #ifdef PY_BINDINGS
 void init_parsing(py::module &m){

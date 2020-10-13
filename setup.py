@@ -17,11 +17,15 @@ ext_modules = [
         ['veripb/optimized/pybindings.cpp',
          'veripb/optimized/constraints.cpp',
          'veripb/optimized/parsing.cpp'],
+        depends=[
+         'veripb/optimized/constraints.h',
+        ],
         include_dirs=[
             # Path to pybind11 headers
             get_pybind_include(),
         ],
         extra_compile_args=['--std=c++17', '-DPY_BINDINGS'],
+        libraries=['gmp', 'gmpxx'],
         language='c++'
     ),
     Extension('veripb.constraints', sources=['veripb/constraints.pyx']),

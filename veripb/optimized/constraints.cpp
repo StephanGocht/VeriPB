@@ -7,30 +7,30 @@
 #endif
 
 #include "constraints.h"
-// int main(int argc, char const *argv[])
-// {
-//     /* code */
-//     {
-//     Inequality<CoefType> foo({1,1,1},{1,1,1},1);
-//     Inequality<CoefType> baa({1,1,1},{-1,-1,-1},3);
-//     PropEngine<CoefType> p(10);
-//     foo.eq(&baa);
-//     foo.implies(&baa);
-//     foo.negated();
-//     Inequality<CoefType> test(baa);
-//     p.attach(&foo);
-//     p.attachTmp(&baa);
-//     }
-//     Inequality<CoefType> foo({1,1,1},{1,1,1},1);
 
-//     std::cout << foo.isContradiction() << std::endl;
+int main(int argc, char const *argv[])
+{
+    /* code */
+    {
+    Inequality<CoefType> foo({1,1,1},{1,1,1},1);
+    Inequality<CoefType> baa({1,1,1},{-1,-1,-1},3);
+    PropEngine<CoefType> p(10);
+    foo.eq(&baa);
+    foo.implies(&baa);
+    foo.negated();
+    Inequality<CoefType> test(baa);
+    p.attach(&foo);
+    }
+    Inequality<CoefType> foo({1,1,1},{1,1,1},1);
 
-//     std::cout << std::endl;
-//     std::cout << (~Lit(Var(2), false)).var() << std::endl;
-//     int test = 4 ^ 1;
-//     std::cout << test << std::endl;
-//     return 0;
-// }
+    std::cout << foo.isContradiction() << std::endl;
+
+    std::cout << std::endl;
+    std::cout << (~Lit(Var(2), false)).var() << std::endl;
+    int test = 4 ^ 1;
+    std::cout << test << std::endl;
+    return 0;
+}
 
 #ifdef PY_BINDINGS
     void init_constraints(py::module &m){

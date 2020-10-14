@@ -6,7 +6,7 @@
     namespace py = pybind11;
 #endif
 
-#include "constraints.h"
+#include "constraints.hpp"
 
 int main(int argc, char const *argv[])
 {
@@ -32,6 +32,8 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
+
+
 #ifdef PY_BINDINGS
     void init_constraints(py::module &m){
         m.doc() = "Efficient implementation for linear combinations of constraints.";
@@ -47,7 +49,7 @@ int main(int argc, char const *argv[])
 
 
         py::class_<Inequality<CoefType>>(m, "CppInequality")
-            .def(py::init<std::vector<CoefType>&, std::vector<CoefType>&, CoefType>())
+            .def(py::init<std::vector<CoefType>&, std::vector<int>&, CoefType>())
             .def("saturate", &Inequality<CoefType>::saturate)
             .def("divide", &Inequality<CoefType>::divide)
             .def("multiply", &Inequality<CoefType>::multiply)

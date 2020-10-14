@@ -6,7 +6,9 @@
 #include <unordered_map>
 #include <vector>
 #include <cctype>
-#include "constraints.h"
+
+#include "constraints.hpp"
+#include "BigInt.hpp"
 
 #ifdef PY_BINDINGS
     #include <pybind11/pybind11.h>
@@ -272,6 +274,30 @@ int parseInt(const WordIter& it, std::string msg) {
 template<>
 int parseCoeff<int>(const WordIter& it, size_t start, size_t length) {
     return parseInt(it, "Expected coefficient", start, length);
+}
+
+template<>
+BigInt parseCoeff<BigInt>(const WordIter& word, size_t start, size_t length){
+    assert(word->size() >= start + length);
+    assert(length > 0);
+
+    if (!word.isEnd()) {
+        throw ParseError(word, "Expected Number.");
+    }
+
+    const char* it = word->data() + start;
+    if (*it == '+') {
+        it += 1;
+    }
+    // copy to string to get \0 terminated string
+    std::string subString(it, length);
+    try {
+        return BigInt(subString);
+    } catch (...) {
+        throw ParseError(word, "Error while parsing number.");
+    }
+
+
 }
 
 class VariableNameManager {

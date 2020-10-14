@@ -391,4 +391,7 @@ class CppIneqFactory(IneqFactory):
 
     def fromTerms(self, terms, degree):
         ineq = super().fromTerms(terms, degree)
-        return CppInequality(*terms2lists(ineq.terms), ineq.degree)
+        coefs, lits = terms2lists(ineq.terms)
+        coefs = list(coefs)
+        lits  = list(lits)
+        return CppInequality(coefs, lits, ineq.degree)

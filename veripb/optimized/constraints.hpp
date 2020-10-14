@@ -8,13 +8,11 @@
 #include <functional>
 #include <cstdlib>
 #include <iomanip>
-
-
-#include <gmpxx.h>
-
 #include <type_traits>
 
-using CoefType = mpz_class;
+#include "BigInt.hpp"
+
+using CoefType = BigInt;
 // using CoefType = int;
 // use the following line istead to increas precision.
 // using CoefType = long long;
@@ -61,12 +59,6 @@ public:
 template<typename T>
 T divideAndRoundUp(T value, T divisor) {
     return (value + divisor - 1) / divisor;
-}
-
-namespace std {
-    mpz_class abs(mpz_class num) {
-        return abs(num);
-    }
 }
 
 typedef uint32_t LitData;

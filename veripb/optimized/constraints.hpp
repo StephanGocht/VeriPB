@@ -12,10 +12,10 @@
 
 #include "BigInt.hpp"
 
-using CoefType = BigInt;
-// using CoefType = int;
-// use the following line istead to increas precision.
+using CoefType = int;
+// use one of the following lines istead to increas precision.
 // using CoefType = long long;
+// using CoefType = BigInt;
 
 // #undef NDEBUG
 

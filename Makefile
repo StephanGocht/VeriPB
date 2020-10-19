@@ -7,3 +7,6 @@ test:
 
 install:
 	pip3 install ${ROOT_DIR}
+
+clean:
+	find . -name "*.so" -delete

@@ -67,5 +67,34 @@ int main(int argc, char const *argv[])
             .def("toOPB", &Inequality<CoefType>::repr)
             .def("isContradiction", &Inequality<CoefType>::isContradiction);
 
+        py::class_<PropEngine<BigInt>>(m, "PropEngineBigInt")
+            .def(py::init<size_t>())
+            .def("attach", &PropEngine<BigInt>::attach)
+            .def("detach", &PropEngine<BigInt>::detach)
+            .def("reset", &PropEngine<BigInt>::reset)
+            .def("checkSat", &PropEngine<BigInt>::checkSat)
+            .def("increaseNumVarsTo", &PropEngine<BigInt>::increaseNumVarsTo)
+            .def("printStats", &PropEngine<BigInt>::printStats);
+
+
+        py::class_<Inequality<BigInt>>(m, "CppInequalityBigInt")
+            .def(py::init<std::vector<BigInt>&, std::vector<int>&, BigInt>())
+            .def("saturate", &Inequality<BigInt>::saturate)
+            .def("divide", &Inequality<BigInt>::divide)
+            .def("multiply", &Inequality<BigInt>::multiply)
+            .def("add", &Inequality<BigInt>::add)
+            .def("contract", &Inequality<BigInt>::contract)
+            .def("copy", &Inequality<BigInt>::copy)
+            .def("implies", &Inequality<BigInt>::implies)
+            .def("expand", &Inequality<BigInt>::expand)
+            .def("contract", &Inequality<BigInt>::contract)
+            .def("negated", &Inequality<BigInt>::negated)
+            .def("ratCheck", &Inequality<BigInt>::ratCheck)
+            .def("__eq__", &Inequality<BigInt>::eq)
+            .def("__repr__", &Inequality<BigInt>::repr)
+            .def("toString", &Inequality<BigInt>::toString)
+            .def("toOPB", &Inequality<BigInt>::repr)
+            .def("isContradiction", &Inequality<BigInt>::isContradiction);
+
     }
 #endif

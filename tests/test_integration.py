@@ -5,13 +5,18 @@ from pathlib import Path
 from env import veripb
 from veripb import run, InvalidProof, ParseError
 
+from veripb.utils import Settings as MiscSettings
+
 class TestIntegration(unittest.TestCase):
     def run_single(self, formulaPath):
         proofPath = formulaPath.with_suffix(".proof")
         print("veripb %s %s"%(formulaPath, proofPath))
+
+        miscSettings = MiscSettings({"arbitraryPrecision": True})
+
         with formulaPath.open() as formula:
             with proofPath.open() as proof:
-                run(formula, proof)
+                run(formula, proof, miscSettings = miscSettings)
 
     def correct_proof(self, formulaPath):
         self.run_single(formulaPath)

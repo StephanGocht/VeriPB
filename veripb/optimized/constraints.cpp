@@ -61,7 +61,8 @@
             .def("__eq__", &Inequality<CoefType>::eq)
             .def("__repr__", &Inequality<CoefType>::repr)
             .def("toString", &Inequality<CoefType>::toString)
-            .def("isContradiction", &Inequality<CoefType>::isContradiction);
+            .def("isContradiction", &Inequality<CoefType>::isContradiction)
+            .def("weaken", &Inequality<CoefType>::weaken);
 
     }
 #endif

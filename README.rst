@@ -38,7 +38,7 @@ Installation
 
     git clone git@gitlab.com:miao_research/VeriPB.git
     cd ./VeriPB
-    pip3 install --user -e ./ 
+    pip3 install --user -e ./
 
 Run ``veripb --help`` for help. Note that the first call to veripb
 after installation or update will take a while as it is compiling
@@ -218,6 +218,13 @@ Where ``[literal]`` is a variable name or its negation (``~``) and
 generates the constraint that the literal is greater equal zero.
 For example for ``~x1`` this generates the constraint ~x1 >= 0.
 
+* Weakening::
+
+    [constraint] [variable] w
+
+Where ``[variable]`` is a variable name and may not contain negation.
+This step adds literal axioms such that ``[variable]`` disapears from
+the constraint, i.e., its coefficient becomes zero.
 
 Conclusion
 ^^^^^^^^^^

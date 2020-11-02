@@ -65,7 +65,8 @@ int main(int argc, char const *argv[])
             .def("__repr__", &Inequality<CoefType>::repr)
             .def("toString", &Inequality<CoefType>::toString)
             .def("toOPB", &Inequality<CoefType>::repr)
-            .def("isContradiction", &Inequality<CoefType>::isContradiction);
+            .def("isContradiction", &Inequality<CoefType>::isContradiction)
+            .def("weaken", &Inequality<CoefType>::weaken);
 
         py::class_<PropEngine<BigInt>>(m, "PropEngineBigInt")
             .def(py::init<size_t>())
@@ -94,7 +95,8 @@ int main(int argc, char const *argv[])
             .def("__repr__", &Inequality<BigInt>::repr)
             .def("toString", &Inequality<BigInt>::toString)
             .def("toOPB", &Inequality<BigInt>::repr)
-            .def("isContradiction", &Inequality<BigInt>::isContradiction);
+            .def("isContradiction", &Inequality<BigInt>::isContradiction)
+            .def("weaken", &Inequality<BigInt>::weaken);
 
     }
 #endif

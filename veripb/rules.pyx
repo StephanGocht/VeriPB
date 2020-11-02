@@ -1,3 +1,5 @@
+import logging
+
 import veripb.constraints
 from veripb.constraints import Term
 from veripb.parser import OPBParser, WordParser
@@ -452,7 +454,7 @@ class ReversePolishNotation(Rule):
         def f(word):
             nonlocal stackSize
 
-            if word in ["+", "*", "d"]:
+            if word in ["+", "*", "d", "w"]:
                 stackSize -= 1
             elif word == "r":
                 stackSize -= 2
@@ -505,7 +507,7 @@ class ReversePolishNotation(Rule):
                 current = next(self.instructions)
                 if isinstance(current, int):
                     return current
-                if current in ["*", "d", "r"]:
+                if current in ["*", "d", "r", "w"]:
                     # consume one more, remember that we swaped the right operand and operator
                     next(self.instructions)
 
@@ -515,7 +517,7 @@ class ReversePolishNotation(Rule):
             # needs to be a constant and not a constraint, so we (can) switch
             # positions, which makes it easier to distinguish constraints from
             # constants later on
-            if x in ["*", "d", "r"]:
+            if x in ["*", "d", "r", "w"]:
                 instructions[i] = instructions[i - 1]
                 instructions[i - 1] = x
 
@@ -537,6 +539,8 @@ class ReversePolishNotation(Rule):
                 if what == "l":
                     lit = ins[1]
                     stack.append(context.ineqFactory.litAxiom(lit))
+                else:
+                    assert(False)
             elif ins == "+":
                 second = stack.pop()
                 first  = stack.pop()
@@ -557,6 +561,16 @@ class ReversePolishNotation(Rule):
             elif ins == "s":
                 constraint = stack.pop()
                 stack.append(constraint.saturate())
+            elif ins == "w":
+                nxt = next(it, None)
+                assert(nxt[0] == "l")
+                lit = nxt[1]
+                if lit < 0:
+                    logging.warn("Weakening step ignores sign of literals.")
+                    lit = abs(lit)
+                constraint = stack.pop()
+                stack.append(constraint.weaken(lit))
+
 
             ins = next(it, None)
 

@@ -1232,6 +1232,10 @@ public:
         return result;
     }
 
+    void weaken(Var var) {
+        this->degree -= abs(this->coeffs[var]);
+        this->coeffs[var] = 0;
+    }
 
     void add(const FixedSizeInequality<T>& other) {
         for (const Term<T> &term:other.terms) {
@@ -1462,6 +1466,14 @@ public:
     Inequality* copy(){
         contract();
         return new Inequality(*this);
+    }
+
+    Inequality* weaken(int _var) {
+        assert(_var >= 0);
+        Var var(_var);
+        expand();
+        expanded->weaken(var);
+        return this;
     }
 
     bool isContradiction(){

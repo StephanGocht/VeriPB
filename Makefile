@@ -15,7 +15,7 @@ test:
 	python3 -m pytest ${ROOT_DIR}
 
 install:
-	pip3 install ${ROOT_DIR}
+	pip3 install --user -e ${ROOT_DIR}
 
 cpp ${CPP_FILES} ${HPP_FILES}:
 	$(CXX) -Wall -shared -std=c++17 -fPIC \

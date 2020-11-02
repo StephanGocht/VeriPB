@@ -9,7 +9,9 @@ HPP_FILES:=\
 	./veripb/optimized/BigInt.hpp \
 	./veripb/optimized/constraints.hpp
 
-.PHONY: install test
+.PHONY: install test all
+
+all: install
 
 test:
 	python3 -m pytest ${ROOT_DIR}

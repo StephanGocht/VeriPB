@@ -181,7 +181,7 @@ class ReverseUnitPropagation(Rule):
                         "before the formula is loaded.")
 
                 for nxt in words:
-                    if nxt == "0":
+                    if nxt in ["0", ";"]:
                         break
                     w.append(context.ineqFactory.lit2int(nxt))
             else:
@@ -458,7 +458,7 @@ class ReversePolishNotation(Rule):
                 stackSize -= 1
             elif word == "r":
                 stackSize -= 2
-            elif word == "s":
+            elif word in ["s", ";"]:
                 stackSize += 0
             else:
                 if context.ineqFactory.isLit(word):
@@ -486,6 +486,8 @@ class ReversePolishNotation(Rule):
             if sequence[-1] == 0:
                 sequence.pop()
                 stackSize -= 1
+            if sequence[-1] == ";":
+                sequence.pop()
 
             if stackSize != 1:
                 raise ValueError("Stack should contain exactly one element at end of polish notation.");

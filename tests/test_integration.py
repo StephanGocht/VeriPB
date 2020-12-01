@@ -9,7 +9,7 @@ from veripb.utils import Settings as MiscSettings
 
 class TestIntegration(unittest.TestCase):
     def run_single(self, formulaPath):
-        proofPath = formulaPath.with_suffix(".proof")
+        proofPath = formulaPath.with_suffix(".pbp")
         print("veripb %s %s"%(formulaPath, proofPath))
 
         miscSettings = MiscSettings({"arbitraryPrecision": True})

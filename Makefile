@@ -15,7 +15,7 @@ HPP_FILES:=\
 
 all: install
 
-test:
+test: install
 	python3 -m pytest ${ROOT_DIR}
 
 install:

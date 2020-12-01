@@ -12,13 +12,12 @@ def get_pybind_include():
 ext_modules = [
     Extension(
         'veripb.optimized.pybindings',
-        # Sort input source files to ensure bit-for-bit reproducible builds
-        # (https://github.com/pybind/python_example/pull/53)
         ['veripb/optimized/pybindings.cpp',
          'veripb/optimized/constraints.cpp',
          'veripb/optimized/parsing.cpp'],
         depends=[
-         'veripb/optimized/constraints.h',
+         'veripb/optimized/constraints.hpp',
+         'veripb/optimized/BigInt.hpp',
         ],
         include_dirs=[
             # Path to pybind11 headers
@@ -34,7 +33,7 @@ ext_modules = [
 
 setup(
     name='veripb',
-    version='0.2-alpha',
+    version='0.3a0',
     description='Tool for verifying refutations.',
     url='http://github.com/StephanGocht/veripb',
     author='Stephan Gocht',

@@ -47,8 +47,11 @@ code.
 Update
 ------
 
-If installed as described above the tool can be updated with ``git pull``.
+If installed as described above the tool can be updated with
 
+::
+    git pull
+    pip3 install --user -e ./
 
 Getting Started
 ===============

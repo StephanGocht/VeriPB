@@ -414,11 +414,15 @@ class IsContradiction(Rule):
     @classmethod
     def parse(cls, line, context):
         with WordParser(line) as words:
-            which = words.nextInt()
-            words.expectZero()
-            words.expectEnd()
+            which = list(map(int, words))
 
-        return cls(which)
+            if (which[-1] == 0):
+                which = which[:-1]
+
+            if len(which) != 1:
+                raise ValueError("Expected exactly one constraintId.")
+
+        return cls(which[0])
 
     def __init__(self, constraintId):
         self.constraintId = constraintId
@@ -595,9 +599,11 @@ class LoadFormula(Rule):
         context.foundLoadFormula = True
         numConstraints = len(context.formula)
         with WordParser(line) as words:
-            num = words.nextInt()
+            try:
+                num = int(next(words))
+            except StopIteration:
+                num = 0
             if num == 0:
-                words.expectEnd()
                 return cls(numConstraints)
             else:
                 if num != numConstraints:

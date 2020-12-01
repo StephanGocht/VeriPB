@@ -2,10 +2,10 @@ import argparse
 import logging
 
 import os
-import pyximport; pyximport.install(
-    language_level=3,
-    build_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)), "__pycache__/pyximport")
-)
+# import pyximport; pyximport.install(
+#     language_level=3,
+#     build_dir=os.path.join(os.path.dirname(os.path.abspath(__file__)), "__pycache__/pyximport")
+# )
 
 from veripb import InvalidProof
 from veripb import ParseError
@@ -16,9 +16,9 @@ from veripb.rules import registered_rules
 from veripb.timed_function import TimedFunction
 from veripb.parser import RuleParser
 from veripb.exceptions import ParseError
-from veripb.optimized.constraints import PropEngine as CppPropEngine
-from veripb.optimized.parsing import parseOpb
-from veripb.constraints import PropEngine,CppIneqFactory,IneqFactory
+from veripb.optimized.constraints import PropEngine as CppPropEngine,PropEngineBigInt
+from veripb.optimized.parsing import parseOpb,parseOpbBigInt
+from veripb.constraints import PropEngine,CppIneqFactory,BigIntIneqFactory
 from time import perf_counter
 
 profile = False
@@ -29,8 +29,8 @@ if profile:
     from guppy import hpy
 
 @TimedFunction.time("LoadFormula")
-def loadFormula(file, varMgr):
-    formula = parseOpb(file, varMgr)
+def loadFormula(file, parser, varMgr):
+    formula = parser(file, varMgr)
     return {
         "numVariables": formula.maxVar,
         "constraints": formula.getConstraints(),
@@ -125,17 +125,19 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
 
     context = Context()
     if miscSettings.arbitraryPrecision:
-        context.ineqFactory = IneqFactory()
+        context.ineqFactory = BigIntIneqFactory()
     else:
         context.ineqFactory = CppIneqFactory()
 
     try:
         if miscSettings.drat or miscSettings.cnf:
             formula = CNFParser(context.ineqFactory).parse(formulaFile)
-        elif miscSettings.arbitraryPrecision:
-            formula = OPBParser(context.ineqFactory).parse(formulaFile)
         else:
-            formula = loadFormula(formulaFile.name, context.ineqFactory.varNameMgr)
+            if miscSettings.arbitraryPrecision:
+                parser = parseOpbBigInt
+            else:
+                parser = parseOpb
+            formula = loadFormula(formulaFile.name, parser, context.ineqFactory.varNameMgr)
     except ParseError as e:
         e.fileName = formulaFile.name
         raise e
@@ -144,7 +146,7 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
     context.objective = formula["objective"]
 
     if miscSettings.arbitraryPrecision:
-        context.propEngine = PropEngine()
+        context.propEngine = PropEngineBigInt(formula["numVariables"])
     else:
         context.propEngine = CppPropEngine(formula["numVariables"])
 

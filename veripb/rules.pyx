@@ -1,6 +1,7 @@
+import logging
+
 import veripb.constraints
 from veripb.constraints import Term
-from veripb.pbsolver import RoundingSat, Formula
 from veripb.parser import OPBParser, WordParser
 from veripb.timed_function import TimedFunction
 
@@ -180,7 +181,7 @@ class ReverseUnitPropagation(Rule):
                         "before the formula is loaded.")
 
                 for nxt in words:
-                    if nxt == "0":
+                    if nxt in ["0", ";"]:
                         break
                     w.append(context.ineqFactory.lit2int(nxt))
             else:
@@ -453,11 +454,11 @@ class ReversePolishNotation(Rule):
         def f(word):
             nonlocal stackSize
 
-            if word in ["+", "*", "d"]:
+            if word in ["+", "*", "d", "w"]:
                 stackSize -= 1
             elif word == "r":
                 stackSize -= 2
-            elif word == "s":
+            elif word in ["s", ";"]:
                 stackSize += 0
             else:
                 if context.ineqFactory.isLit(word):
@@ -485,6 +486,8 @@ class ReversePolishNotation(Rule):
             if sequence[-1] == 0:
                 sequence.pop()
                 stackSize -= 1
+            if sequence[-1] == ";":
+                sequence.pop()
 
             if stackSize != 1:
                 raise ValueError("Stack should contain exactly one element at end of polish notation.");
@@ -506,7 +509,7 @@ class ReversePolishNotation(Rule):
                 current = next(self.instructions)
                 if isinstance(current, int):
                     return current
-                if current in ["*", "d", "r"]:
+                if current in ["*", "d", "r", "w"]:
                     # consume one more, remember that we swaped the right operand and operator
                     next(self.instructions)
 
@@ -516,7 +519,7 @@ class ReversePolishNotation(Rule):
             # needs to be a constant and not a constraint, so we (can) switch
             # positions, which makes it easier to distinguish constraints from
             # constants later on
-            if x in ["*", "d", "r"]:
+            if x in ["*", "d", "r", "w"]:
                 instructions[i] = instructions[i - 1]
                 instructions[i - 1] = x
 
@@ -538,6 +541,8 @@ class ReversePolishNotation(Rule):
                 if what == "l":
                     lit = ins[1]
                     stack.append(context.ineqFactory.litAxiom(lit))
+                else:
+                    assert(False)
             elif ins == "+":
                 second = stack.pop()
                 first  = stack.pop()
@@ -558,6 +563,16 @@ class ReversePolishNotation(Rule):
             elif ins == "s":
                 constraint = stack.pop()
                 stack.append(constraint.saturate())
+            elif ins == "w":
+                nxt = next(it, None)
+                assert(nxt[0] == "l")
+                lit = nxt[1]
+                if lit < 0:
+                    logging.warn("Weakening step ignores sign of literals.")
+                    lit = abs(lit)
+                constraint = stack.pop()
+                stack.append(constraint.weaken(lit))
+
 
             ins = next(it, None)
 

@@ -6,7 +6,9 @@
 #include <unordered_map>
 #include <vector>
 #include <cctype>
-#include "constraints.h"
+
+#include "constraints.hpp"
+#include "BigInt.hpp"
 
 #ifdef PY_BINDINGS
     #include <pybind11/pybind11.h>
@@ -272,6 +274,30 @@ int parseInt(const WordIter& it, std::string msg) {
 template<>
 int parseCoeff<int>(const WordIter& it, size_t start, size_t length) {
     return parseInt(it, "Expected coefficient", start, length);
+}
+
+template<>
+BigInt parseCoeff<BigInt>(const WordIter& word, size_t start, size_t length){
+    assert(word->size() >= start + length);
+    assert(length > 0);
+
+    if (!word.isEnd()) {
+        throw ParseError(word, "Expected Number.");
+    }
+
+    const char* it = word->data() + start;
+    if (*it == '+') {
+        it += 1;
+    }
+    // copy to string to get \0 terminated string
+    std::string subString(it, length);
+    try {
+        return BigInt(subString);
+    } catch (...) {
+        throw ParseError(word, "Error while parsing number.");
+    }
+
+
 }
 
 class VariableNameManager {
@@ -585,33 +611,34 @@ public:
 template<typename T>
 std::unique_ptr<Formula<T>> parseOpb(std::string fileName, VariableNameManager& varMgr) {
     std::ifstream f(fileName);
-    OPBParser<CoefType> parser(varMgr);
+    OPBParser<T> parser(varMgr);
     std::unique_ptr<Formula<T>> result = parser.parse(f, fileName);
     return result;
 }
 
-int main(int argc, char const *argv[])
-{
+// int main(int argc, char const *argv[])
+// {
 
-    std::cout << "start reading file..." << std::endl;
-    std::string fileName(argv[1]);
-    std::ifstream f(fileName);
+//     std::cout << "start reading file..." << std::endl;
+//     std::string fileName(argv[1]);
+//     std::ifstream f(fileName);
 
 
-    VariableNameManager manager(false);
-    OPBParser<int> parser(manager);
-    try {
-        std::cout << parser.parse(f, fileName)->getConstraints().size() << std::endl;
-    } catch (const ParseError& e) {
-        std::cout << e.what() << std::endl;
-    }
-    return 0;
-}
+//     VariableNameManager manager(false);
+//     OPBParser<int> parser(manager);
+//     try {
+//         std::cout << parser.parse(f, fileName)->getConstraints().size() << std::endl;
+//     } catch (const ParseError& e) {
+//         std::cout << e.what() << std::endl;
+//     }
+//     return 0;
+// }
 
 #ifdef PY_BINDINGS
 void init_parsing(py::module &m){
     m.doc() = "Efficient implementation for parsing opb and pbp files.";
-    m.def("parseOpb", &parseOpb<CoefType>, "Parse opb file");
+    m.def("parseOpb", &parseOpb<CoefType>, "Parse opb file with fixed precision.");
+    m.def("parseOpbBigInt", &parseOpb<BigInt>, "Parse opb file with arbitrary precision.");
 
     py::register_exception_translator([](std::exception_ptr p) {
         try {
@@ -638,5 +665,16 @@ void init_parsing(py::module &m){
         .def_readonly("hasObjective", &Formula<CoefType>::hasObjective)
         .def_readonly("objectiveVars", &Formula<CoefType>::objectiveVars)
         .def_readonly("objectiveCoeffs", &Formula<CoefType>::objectiveCoeffs);
+
+    py::class_<Formula<BigInt>>(m, "FormulaBigInt")
+        .def(py::init<>())
+        .def("getConstraints", &Formula<BigInt>::getConstraints,
+            py::return_value_policy::reference_internal)
+        .def_readonly("maxVar", &Formula<BigInt>::maxVar)
+        .def_readonly("claimedNumC", &Formula<BigInt>::claimedNumC)
+        .def_readonly("claimedNumVar", &Formula<BigInt>::claimedNumVar)
+        .def_readonly("hasObjective", &Formula<BigInt>::hasObjective)
+        .def_readonly("objectiveVars", &Formula<BigInt>::objectiveVars)
+        .def_readonly("objectiveCoeffs", &Formula<BigInt>::objectiveCoeffs);
 }
 #endif

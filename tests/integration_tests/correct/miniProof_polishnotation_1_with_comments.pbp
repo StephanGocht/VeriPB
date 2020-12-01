@@ -2,7 +2,7 @@ pseudo-Boolean proof version 1.0
 * This is the proof of the formula
 
 * load the formula
-f 0
+f
 * add some constraints
 p 3 1 * 4 1 * + s
 * check that the constraint with Id 6 is equal to the given constraint
@@ -16,5 +16,5 @@ p 5 2 * 8 2 * +
 e 9 >= 2;
 *check contardiction
 * hopefully this works
-c 9 0
+c 9
 * thats it!

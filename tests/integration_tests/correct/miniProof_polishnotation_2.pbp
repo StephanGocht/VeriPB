@@ -1,5 +1,5 @@
 pseudo-Boolean proof version 1.0
-f 0
+f
 p 3 1 * 4 1 * + s
 e 6 +1 x3 >= 1;
 j 6 1 x1 +1 x3 >= 1;
@@ -12,4 +12,4 @@ p 8 7 +
 e 9 +2 x1 +1 x2 +1 x3 >= 2;
 p 5 2 * 9 2 * +
 e 10 >= 2;
-c 10 0
+c 10

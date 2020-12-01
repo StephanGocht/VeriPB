@@ -1,5 +1,5 @@
 pseudo-Boolean proof version 1.0
-f 1 0
+f 1
 # 1
 v x1 x2
 v ~x1
@@ -7,4 +7,4 @@ v ~x2
 # 0
 u >= 1 ;
 w 1
-c 5 0
+c 5

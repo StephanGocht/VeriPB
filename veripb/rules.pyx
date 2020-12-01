@@ -611,10 +611,6 @@ class LoadFormula(Rule):
                         "Number of constraints does not match, got %i but "\
                         "there are %i constraints."%(num, numConstraints))
 
-                if (words.nextInt() != 0):
-                    raise ValueError("Expected 0.")
-                words.expectEnd()
-
                 return cls(numConstraints)
 
     def __init__(self, numConstraints):

@@ -1,5 +1,5 @@
 pseudo-Boolean proof version 1.1
 f
 * derive x1 <-> x2 and x3
-u w  x1 0 1 x1 1 ~x2 1 ~x3 >= 1;
-u w ~x1 0 2 ~x1 1 x2 1 x3 >= 2;
+u w  x1 0 1 x1 1 ~x2 1 ~x3 >= 1 ;
+u w ~x1 0 2 ~x1 1 x2 1 x3 >= 2 ;

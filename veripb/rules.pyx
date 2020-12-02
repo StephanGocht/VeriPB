@@ -8,6 +8,8 @@ from veripb.timed_function import TimedFunction
 
 from veripb import InvalidProof
 
+import itertools
+
 registered_rules = []
 def register_rule(rule):
     registered_rules.append(rule)
@@ -168,15 +170,32 @@ class ReverseUnitPropagation(Rule):
     @classmethod
     def parse(cls, line, context):
         with WordParser(line) as words:
+            peek = next(words)
+            w = list()
+
+            if peek == "w":
+                if getattr(context, "foundLoadFormula", False) == False:
+                    raise ValueError("You are not allowed to use redundancy checks"\
+                        "before the formula is loaded.")
+
+                for nxt in words:
+                    if nxt == "0":
+                        break
+                    w.append(context.ineqFactory.lit2int(nxt))
+            else:
+                words = itertools.chain([peek], words)
+
             parser = OPBParser(
                     ineqFactory = context.ineqFactory,
                     allowEq = False)
             ineq = parser.parseConstraint(words)
 
-        return cls(ineq[0])
+        return cls(ineq[0], w, context.ineqFactory.numVars())
 
-    def __init__(self, constraint):
+    def __init__(self, constraint, w, numVars):
         self.constraint = constraint
+        self.w = w
+        self.numVars = numVars
 
     def numConstraints(self):
         return 1
@@ -192,13 +211,15 @@ class ReverseUnitPropagation(Rule):
 
     @TimedFunction.time("ReverseUnitPropagation::compute")
     def compute(self, antecedents, context):
-        assumption = self.constraint.copy().negated()
-        conflicting = context.propEngine.attachTmp(assumption)
+        context.propEngine.increaseNumVarsTo(self.numVars)
+        success = self.constraint.ratCheck(self.w, context.propEngine)
 
-        if conflicting:
+        if success:
             return [self.constraint]
         else:
-            raise ReverseUnitPropagationFailed("Failed to show '%s' by reverse unit propagation."%(context.ineqFactory.toString(self.constraint)))
+            raise ReverseUnitPropagationFailed(
+                "Failed to show '%s' by reverse unit propagation."%(
+                    context.ineqFactory.toString(self.constraint)))
 
 class CompareToConstraint(Rule):
     @classmethod
@@ -565,6 +586,7 @@ class LoadFormula(Rule):
 
     @classmethod
     def parse(cls, line, context):
+        context.foundLoadFormula = True
         numConstraints = len(context.formula)
         with WordParser(line) as words:
             num = words.nextInt()

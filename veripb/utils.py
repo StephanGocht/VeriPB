@@ -10,13 +10,14 @@ import pyximport; pyximport.install(
 from veripb import InvalidProof
 from veripb import ParseError
 from veripb.verifier import Verifier, Context
+from veripb.parser import OPBParser, CNFParser
+from veripb.drat import DRATParser
 from veripb.rules import registered_rules
 from veripb.timed_function import TimedFunction
 from veripb.parser import RuleParser
 from veripb.exceptions import ParseError
 from veripb.optimized.constraints import PropEngine as CppPropEngine
 from veripb.optimized.parsing import parseOpb
-from veripb.parser import OPBParser
 from veripb.constraints import PropEngine,CppIneqFactory,IneqFactory
 from time import perf_counter
 
@@ -44,26 +45,94 @@ def objectiveToDict(formula):
     else:
         return None
 
-def run(formulaFile, rulesFile, settings = None, arbitraryPrecision = False):
+class Settings():
+    def __init__(self, preset = None):
+        self.setPreset(type(self).defaults(), unchecked = True)
+
+        if preset is not None:
+            self.setPreset(preset)
+
+    def setPreset(self, preset, unchecked = False):
+        for key, value in preset.items():
+            if unchecked or hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                raise ValueError("Got unknown setting %s."%key)
+
+    @staticmethod
+    def defaults():
+        return {
+            "drat": False,
+            "cnf": False,
+            "arbitraryPrecision": False
+        }
+
+    def computeNumUse(self):
+        return self.lazy or not self.disableDeletion
+
+    @classmethod
+    def addArgParser(cls, parser, name = "misc"):
+        defaults = cls.defaults()
+        group = parser.add_argument_group(name)
+
+        group.add_argument(
+            '--drat',
+            help="Process CNF with DRAT proof.",
+            action="store_true", dest=name+".drat", default=False
+        )
+
+        group.add_argument(
+            '--cnf',
+            help="Process CNF with PB proof.",
+            action="store_true", dest=name+".cnf", default=False
+        )
+
+        group.add_argument("--arbitraryPrecision",
+            action="store_true",
+            default=defaults["arbitraryPrecision"],
+            help="Turn on arbitrary precision. Experimental, does not work with unit propagation or solution checking.",
+            dest=name+".arbitraryPrecision")
+        group.add_argument("--no-arbitraryPrecision",
+            action="store_false",
+            help="Turn off arbitrary precision.",
+            dest=name+".arbitraryPrecision")
+
+    @classmethod
+    def extract(cls, result, name = "misc"):
+        preset = dict()
+        defaults = cls.defaults()
+        for key in defaults:
+            try:
+                preset[key] = getattr(result, name + "." + key)
+            except AttributeError:
+                pass
+        return cls(preset)
+
+    def __repr__(self):
+        return type(self).__name__ + repr(vars(self))
+
+def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings()):
     if profile:
         pr = cProfile.Profile()
         pr.enable()
 
-    if settings == None:
-        settings = Verifier.Settings()
+    if verifierSettings == None:
+        verifierSettings = Verifier.Settings()
 
     TimedFunction.startTotalTimer()
 
     rules = list(registered_rules)
 
     context = Context()
-    if arbitraryPrecision:
+    if miscSettings.arbitraryPrecision:
         context.ineqFactory = IneqFactory()
     else:
         context.ineqFactory = CppIneqFactory()
 
     try:
-        if arbitraryPrecision:
+        if miscSettings.drat or miscSettings.cnf:
+            formula = CNFParser(context.ineqFactory).parse(formulaFile)
+        elif miscSettings.arbitraryPrecision:
             formula = OPBParser(context.ineqFactory).parse(formulaFile)
         else:
             formula = loadFormula(formulaFile.name, context.ineqFactory.varNameMgr)
@@ -74,7 +143,7 @@ def run(formulaFile, rulesFile, settings = None, arbitraryPrecision = False):
     context.formula = formula["constraints"]
     context.objective = formula["objective"]
 
-    if arbitraryPrecision:
+    if miscSettings.arbitraryPrecision:
         context.propEngine = PropEngine()
     else:
         context.propEngine = CppPropEngine(formula["numVariables"])
@@ -82,13 +151,18 @@ def run(formulaFile, rulesFile, settings = None, arbitraryPrecision = False):
 
     verify = Verifier(
         context = context,
-        settings = settings)
+        settings = verifierSettings)
 
     try:
-        ruleParser = RuleParser(context)
-        if settings.progressBar:
+        if not miscSettings.drat:
+            ruleParser = RuleParser(context)
+            rules = ruleParser.parse(rules, rulesFile, dumpLine = verifierSettings.trace)
+        else:
+            ruleParser = DRATParser(context)
+            rules = ruleParser.parse(rulesFile)
+
+        if verifierSettings.progressBar:
             context.ruleCount = ruleParser.numRules(rulesFile)
-        rules = ruleParser.parse(rules, rulesFile, dumpLine = settings.trace)
         return verify(rules)
     except ParseError as e:
         e.fileName = rulesFile.name
@@ -168,11 +242,13 @@ def run_cmd_main():
         help="Turn off arbitrary precision.")
 
     Verifier.Settings.addArgParser(p)
+    Settings.addArgParser(p)
 
     args = p.parse_args()
 
     verifyerSettings = Verifier.Settings.extract(args)
+    miscSettings = Settings.extract(args)
 
     logging.basicConfig(level=args.loglevel)
 
-    return runUI(args.formula, args.derivation, verifyerSettings, arbitraryPrecision = args.arbitraryPrecision)
+    return runUI(args.formula, args.derivation, verifyerSettings, miscSettings)

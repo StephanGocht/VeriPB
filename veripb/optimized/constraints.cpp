@@ -6,7 +6,6 @@
     namespace py = pybind11;
 #endif
 
-
 #include "constraints.h"
 // int main(int argc, char const *argv[])
 // {
@@ -38,31 +37,33 @@
         m.doc() = "Efficient implementation for linear combinations of constraints.";
 
         py::class_<PropEngine<CoefType>>(m, "PropEngine")
-            .def(py::init<int>())
+            .def(py::init<CoefType>())
             .def("attach", &PropEngine<CoefType>::attach)
             .def("detach", &PropEngine<CoefType>::detach)
-            .def("attachTmp", &PropEngine<CoefType>::attachTmp)
             .def("reset", &PropEngine<CoefType>::reset)
             .def("checkSat", &PropEngine<CoefType>::checkSat)
+            .def("increaseNumVarsTo", &PropEngine<CoefType>::increaseNumVarsTo)
             .def("printStats", &PropEngine<CoefType>::printStats);
 
 
         py::class_<Inequality<CoefType>>(m, "CppInequality")
-            .def(py::init<std::vector<CoefType>&, std::vector<int>&, CoefType>())
+            .def(py::init<std::vector<CoefType>&, std::vector<CoefType>&, CoefType>())
             .def("saturate", &Inequality<CoefType>::saturate)
             .def("divide", &Inequality<CoefType>::divide)
             .def("multiply", &Inequality<CoefType>::multiply)
             .def("add", &Inequality<CoefType>::add)
+            .def("contract", &Inequality<CoefType>::contract)
             .def("copy", &Inequality<CoefType>::copy)
             .def("implies", &Inequality<CoefType>::implies)
-            // .def("expand", &Inequality<CoefType>::expand)
+            .def("expand", &Inequality<CoefType>::expand)
             .def("contract", &Inequality<CoefType>::contract)
             .def("negated", &Inequality<CoefType>::negated)
+            .def("ratCheck", &Inequality<CoefType>::ratCheck)
             .def("__eq__", &Inequality<CoefType>::eq)
             .def("__repr__", &Inequality<CoefType>::repr)
             .def("toString", &Inequality<CoefType>::toString)
-            .def("isContradiction", &Inequality<CoefType>::isContradiction)
-            .def("weaken", &Inequality<CoefType>::weaken);
+            .def("toOPB", &Inequality<CoefType>::repr)
+            .def("isContradiction", &Inequality<CoefType>::isContradiction);
 
     }
 #endif

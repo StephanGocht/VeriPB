@@ -14,6 +14,7 @@ using CoefType = int32_t;
 // use the following line istead to increas precision.
 // using CoefType = int64_t;
 
+
 #undef assert
 #ifdef NDEBUG
 #define assert(x) ((void)sizeof(x))
@@ -128,6 +129,19 @@ public:
     };
 };
 
+inline std::ostream& operator<<(std::ostream& os, const Var& v) {
+    os << "x" << v.value;
+    return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const Lit& v) {
+    if (v.isNegated()) {
+        os << "~";
+    }
+    os << v.var();
+    return os;
+}
+
 /*
  * some syntactic suggar to prevent us from accidentally using Var to
  * go in to a Lit inexed vector and vice versa.
@@ -140,6 +154,11 @@ public:
     // using std::vector<T>::operator[];
     T& operator[](Var idx) = delete;
     T& operator[](Lit idx) {
+        return this->std::vector<T>::operator[](
+            static_cast<size_t>(idx)
+        );
+    }
+    const T& operator[](Lit idx) const {
         return this->std::vector<T>::operator[](
             static_cast<size_t>(idx)
         );
@@ -158,6 +177,11 @@ public:
     // using std::vector<T>::operator[];
     T& operator[](Lit idx) = delete;
     T& operator[](Var idx) {
+        return this->std::vector<T>::operator[](
+            static_cast<size_t>(idx)
+        );
+    }
+    const T& operator[](Var idx) const {
         return this->std::vector<T>::operator[](
             static_cast<size_t>(idx)
         );
@@ -205,6 +229,12 @@ struct Term {
 };
 
 template<typename T>
+inline std::ostream& operator<<(std::ostream& os, const Term<T>& term) {
+    os << term.coeff << " " << term.lit;
+    return os;
+}
+
+template<typename T>
 bool orderByVar(T &a, T &b) {
     return a.lit > b.lit;
 }
@@ -232,7 +262,7 @@ public:
     LitIndexedVec<State> value;
 
     Assignment(int nVars)
-        : value(2 * (nVars + 1))
+        : value(2 * (nVars + 1), State::Unassigned)
     {}
 
     void assign(Lit lit) {
@@ -243,6 +273,18 @@ public:
     void unassign(Lit lit) {
         value[lit] = State::Unassigned;
         value[~lit] = State::Unassigned;
+    }
+
+    void resize(size_t nVars) {
+        value.resize(2 * (nVars + 1), State::Unassigned);
+    }
+
+    State& operator[](Lit lit) {
+        return value[lit];
+    }
+
+    State operator[](Lit lit) const {
+        return this->value[lit];
     }
 };
 
@@ -281,7 +323,7 @@ private:
         :_size(size) {
     }
 
-    FixedSizeInequality(FixedSizeInequality& other)
+    FixedSizeInequality(const FixedSizeInequality<T>& other)
         : _size(other.size())
     {
         using namespace std;
@@ -324,6 +366,11 @@ private:
         watchSize = i;
     }
 
+    void registerOccurence(PropEngine<T>& prop) {
+        for (Term<T>& term: *this) {
+            prop.addOccurence(term.lit, *this);
+        }
+    }
 
 public:
     void clearWatches(PropEngine<T>& prop) {
@@ -342,10 +389,13 @@ public:
         }
     }
 
-    template<bool init>
+    template<bool autoInit>
     void updateWatch(PropEngine<T>& prop, Lit falsifiedLit = Lit::Undef()) {
+        // std::cout << "updateWatch: " << *this << std::endl;
+        bool init = autoInit && (watchSize == 0);
         if (init) {
             computeWatchSize();
+            registerOccurence(prop);
         }
 
         T slack = -this->degree;
@@ -396,10 +446,91 @@ public:
                 if (terms[i].coeff > slack
                     && value[terms[i].lit] == State::Unassigned)
                 {
-                    prop.propagate(terms[i].lit);
+                    prop.enqueue(terms[i].lit);
                 }
             }
         }
+    }
+
+    void negate() {
+        this->degree = -this->degree + 1;
+        for (Term<T>& term:*this) {
+            this->degree += term.coeff;
+            term.lit = ~term.lit;
+        }
+    }
+
+    bool implies(const FixedSizeInequality& other) const {
+        std::unordered_map<size_t, Term<T>> lookup;
+        for (const Term<T>& term:other) {
+            lookup.insert(std::make_pair(term.lit.var(), term));
+        }
+
+        T weakenCost = 0;
+        for (const Term<T>& mine:*this) {
+            using namespace std;
+            size_t var = mine.lit.var();
+
+            auto search = lookup.find(var);
+            if (search == lookup.end()) {
+                weakenCost += mine.coeff;
+            } else {
+                auto theirs = search->second;
+                if (mine.lit != theirs.lit) {
+                    weakenCost += mine.coeff;
+                } else if (mine.coeff > theirs.coeff) {
+                    if (theirs.coeff < other.degree) {
+                        // only weaken if target coefficient is not saturated
+                        weakenCost += mine.coeff - theirs.coeff;
+                    }
+                }
+            }
+        }
+
+        return this->degree - weakenCost >= other.degree;
+    }
+
+    bool isSatisfied(const Assignment& a) const {
+        T slack = -this->degree;
+        for (const Term<T>& term:*this) {
+            if (a[term.lit] == State::True) {
+                slack += term.coeff;
+            }
+        }
+        return slack >= 0;
+    }
+
+    void restrictBy(const Assignment& a){
+        for (Term<T>& term:*this) {
+            this->erase(
+                std::remove_if(
+                    this->begin(),
+                    this->end(),
+                    [this, &a](Term<T>& term){
+                        switch (a[term.lit]) {
+                            case State::True:
+                                this->degree -= term.coeff;
+                                term.coeff = 0;
+                                break;
+                            case State::False:
+                                term.coeff = 0;
+                                break;
+                            default:
+                                break;
+                        }
+                        return term.coeff == 0;
+                    }),
+                this->end());
+        }
+    }
+
+    void erase(Term<T>* begin, Term<T>* end) {
+        size_t removed = end - begin;
+        assert(removed >= 0);
+        for (;begin != end; begin++) {
+            begin->~Term<T>();
+        }
+        _size = size() - removed;
     }
 
     size_t size() const {
@@ -426,6 +557,15 @@ public:
         return terms + size();
     }
 };
+
+template<typename T>
+inline std::ostream& operator<<(std::ostream& os, const FixedSizeInequality<T>& v) {
+    for (const Term<T>& term: v) {
+        os << term << " + ";
+    };
+    os << " >= " << v.degree;
+    return os;
+}
 
 struct PropState {
     size_t qhead = 0;
@@ -454,14 +594,25 @@ public:
     FixedSizeInequality<T>* ineq = nullptr;
     size_t capacity = 0;
 
-    FixedSizeInequalityHandler(FixedSizeInequalityHandler& other) {
-        void* addr = malloc(other.ineq->size());
-        ineq = new (addr) FixedSizeInequality<T>(*other.ineq);
+    FixedSizeInequalityHandler(const FixedSizeInequality<T>& copyFrom) {
+        void* addr = malloc(copyFrom.size());
+        ineq = new (addr) FixedSizeInequality<T>(copyFrom);
     }
 
-    FixedSizeInequalityHandler(FixedSizeInequalityHandler&& other) {
+    FixedSizeInequalityHandler(const FixedSizeInequalityHandler<T>& other):
+        FixedSizeInequalityHandler(*other.ineq) {}
+
+    FixedSizeInequalityHandler(FixedSizeInequalityHandler<T>&& other) {
         ineq = other.ineq;
         other.ineq = nullptr;
+    }
+
+    FixedSizeInequality<T>& operator*(){
+        return *ineq;
+    }
+
+    FixedSizeInequality<T>* operator->(){
+        return ineq;
     }
 
     FixedSizeInequalityHandler& operator=(FixedSizeInequalityHandler&& other) {
@@ -526,11 +677,28 @@ private:
     std::vector<Lit> trail;
 
     PropState current;
-    PropState base;
 
+    bool updateWatch = true;
     size_t dbMem = 0;
     size_t cumDbMem = 0;
     size_t maxDbMem = 0;
+
+
+    class AutoReset {
+    private:
+        PropEngine& engine;
+        PropState base;
+    public:
+        AutoReset(PropEngine& engine_)
+            : engine(engine_)
+            , base(engine.current) {
+
+        }
+
+        ~AutoReset(){
+            engine.reset(base);
+        }
+    };
 
 public:
     Assignment assignment;
@@ -562,20 +730,32 @@ public:
             << static_cast<float>(maxDbMem) / 1024 / 1024 / 1024 << " GB" << std::endl;
     }
 
-    void propagate(Lit lit) {
+    void enqueue(Lit lit) {
         assignment.assign(lit);
         trail.push_back(lit);
     }
 
-    void propagate(bool permanent = false) {
+    void increaseNumVarsTo(size_t _nVars){
+        assert(nVars <= _nVars);
+        if (nVars < _nVars) {
+            this->nVars = _nVars;
+            assignment.resize(_nVars);
+            watchlist.resize(2 * (_nVars + 1));
+            occurs.resize(2 * (_nVars + 1));
+        }
+    }
+
+    void propagate() {
         while (current.qhead < trail.size() and !current.conflict) {
             Lit falsifiedLit = ~trail[current.qhead];
+            // std::cout << "propagating: " << trail[current.qhead] << std::endl;
+
             WatchList& ws = watchlist[falsifiedLit];
             WatchList wsTmp;
             wsTmp.reserve(ws.size());
             std::swap(ws, wsTmp);
 
-            const uint lookAhead = 6;
+            const uint lookAhead = 3;
             WatchedType* end = wsTmp.data() + wsTmp.size();
             for (WatchedType* next = wsTmp.data(); next != end; next++) {
                 auto fetch = next + lookAhead;
@@ -608,19 +788,17 @@ public:
             current.qhead += 1;
         }
 
-        if (permanent) {
-            base = current;
-        }
     }
 
     bool checkSat(std::vector<int>& lits) {
+        AutoReset autoReset(*this);
         attachUnattached();
         for (int lit: lits) {
             Lit l(lit);
             auto val = assignment.value[l];
 
             if (val == State::Unassigned) {
-                propagate(l);
+                enqueue(l);
             } else if (val == State::False) {
                 conflict();
                 break;
@@ -641,14 +819,13 @@ public:
             }
         }
 
-        reset();
         return success;
     }
 
-    void _attach(Inequality<T>* ineq, bool permanent = true) {
+    void _attach(Inequality<T>* ineq) {
         ineq->freeze(this->nVars);
         ineq->updateWatch(*this);
-        propagate(permanent);
+        propagate();
     }
 
     void attach(Inequality<T>* ineq) {
@@ -661,7 +838,7 @@ public:
     void attachUnattached() {
         for (Inequality<T>* ineq: unattached) {
             if (ineq != nullptr) {
-                _attach(ineq, true);
+                _attach(ineq);
             }
         }
         unattached.clear();
@@ -683,16 +860,93 @@ public:
         }
     }
 
-    bool attachTmp(Inequality<T>* ineq) {
-        attachUnattached();
-        _attach(ineq, false);
-        bool result = isConflicting();
-        reset();
-        ineq->clearWatches(*this);
-        return result;
+    /*
+     * Propagates a constraint once without attaching it.
+     * Returns true if some variable was propagated.
+     */
+    bool singleTmpPropagation(FixedSizeInequality<T>& ineq) {
+        disableWatchUpdate();
+        ineq.template updateWatch<true>(*this);
+        enableWatchUpdate();
+
+        return (current.qhead != trail.size());
     }
 
-    void reset() {
+    void disableWatchUpdate(){
+        this->updateWatch = false;
+    }
+
+    void enableWatchUpdate(){
+        this->updateWatch = true;
+    }
+
+    bool ratCheck(const FixedSizeInequality<T>& redundant, const std::vector<Lit>& w) {
+        attachUnattached();
+        Assignment a(this->nVars);
+        if (w.size() > 0) {
+            for (Lit lit: w) {
+                a.assign(lit);
+            }
+            if (!redundant.isSatisfied(a)) {
+                // std::cout << "given assignment does not satisfy constraint" << std::endl;
+                return false;
+            }
+        }
+
+        AutoReset autoReset(*this);
+        FixedSizeInequalityHandler<T> negated(redundant);
+        negated->negate();
+
+        while (!current.conflict &&
+                singleTmpPropagation(*negated))
+        {
+            propagate();
+        }
+
+        if (current.conflict) {
+            // std::cout << "rup check succeded" << std::endl;
+            return true;
+        } else if (w.size() == 0) {
+            // std::cout << "rup check failed" << std::endl;
+            return false;
+        }
+
+        for (Lit lit: w) {
+            for (const FixedSizeInequality<T>* ineq: occurs[~lit]) {
+                FixedSizeInequalityHandler<T> implied(*ineq);
+                implied->restrictBy(a);
+
+                // std::cout << "checking constraint" << std::endl;
+                if (negated->implies(*implied)) {
+                    // std::cout << "  ...syntactic implication check succeded" << std::endl;
+                    continue;
+                } else {
+                    AutoReset autoReset(*this);
+                    implied->negate();
+
+                    while (!current.conflict
+                        && (singleTmpPropagation(*implied)
+                            || singleTmpPropagation(*negated)))
+                    {
+                        propagate();
+                    }
+
+                    if (!current.conflict) {
+                        // std::cout << "  ...rup check failed" << std::endl;
+                        return false;
+                    } else {
+                        // std::cout << "  ...rup check succeded" << std::endl;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // std::cout << "checking all implications succeded" << std::endl;
+        return true;
+    }
+
+    void reset(PropState base) {
         while (trail.size() > base.qhead) {
             assignment.unassign(trail.back());
             trail.pop_back();
@@ -709,11 +963,15 @@ public:
     }
 
     void watch(Lit lit, WatchInfo<T>& w) {
-        watchlist[lit].push_back(w);
+        if (this->updateWatch) {
+            watchlist[lit].push_back(w);
+        }
     }
 
     void addOccurence(Lit lit, FixedSizeInequality<T>& w) {
-        occurs[lit].push_back(w);
+        if (this->updateWatch) {
+            occurs[lit].push_back(&w);
+        }
     }
 
 };
@@ -1014,43 +1272,23 @@ public:
     bool implies(Inequality* other) {
         this->contract();
         other->contract();
-        std::unordered_map<size_t, Term<T>> lookup;
-        for (Term<T>& term:*other->ineq) {
-            lookup.insert(std::make_pair(term.lit.var(), term));
+
+        return ineq->implies(*other->ineq);
+    }
+
+    bool ratCheck(const std::vector<int>& w, PropEngine<T>& propEngine) {
+        this->contract();
+        std::vector<Lit> v;
+        for (int i : w) {
+            v.emplace_back(i);
         }
-
-        T weakenCost = 0;
-        for (Term<T>& mine:*ineq) {
-            using namespace std;
-            size_t var = mine.lit.var();
-
-            auto search = lookup.find(var);
-            if (search == lookup.end()) {
-                weakenCost += mine.coeff;
-            } else {
-                auto theirs = search->second;
-                if (mine.lit != theirs.lit) {
-                    weakenCost += mine.coeff;
-                } else if (mine.coeff > theirs.coeff) {
-                    if (theirs.coeff < other->ineq->degree) {
-                        // only weaken if target coefficient is not saturated
-                        weakenCost += mine.coeff - theirs.coeff;
-                    }
-                }
-            }
-        }
-
-        return ineq->degree - weakenCost >= other->ineq->degree;
+        return propEngine.ratCheck(*this->ineq, v);
     }
 
     Inequality* negated() {
         assert(!frozen);
         this->contract();
-        ineq->degree = -ineq->degree + 1;
-        for (Term<T>& term:*ineq) {
-            ineq->degree += term.coeff;
-            term.lit = ~term.lit;
-        }
+        ineq->negate();
 
         return this;
     }

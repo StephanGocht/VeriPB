@@ -47,8 +47,11 @@ code.
 Update
 ------
 
-If installed as described above the tool can be updated with ``git pull``.
+If installed as described above the tool can be updated with
 
+::
+    git pull
+    pip3 install --user -e ./
 
 Getting Started
 ===============
@@ -84,24 +87,24 @@ specific and produces an error if unsupported characters are used.
 Basic Proof Format
 ==================
 TLDR;
-----
+-----
 
 ::
 
-    pseudo-Boolean proof version 1.0
+    pseudo-Boolean proof version 1.1
     * load formula
-    f [nProblemConstraints] 0
+    f [nProblemConstraints]
     * compute constraint in polish notation
-    p [sequence of operations in reverse polish notation] 0
+    p [sequence of operations in reverse polish notation]
     * introduce constraint that is verified by reverse unit propagation
     u  [OPB style constraint]
     * delete constraints
-    d [constraintId1] [constraintId2] [constraintId3] ... 0
+    d [constraintId1] [constraintId2] [constraintId3] ...
     * verify contradiction
-    c [which] 0
+    c [which]
 
 Introduction
-----
+------------
 
 There are multiple rules, which are described in more detail below.
 Every rule has to be written on one line and no line may contain more
@@ -116,12 +119,12 @@ In what follows we will use IDmax to refer to the largest used ID
 before a rule is executed.
 
 (f)ormula
-----
+---------
 
 ::
 
 
-    f [nProblemConstraints] 0
+    f [nProblemConstraints]
 
 This rule loads all axioms from the input formula (the path to the
 formula will be provided separately when calling the proof checker).
@@ -140,44 +143,44 @@ the correct value is used (optionally a warning is emitted).
 For example the opb file::
 
     * #variable= 3 #constraint= 1
-    1 x1 2 x2 >= 1;
-    1 x3 1 x4  = 1;
+    1 x1 2 x2 >= 1 ;
+    1 x3 1 x4  = 1 ;
 
 with the proof file::
 
-    pseudo-Boolean proof version 1.0
-    f 3 0
+    pseudo-Boolean proof version 1.1
+    f 3
 
 will be translated to::
 
-    1: 1 x1 2 x2 >= 1;
-    2: 1 x3 1 x4 >= 1;
-    3: -1 x3 -1 x4 >= -1;
+    1: 1 x1 2 x2 >= 1 ;
+    2: 1 x3 1 x4 >= 1 ;
+    3: -1 x3 -1 x4 >= -1 ;
 
 
 (c)ontradiction
-----
+---------------
 
 ::
 
-    c [ConstraintId] 0
+    c [ConstraintId]
 
 Verify that the constraint [ConstraintId] is contradicting, i.e., it
 can not be satisfied.
 
 Examples of contradicting constraints::
 
-    >= 1;
-    >= 3;
-    3 x1 -2 x2 >= 4;
+    >= 1 ;
+    >= 3 ;
+    3 x1 -2 x2 >= 4 ;
 
 
 reverse (p)olish notation
-----
+-------------------------
 
 ::
 
-    p [sequence in reverse polish notation] 0
+    p [sequence in reverse polish notation]
 
 Add a new constraint with ConstraintId := IDmax + 1. How to derive the constraint is describe by a 0 terminated sequence of
 arithmetic operations over the constraints. These are written down in
@@ -234,7 +237,7 @@ with a single rule.
 
 For example::
 
-    p 42 3 * 43 + s 2 d 0
+    p 42 3 * 43 + s 2 d
 
 Creates a new constraint by taking 3 times the constraint with index
 42, then adds constraint 43, followed by a saturation step and a
@@ -256,12 +259,33 @@ know that the constraint is implied and the check passes.
 If the reverse unit propagation check passes then the constraint is
 added with ConstraintId := IDmax + 1. Otherwise, verification fails.
 
+It is also possible to introduce redundant constraints that can be
+checked with unit propagation.
+
+::
+
+    u w [literal1] [literal2] ... ; [OPB style constraint]
+
+Adding the constraint is successful if it passes the map redundancy
+check via unit propagation or syntactic checks, i.e., if it can be
+shown that every assignment satisfying the constraints in the database
+:math:`F` but falsifying the to-be-added constraint :math:`C` can be
+transformed into an assignment satisfying both by using the
+assignment (or witness) :math:`\omega` provided by the list of
+literals. More formally it is checked that,
+
+.. math::
+    F \land \neg C \models (F \land C)\upharpoonright\omega .
+
+For details, please refer to [GN21]_.
+
+
 (d)elete constraint
 -------------------
 
 ::
 
-    d [constraintId1] [constraintId2] [constraintId3] ... 0
+    d [constraintId1] [constraintId2] [constraintId3] ...
 
 Delete constraints with given constrain ids. This verifier currently
 implements weak propagating semantic for deletion (see below) but will
@@ -293,7 +317,7 @@ Convenience Rules and Rules for Sanity Checks
 =============================================
 
 TLDR;
-----
+-----
 
 ::
 
@@ -373,7 +397,7 @@ Beyond Refutations
 ==================
 
 TLDR;
-----
+-----
 
 ::
 
@@ -435,7 +459,7 @@ Debugging and for Development Only
 ==================================
 
 TLDR;
-----
+-----
 
 ::
 
@@ -462,3 +486,11 @@ is OK to add a constraint C, however proof logging for the derivation
 of C is not implemented yet. Using this rule we can simply add C
 without providing a derivation and check with VeriPB that all other
 derivations that are already implemented are correct.
+
+References
+==========
+
+.. _GN21:
+
+[GN21] Certifying Parity Reasoning Efficiently Using Pseudo-Boolean Proofs,
+Stephan Gocht, Jakob Nordström, (in review for 2021).

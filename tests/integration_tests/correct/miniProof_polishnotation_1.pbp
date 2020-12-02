@@ -1,0 +1,12 @@
+pseudo-Boolean proof version 1.0
+f 5
+p 3 1 * 4 1 * + s
+e 6 1 x1 +1 x3 >= 1 ;
+p 1 2 + 6 +
+e 7 +2 x1 +2 x2 +2 x3 >= 3 ;
+p 1 2 + 6 + 2 d
+e 8 1 x1 1 x2 1 x3 >= 2 ;
+i 8 1 x1 1 x2 2 x3 1 x4 >= 1 ;
+p 5 2 * 8 2 * +
+e 9 >= 2 ;
+c 9

@@ -9,6 +9,8 @@ import logging
 import time
 import argparse
 
+import gc
+
 class Context():
     pass
 
@@ -189,11 +191,11 @@ class Verifier():
             context.propEngine = DummyPropEngine()
         self.context = context
 
-    @TimedFunction.time("propEngine::attach")
+    @TimedFunction.time("propEngine.attach")
     def attach(self, constraint):
         self.context.propEngine.attach(constraint)
 
-    @TimedFunction.time("propEngine::detach")
+    @TimedFunction.time("propEngine.detach")
     def detach(self, constraint):
         self.context.propEngine.detach(constraint)
 
@@ -202,9 +204,6 @@ class Verifier():
             printProgressBar(ruleNum,self.context.ruleCount,self.start_time,length=50)
 
         didPrint = False
-
-        if isinstance(rule, IsContradiction):
-            self.result.containsContradiction = True
 
         antecedents = self.antecedents(rule.antecedentIDs(), ruleNum)
         constraints = rule.compute(antecedents, self.context)
@@ -241,10 +240,14 @@ class Verifier():
         for i in deletedConstraints:
             self.detach(self.db[i])
 
-            # clean constraint to supress superficial warning
+            # clean up references, to not get spicious warnings
             constraint = None
+            antecedents = None
+
             refcount = sys.getrefcount(self.db[i])
-            if (refcount > 2):
+            if (refcount > 3):
+                # todo: refcount should be at-most 2, except for
+                # constraints that apear in the formula.
                 logging.warn("Internal Warning: refcount of "
                     "deleted constraint too large (is %i), memory will "
                     "not be freed."%(refcount))
@@ -273,6 +276,7 @@ class Verifier():
                 raise e
 
         self.result.usesAssumptions = getattr(self.context, "usesAssumptions", False)
+        self.result.containsContradiction = getattr(self.context, "containsContradiction", False)
 
         if self.settings.requireUnsat and not self.result.containsContradiction:
             raise InvalidProof("Proof does not contain contradiction!")

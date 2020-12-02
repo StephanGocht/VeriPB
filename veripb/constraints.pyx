@@ -1,4 +1,4 @@
-from veripb.optimized.constraints import CppInequality
+from veripb.optimized.constraints import CppInequality, CppInequalityBigInt
 from veripb.optimized.parsing import VariableNameManager
 
 
@@ -310,8 +310,8 @@ class PyInequality():
 
 class IneqFactory():
     def __init__(self):
-        freeNames = True
-        self.varNameMgr = VariableNameManager(freeNames)
+        self.freeNames = True
+        self.varNameMgr = VariableNameManager(self.freeNames)
 
     def litAxiom(self, lit):
         return PyInequality([Term(1, lit)], 0)
@@ -391,4 +391,18 @@ class CppIneqFactory(IneqFactory):
 
     def fromTerms(self, terms, degree):
         ineq = super().fromTerms(terms, degree)
-        return CppInequality(*terms2lists(ineq.terms), ineq.degree)
+        coefs, lits = terms2lists(ineq.terms)
+        coefs = list(coefs)
+        lits  = list(lits)
+        return CppInequality(coefs, lits, ineq.degree)
+
+class BigIntIneqFactory(IneqFactory):
+    def litAxiom(self, lit):
+        return CppInequalityBigInt([1], [lit], 0)
+
+    def fromTerms(self, terms, degree):
+        ineq = super().fromTerms(terms, degree)
+        coefs, lits = terms2lists(ineq.terms)
+        coefs = list(coefs)
+        lits  = list(lits)
+        return CppInequalityBigInt(coefs, lits, ineq.degree)

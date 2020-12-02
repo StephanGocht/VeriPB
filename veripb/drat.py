@@ -15,23 +15,35 @@ class DRATClauseFinder():
         self.clauses = dict()
         self.maxId = firstId
 
-    def add(self, lits):
-        clause = tuple(sorted(lits))
-        if clause in self.clauses:
-            raise ParseError("Dublicate clauses are not supported.", column = 0)
-        self.clauses[clause] = self.maxId
-        self.maxId += 1
+    def normalized(self, lits):
+        return tuple(sorted(lits))
+
+    def increase(self, lits):
+        """add one entry, returns true if no entries was there before"""
+
+        clause = self.normalized(lits)
+        data = self.clauses.setdefault(clause, {"id": self.maxId, "count": 0})
+        if data["count"] == 0:
+            self.maxId += 1
+        data["count"] += 1
+
+        return data["count"] == 1
+
+    def decrease(self, lits):
+        """remove one entry, returns entrie if no entries are left"""
+        clause = self.normalized(lits)
+        data = self.clauses.get(clause, {"id": 0, "count": 0})
+        data["count"] -= 1
+        if (data["count"] == 0):
+            del self.clauses[clause]
+
+        # todo: add support for deleting / unattaching formula
+        # constraints
+        return None if data["count"] != 0 else data["id"]
 
     def find(self, lits):
-        clause = tuple(sorted(lits))
-        Id = self.clauses.get(clause, None)
-        if Id is None:
-            pass
-            # todo: solvers might erase clauses from the formula, which is currently not supported.
-            # raise ValueError("Erasing clause that was never added.")
-        else:
-            del self.clauses[clause]
-        return Id
+        clause = self.normalized(lits)
+        return clause in self.clauses
 
 class FindCheckFailed(InvalidProof):
     def __init__(self, expected):
@@ -63,8 +75,7 @@ class DRATFind(EmptyRule):
 
     def compute(self, antecedents, context = None):
         clauseFinder = DRATClauseFinder.get(context)
-        ClauseId = clauseFinder.find(self.lits)
-        if ClauseId is None:
+        if not clauseFinder.find(self.lits):
             raise FindCheckFailed(self.lits)
 
         return []
@@ -86,7 +97,7 @@ class DRATDeletion(EmptyRule):
             lits = parseIntList(words)
 
         clauseFinder = DRATClauseFinder.get(context)
-        ClauseId = clauseFinder.find(lits)
+        ClauseId = clauseFinder.decrease(lits)
 
         return cls(ClauseId)
 
@@ -107,16 +118,31 @@ class DRAT(ReverseUnitPropagation):
         with WordParser(line) as words:
             lits = parseIntList(words)
 
-        clauseFinder = DRATClauseFinder.get(context)
-        clauseFinder.add(lits)
+            clauseFinder = DRATClauseFinder.get(context)
+            isNew = clauseFinder.increase(lits)
 
-        terms = [(1,context.ineqFactory.intlit2int(l)) for l in lits]
-        ineq = context.ineqFactory.fromTerms(terms, 1)
-        if len(lits) > 0:
-            w = [terms[0][1]]
-        else:
-            w = []
-        return cls(ineq, w, context.ineqFactory.numVars())
+            if isNew:
+                terms = [(1,context.ineqFactory.intlit2int(l)) for l in lits]
+                ineq = context.ineqFactory.fromTerms(terms, 1)
+                if len(lits) > 0:
+                    w = [terms[0][1]]
+                else:
+                    w = []
+                isContradiction = (len(lits) == 0)
+                return cls(ineq, w, context.ineqFactory.numVars(), isContradiction)
+            else:
+                return EmptyRule()
+
+    def __init__(self, ineq, w, numVars, isContradiction):
+        super().__init__(ineq, w, numVars)
+        self.isContradiction = isContradiction
+
+    def compute(self, antecedents, context):
+        if self.isContradiction:
+            context.containsContradiction = True
+
+        return super().compute(antecedents, context)
+
 
 
 class DRATParser(RuleParserBase):

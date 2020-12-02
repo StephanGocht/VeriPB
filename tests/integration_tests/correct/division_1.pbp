@@ -1,0 +1,6 @@
+pseudo-Boolean proof version 1.0
+f 2
+p 1 1 * 2 1 * +
+e 3 2 x1 1 x3 >= 2 ;
+p 1 1 * 2 1 * + 42 d
+e 4 1 x1 1 x3 >= 1 ;

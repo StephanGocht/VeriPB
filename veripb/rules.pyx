@@ -2,7 +2,6 @@ import logging
 
 import veripb.constraints
 from veripb.constraints import Term
-from veripb.pbsolver import RoundingSat, Formula
 from veripb.parser import OPBParser, WordParser
 from veripb.timed_function import TimedFunction
 
@@ -108,6 +107,9 @@ class DeleteConstraints(Rule):
             if (which[-1] == 0):
                 which = which[:-1]
 
+            if 0 in which:
+                raise ValueError("Can not delete constraint with index 0.")
+
         return cls(which)
 
     def __init__(self, toDelete):
@@ -157,7 +159,7 @@ class Assumption(Rule):
     def isGoal(self):
         return False
 
-    @TimedFunction.time("Assumption::compute")
+    @TimedFunction.time("Assumption.compute")
     def compute(self, antecedents, context):
         context.usesAssumptions = True
         return [self.constraint]
@@ -179,7 +181,7 @@ class ReverseUnitPropagation(Rule):
                         "before the formula is loaded.")
 
                 for nxt in words:
-                    if nxt == "0":
+                    if nxt in ["0", ";"]:
                         break
                     w.append(context.ineqFactory.lit2int(nxt))
             else:
@@ -209,7 +211,7 @@ class ReverseUnitPropagation(Rule):
     def isGoal(self):
         return False
 
-    @TimedFunction.time("ReverseUnitPropagation::compute")
+    @TimedFunction.time("ReverseUnitPropagation.compute")
     def compute(self, antecedents, context):
         context.propEngine.increaseNumVarsTo(self.numVars)
         success = self.constraint.ratCheck(self.w, context.propEngine)
@@ -256,7 +258,7 @@ class CompareToConstraint(Rule):
 class ConstraintEquals(CompareToConstraint):
     Id = "e"
 
-    @TimedFunction.time("ConstraintEquals::compute")
+    @TimedFunction.time("ConstraintEquals.compute")
     def compute(self, antecedents, context = None):
         antecedents = list(antecedents)
         if self.constraint != antecedents[0]:
@@ -283,7 +285,7 @@ class ConstraintImplies(CompareToConstraint):
 class ConstraintImpliesGetImplied(ConstraintImplies):
     Id = "j"
 
-    @TimedFunction.time("ConstraintImpliesGetImplied::compute")
+    @TimedFunction.time("ConstraintImpliesGetImplied.compute")
     def compute(self, antecedents, context = None):
         super().compute(antecedents)
         return [self.constraint]
@@ -324,7 +326,7 @@ class Solution(Rule):
     def __init__(self, partialAssignment):
         self.partialAssignment = partialAssignment
 
-    @TimedFunction.time("Solution::compute")
+    @TimedFunction.time("Solution.compute")
     def compute(self, antecedents, context):
         if not context.propEngine.checkSat(self.partialAssignment):
             raise SolutionCheckFailed()
@@ -369,7 +371,7 @@ class ObjectiveBound(Rule):
     def __init__(self, partialAssignment):
         self.partialAssignment = partialAssignment
 
-    @TimedFunction.time("ObjectiveBound::compute")
+    @TimedFunction.time("ObjectiveBound.compute")
     def compute(self, antecedents, context):
         if not context.propEngine.checkSat(self.partialAssignment):
             raise SolutionCheckFailed()
@@ -412,20 +414,26 @@ class IsContradiction(Rule):
     @classmethod
     def parse(cls, line, context):
         with WordParser(line) as words:
-            which = words.nextInt()
-            words.expectZero()
-            words.expectEnd()
+            which = list(map(int, words))
 
-        return cls(which)
+            if (which[-1] == 0):
+                which = which[:-1]
+
+            if len(which) != 1:
+                raise ValueError("Expected exactly one constraintId.")
+
+        return cls(which[0])
 
     def __init__(self, constraintId):
         self.constraintId = constraintId
 
-    @TimedFunction.time("IsContradiction::compute")
+    @TimedFunction.time("IsContradiction.compute")
     def compute(self, antecedents, context = None):
         antecedents = list(antecedents)
         if not antecedents[0].isContradiction():
             raise ContradictionCheckFailed()
+        else:
+            context.containsContradiction = True
         return []
 
     def numConstraints(self):
@@ -454,7 +462,7 @@ class ReversePolishNotation(Rule):
                 stackSize -= 1
             elif word == "r":
                 stackSize -= 2
-            elif word == "s":
+            elif word in ["s", ";"]:
                 stackSize += 0
             else:
                 if context.ineqFactory.isLit(word):
@@ -482,6 +490,8 @@ class ReversePolishNotation(Rule):
             if sequence[-1] == 0:
                 sequence.pop()
                 stackSize -= 1
+            if sequence[-1] == ";":
+                sequence.pop()
 
             if stackSize != 1:
                 raise ValueError("Stack should contain exactly one element at end of polish notation.");
@@ -519,7 +529,7 @@ class ReversePolishNotation(Rule):
 
         self.instructions = instructions
 
-    @TimedFunction.time("ReversePolishNotation::compute")
+    @TimedFunction.time("ReversePolishNotation.compute")
     def compute(self, antecedents, context = None):
         antecedents = list(antecedents)
         stack = list()
@@ -589,9 +599,11 @@ class LoadFormula(Rule):
         context.foundLoadFormula = True
         numConstraints = len(context.formula)
         with WordParser(line) as words:
-            num = words.nextInt()
+            try:
+                num = int(next(words))
+            except StopIteration:
+                num = 0
             if num == 0:
-                words.expectEnd()
                 return cls(numConstraints)
             else:
                 if num != numConstraints:
@@ -599,16 +611,12 @@ class LoadFormula(Rule):
                         "Number of constraints does not match, got %i but "\
                         "there are %i constraints."%(num, numConstraints))
 
-                if (words.nextInt() != 0):
-                    raise ValueError("Expected 0.")
-                words.expectEnd()
-
                 return cls(numConstraints)
 
     def __init__(self, numConstraints):
         self._numConstraints = numConstraints
 
-    @TimedFunction.time("LoadFormula::compute")
+    @TimedFunction.time("LoadFormula.compute")
     def compute(self, antecedents, context = None):
         if (len(context.formula) != self._numConstraints):
             raise InvalidProof("Wrong number of constraints")
@@ -634,7 +642,7 @@ class LoadAxiom(Rule):
     def __init__(self, axiomId):
         self._axiomId = axiomId
 
-    @TimedFunction.time("LoadAxiom::compute")
+    @TimedFunction.time("LoadAxiom.compute")
     def compute(self, antecedents, context):
         try:
             return [context.formula[self._axiomId - 1]]

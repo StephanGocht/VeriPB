@@ -493,4 +493,4 @@ References
 .. _GN21:
 
 [GN21] Certifying Parity Reasoning Efficiently Using Pseudo-Boolean Proofs,
-Stephan Gocht, Jakob Nordström, (in review for 2021).
+Stephan Gocht, Jakob Nordström, (to apear 2021).

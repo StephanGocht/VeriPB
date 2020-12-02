@@ -11,10 +11,11 @@ Currently it only supports linear pseudo-Boolean proofs using cutting planes.
 
 WARNING
 =======
-The current version only uses fixed bitwdith integers and does not
-contain code for catching overflows. This means that trying to verify
-proofs that contain or result in large numbers leads to undefined
-behaviour.
+The current default setting only uses fixed bitwdith integers and does
+not contain code for catching overflows. This means that trying to
+verify proofs that contain or result in large numbers leads to
+undefined behaviour. If you need to use large coefficients, you can
+try the ``--arbitraryPrecision`` option.
 
 ATTENTION
 =========

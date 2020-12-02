@@ -90,7 +90,7 @@ class Settings():
         group.add_argument("--arbitraryPrecision",
             action="store_true",
             default=defaults["arbitraryPrecision"],
-            help="Turn on arbitrary precision. Experimental, does not work with unit propagation or solution checking.",
+            help="Turn on arbitrary precision. Slows down proof checking.",
             dest=name+".arbitraryPrecision")
         group.add_argument("--no-arbitraryPrecision",
             action="store_false",

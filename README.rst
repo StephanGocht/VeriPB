@@ -7,7 +7,14 @@ VeriPB is a tool for verifying refutations (proofs of unsatisfiability)
 and more (such as verifying that a valid solution is found) in python
 and c++. A description of the proof file format can be found below.
 
-Currently it only supports linear pseudo-Boolean proofs using cutting planes.
+Currently its focus is on linear pseudo-Boolean proofs utilizing
+cutting planes reasoning. VeriPB has already been used for various
+applications including proof logging of
+
+    * subgraph isomorphism [GMN2020]_,
+    * clique and maximum common (connected) subgraph [GMMNPT2020]_,
+    * constraint programming with all different constraints [EGMN20]_ and
+    * parity reasoning in the context of CDCL SAT solvers [GN21]_.
 
 WARNING
 =======
@@ -494,4 +501,28 @@ References
 .. _GN21:
 
 [GN21] Certifying Parity Reasoning Efficiently Using Pseudo-Boolean Proofs,
-Stephan Gocht, Jakob Nordström, (to apear 2021).
+Stephan Gocht, Jakob Nordström, (to apear AAAI '21).
+
+.. _GMMNPT2020:
+
+[GMMNPT2020] Stephan Gocht, Ross McBride, Ciaran McCreesh, Jakob Nordström, Patrick
+Prosser, and James Trimble. Certifying Solvers for Clique and Maximum
+Common (Connected) Subgraph Problems. In Proceedings of the 26th
+International Conference on Principles and Practice of Constraint
+Programming (CP '20), Lecture Notes in Computer Science, volume 12333,
+pages 338-357, September 2020.
+
+.. _GMN2020:
+
+[GMN2020] Stephan Gocht, Ciaran McCreesh, and Jakob Nordström. Subgraph
+Isomorphism Meets Cutting Planes: Solving with Certified Solutions. In
+Proceedings of the 29th International Joint Conference on Artificial
+Intelligence (IJCAI '20), pages 1134-1140, July 2020.
+
+.. _EGMN20:
+
+[EGMN20] Jan Elffers, Stephan Gocht, Ciaran McCreesh, and Jakob Nordström.
+Justifying All Differences Using Pseudo-Boolean Reasoning. In
+Proceedings of the 34th AAAI Conference on Artificial Intelligence
+(AAAI '20), pages 1486-1494, February 2020.
+

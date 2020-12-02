@@ -11,10 +11,10 @@ Currently its focus is on linear pseudo-Boolean proofs utilizing
 cutting planes reasoning. VeriPB has already been used for various
 applications including proof logging of
 
- * subgraph isomorphism [GMN2020]_,
- * clique and maximum common (connected) subgraph [GMMNPT2020]_,
- * constraint programming with all different constraints [EGMN20]_ and
- * parity reasoning in the context of CDCL SAT solvers [GN21]_.
+* subgraph isomorphism [GMN2020]_,
+* clique and maximum common (connected) subgraph [GMMNPT2020]_,
+* constraint programming with all different constraints [EGMN20]_ and
+* parity reasoning in the context of CDCL SAT solvers [GN21]_.
 
 WARNING
 =======
@@ -58,6 +58,7 @@ Update
 If installed as described above the tool can be updated with
 
 ::
+
     git pull
     pip3 install --user -e ./
 
@@ -130,7 +131,6 @@ before a rule is executed.
 ---------
 
 ::
-
 
     f [nProblemConstraints]
 

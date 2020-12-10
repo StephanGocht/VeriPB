@@ -7,7 +7,7 @@ def get_pybind_include():
     method can be invoked. """
 
     import pybind11
-    return pybind11.get_include()
+    yield pybind11.get_include()
 
 ext_modules = [
     Extension(
@@ -19,10 +19,9 @@ ext_modules = [
          'veripb/optimized/constraints.hpp',
          'veripb/optimized/BigInt.hpp',
         ],
-        include_dirs=[
+        include_dirs=
             # Path to pybind11 headers
             get_pybind_include(),
-        ],
         extra_compile_args=['--std=c++17', '-DPY_BINDINGS'],
         libraries=['gmp', 'gmpxx'],
         language='c++'

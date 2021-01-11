@@ -180,6 +180,10 @@ class ReverseUnitPropagation(Rule):
                     raise ValueError("You are not allowed to use redundancy checks"\
                         "before the formula is loaded.")
 
+                if getattr(context, "objective", None) is not None:
+                    raise ValueError("You are not allowed to use redundancy checks"\
+                        "in optimization problems.")
+
                 for nxt in words:
                     if nxt in ["0", ";"]:
                         break

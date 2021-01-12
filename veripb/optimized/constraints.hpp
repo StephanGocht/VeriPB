@@ -689,6 +689,26 @@ public:
             this->terms.end());
     }
 
+    void restrictByFalseLits(const Assignment& a){
+        this->terms.erase(
+            std::remove_if(
+                this->terms.begin(),
+                this->terms.end(),
+                [this, &a](Term<T>& term){
+                    switch (a[term.lit]) {
+                        case State::True:
+                            break;
+                        case State::False:
+                            term.coeff = 0;
+                            break;
+                        default:
+                            break;
+                    }
+                    return term.coeff == 0;
+                }),
+            this->terms.end());
+    }
+
     size_t mem() const {
         return sizeof(FixedSizeInequality<T>) + terms.size() * sizeof(Term<T>);
     }
@@ -1061,50 +1081,62 @@ public:
             }
         }
 
-        AutoReset autoReset(*this);
-        FixedSizeInequalityHandler<T> negated(redundant);
-        negated->negate();
+        { // with autoReset do
+            AutoReset autoReset(*this);
+            FixedSizeInequalityHandler<T> negated(redundant);
+            negated->negate();
 
-        while (!current.conflict &&
-                singleTmpPropagation(*negated))
-        {
-            propagate();
-        }
+            while (!current.conflict &&
+                    singleTmpPropagation(*negated))
+            {
+                propagate();
+            }
 
-        if (current.conflict) {
-            // std::cout << "rup check succeded" << std::endl;
-            return true;
-        } else if (w.size() == 0) {
-            // std::cout << "rup check failed" << std::endl;
-            return false;
-        }
+            // We might have got some propagations that allow us to
+            // strengthen (remove all falsified literals) the negated
+            // constraint. This will make the comming checks more
+            // likely to succeed.
+            negated->restrictByFalseLits(this->assignment);
 
-        for (Lit lit: w) {
-            for (const FixedSizeInequality<T>* ineq: occurs[~lit]) {
-                FixedSizeInequalityHandler<T> implied(*ineq);
-                implied->restrictBy(a);
+            if (current.conflict) {
+                // std::cout << "rup check succeded" << std::endl;
+                return true;
+            } else if (w.size() == 0) {
+                // std::cout << "rup check failed" << std::endl;
+                return false;
+            }
 
-                // std::cout << "checking constraint" << std::endl;
-                if (negated->implies(*implied)) {
-                    // std::cout << "  ...syntactic implication check succeded" << std::endl;
-                    continue;
-                } else {
-                    AutoReset autoReset(*this);
-                    implied->negate();
+            for (Lit lit: w) {
+                for (const FixedSizeInequality<T>* ineq: occurs[~lit]) {
+                    FixedSizeInequalityHandler<T> implied(*ineq);
+                    implied->restrictBy(a);
 
-                    while (!current.conflict
-                        && (singleTmpPropagation(*implied)
-                            || singleTmpPropagation(*negated)))
-                    {
-                        propagate();
-                    }
+                    // strengthen original constraint by current propagations
+                    FixedSizeInequalityHandler<T> orig(*ineq);
+                    orig->restrictByFalseLits(this->assignment);
 
-                    if (!current.conflict) {
-                        // std::cout << "  ...rup check failed" << std::endl;
-                        return false;
-                    } else {
-                        // std::cout << "  ...rup check succeded" << std::endl;
+                    // std::cout << "checking constraint" << std::endl;
+                    if (orig->implies(*implied) || negated->implies(*implied)) {
+                        // std::cout << "  ...syntactic implication check succeded" << std::endl;
                         continue;
+                    } else {
+                        AutoReset autoReset(*this);
+                        implied->negate();
+
+                        while (!current.conflict
+                            && (singleTmpPropagation(*implied)
+                                || singleTmpPropagation(*negated)))
+                        {
+                            propagate();
+                        }
+
+                        if (!current.conflict) {
+                            // std::cout << "  ...rup check failed" << std::endl;
+                            return false;
+                        } else {
+                            // std::cout << "  ...rup check succeded" << std::endl;
+                            continue;
+                        }
                     }
                 }
             }

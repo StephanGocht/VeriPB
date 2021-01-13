@@ -1094,7 +1094,7 @@ public:
                 a.assign(lit);
             }
             if (!redundant.isSatisfied(a)) {
-                // std::cout << "given assignment does not satisfy constraint" << std::endl;
+                std::cout << "given assignment does not satisfy constraint" << std::endl;
                 return false;
             }
         }

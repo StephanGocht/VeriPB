@@ -984,9 +984,9 @@ public:
         }
     }
 
-    bool checkSat(std::vector<int>& lits) {
+    bool propagate4sat(std::vector<int>& lits) {
         AutoReset autoReset(*this);
-        attachUnattached();
+
         for (int lit: lits) {
             Lit l(lit);
             auto val = assignment.value[l];
@@ -1014,6 +1014,11 @@ public:
         }
 
         return success;
+    }
+
+    bool checkSat(std::vector<int>& lits) {
+        attachUnattached();
+        return propagate4sat(lits);
     }
 
     void _attach(Inequality<T>* ineq) {

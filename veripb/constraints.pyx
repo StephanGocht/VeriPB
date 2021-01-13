@@ -309,8 +309,8 @@ class PyInequality():
         return LazyInequality(self)
 
 class IneqFactory():
-    def __init__(self):
-        self.freeNames = True
+    def __init__(self, _freeNames = True):
+        self.freeNames = _freeNames
         self.varNameMgr = VariableNameManager(self.freeNames)
 
     def litAxiom(self, lit):
@@ -386,6 +386,9 @@ class PropEngine:
         pass
 
 class CppIneqFactory(IneqFactory):
+    def __init__(self, enableFreeNames = True):
+        super().__init__(enableFreeNames)
+
     def litAxiom(self, lit):
         return CppInequality([1], [lit], 0)
 
@@ -397,6 +400,9 @@ class CppIneqFactory(IneqFactory):
         return CppInequality(coefs, lits, ineq.degree)
 
 class BigIntIneqFactory(IneqFactory):
+    def __init__(self, enableFreeNames = True):
+        super().__init__(enableFreeNames)
+
     def litAxiom(self, lit):
         return CppInequalityBigInt([1], [lit], 0)
 

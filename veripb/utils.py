@@ -64,7 +64,8 @@ class Settings():
         return {
             "drat": False,
             "cnf": False,
-            "arbitraryPrecision": False
+            "arbitraryPrecision": False,
+            "enableFreeNames": True
         }
 
     def computeNumUse(self):
@@ -97,6 +98,16 @@ class Settings():
             help="Turn off arbitrary precision.",
             dest=name+".arbitraryPrecision")
 
+        group.add_argument("--freeNames",
+            action="store_true",
+            default=defaults["enableFreeNames"],
+            help="Enable use of arbitrary variable names.",
+            dest=name+".enableFreeNames")
+        group.add_argument("--no-freeNames",
+            action="store_false",
+            help="Disable use of arbitrary variable names.",
+            dest=name+".enableFreeNames")
+
     @classmethod
     def extract(cls, result, name = "misc"):
         preset = dict()
@@ -125,9 +136,9 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
 
     context = Context()
     if miscSettings.arbitraryPrecision:
-        context.ineqFactory = BigIntIneqFactory()
+        context.ineqFactory = BigIntIneqFactory(miscSettings.enableFreeNames)
     else:
-        context.ineqFactory = CppIneqFactory()
+        context.ineqFactory = CppIneqFactory(miscSettings.enableFreeNames)
 
     try:
         if miscSettings.drat or miscSettings.cnf:

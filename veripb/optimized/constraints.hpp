@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 #include <memory>
 #include <chrono>
 #include <algorithm>
@@ -465,8 +466,15 @@ private:
         }
     }
 
+    void unRegisterOccurence(PropEngine<T>& prop) {
+        for (Term<T>& term: this->terms) {
+            prop.rmOccurence(term.lit, *this);
+        }
+    }
+
 public:
     void clearWatches(PropEngine<T>& prop) {
+        unRegisterOccurence(prop);
         for (size_t i = 0; i < this->watchSize; i++) {
             auto& ws = prop.watchlist[terms[i].lit];
             ws.erase(
@@ -716,7 +724,7 @@ public:
 
 template<typename T>
 inline std::ostream& operator<<(std::ostream& os, const FixedSizeInequality<T>& v) {
-    for (const Term<T>& term: v) {
+    for (const Term<T>& term: v.terms) {
         os << term << " + ";
     };
     os << " >= " << v.degree;
@@ -831,7 +839,7 @@ class PropEngine {
 private:
     typedef WatchInfo<T> WatchedType;
     typedef std::vector<WatchedType> WatchList;
-    typedef std::vector<FixedSizeInequality<T>*> OccursList;
+    typedef std::unordered_set<FixedSizeInequality<T>*> OccursList;
 
     size_t nVars;
     std::vector<Lit> trail;
@@ -1109,6 +1117,7 @@ public:
             for (Lit lit: w) {
                 for (const FixedSizeInequality<T>* ineq: occurs[~lit]) {
                     FixedSizeInequalityHandler<T> implied(*ineq);
+                    std::cout << *implied << std::endl;
                     implied->restrictBy(a);
 
                     // strengthen original constraint by current propagations
@@ -1170,7 +1179,13 @@ public:
 
     void addOccurence(Lit lit, FixedSizeInequality<T>& w) {
         if (this->updateWatch) {
-            occurs[lit].push_back(&w);
+            occurs[lit].emplace(&w);
+        }
+    }
+
+    void rmOccurence(Lit lit, FixedSizeInequality<T>& w) {
+        if (this->updateWatch) {
+            occurs[lit].erase(&w);
         }
     }
 

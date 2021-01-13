@@ -1127,7 +1127,7 @@ public:
             for (Lit lit: w) {
                 for (const FixedSizeInequality<T>* ineq: occurs[~lit]) {
                     FixedSizeInequalityHandler<T> implied(*ineq);
-                    std::cout << "  [internal] checking implication of " << *implied << std::endl;
+                    // std::cout << "  [internal] checking implication of " << *implied << std::endl;
                     implied->restrictBy(a);
 
                     // strengthen original constraint by current propagations

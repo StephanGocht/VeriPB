@@ -852,6 +852,11 @@ private:
     size_t maxDbMem = 0;
 
 
+    /*
+     * Automatically resets the trail to its previous state after the
+     * scope is left. Requires that only new things were put on the
+     * trail, i.e., the trail did not grow shorter.
+     */
     class AutoReset {
     private:
         PropEngine& engine;

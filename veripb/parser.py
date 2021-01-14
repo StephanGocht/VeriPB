@@ -70,8 +70,18 @@ class RuleParserBase():
             lineNum = 0
 
         for line in lines:
-            idSize = defaultIdSize
             lineNum += 1
+
+            # skip indendation
+            origLine = line
+            line = line.lstrip()
+            columnOffset = len(line) - len(origLine)
+            line = line.rstrip()
+
+            # find first word
+            ruleId = line.split(" ")[0]
+            idSize = len(ruleId)
+
             if dumpLine:
                 print("line %03d: %s"% (lineNum, line.rstrip()))
 
@@ -84,6 +94,8 @@ class RuleParserBase():
                     else:
                         rule = defaultRule
                         idSize = 0
+
+                columnOffset += idSize
 
                 try:
                     step = rule.parse(line[idSize:], self.context)

@@ -27,7 +27,7 @@ ext_modules = [
         language='c++'
     ),
     Extension('veripb.constraints', sources=['veripb/constraints.pyx']),
-    Extension('veripb.rules', sources=['veripb/rules.pyx']),
+    # Extension('veripb.rules', sources=['veripb/rules.pyx']),
 ]
 
 setup(

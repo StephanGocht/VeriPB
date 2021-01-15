@@ -2,56 +2,65 @@ from veripb import InvalidProof
 from veripb.rules import Rule, EmptyRule, register_rule
 from veripb.rules import LevelStack
 from veripb.rules_register import register_rule
+from veripb.parser import OPBParser, WordParser
 
 
-class LevelCallback():
-    @classmethod
-    def setup(cls, context, namespace = None):
-        try:
-            return context.levelCallback[namespace]
-        except AttributeError:
-            context.levelCallback = dict()
-            addIndex = True
-        except IndexError:
-            addIndex = True
+def rulesToDict(rules, default = None):
+    res = {rule.Id: rule for rule in rules}
+    res[""] = default
+    return res
 
-        if addIndex:
-            levelCallback = cls()
-            context.levelCallback[namespace] = levelCallback
-            return context.levelCallback[namespace]
-
+class SubContextInfo():
     def __init__(self):
-        self.currentLevel = 0
-        self.levels = list()
+        self.toDelete = []
+        self.toAdd = []
+        self.previousRules = None
+        self.callbacks = []
 
-    def setLevel(self, level):
-        self.currentLevel = level
-        while len(self.levels) <= level:
-            self.levels.append(list())
+    def addToDelete(self, ineqs):
+        self.toDelete.extend(ineqs)
 
-    def addToCurrentLevel(self, callback):
-        self.levels[self.currentLevel].append(callback)
+class SubContext():
+    @classmethod
+    def setup(cls, context):
+        try:
+            return context.subContexts
+        except AttributeError:
+            context.subContexts = cls(context)
+            return context.subContexts
 
-    def dropToLevel(self, level):
-        assert(level < len(self.levels))
+    def __init__(self, context):
+        self.infos = []
 
-        result = list()
-        for i in range(level, len(self.levels)):
-            result.extend(self.levels[i])
-            self.levels[i].clear()
+        f = lambda ineqs, context: self.addToDelete(ineqs)
+        context.addIneqListener.append(f)
 
-        return result
+    def addToDelete(self, ineqs):
+        if len(self.infos) > 0:
+            self.infos[-1].addToDelete(ineqs)
 
+    def push(self):
+        newSubContext = SubContextInfo()
+        self.infos.append(newSubContext)
+        return self.infos[-1]
 
+    def pop(self):
+        oldContext = self.infos.pop()
+        for callback in oldContext.callbacks:
+            callback(oldContext)
+        return oldContext
+
+    def getCurrent(self):
+        return self.infos[-1]
 
 class Order:
     def __init__(self, name = ""):
         self.name = name
         self.definition = None
         self.auxDefinition = None
-        self.leftVars = None
-        self.rightVars = None
-        self.auxVars = None
+        self.leftVars = []
+        self.rightVars = []
+        self.auxVars = []
 
     def check(self):
         # todo: check that all proof goals were met
@@ -92,39 +101,92 @@ class OrderContext:
 
         return []
 
-@register_rule
 class EndOfProof(EmptyRule):
     Id = "qed"
 
     @classmethod
     def parse(cls, line, context):
-        levelStack = LevelStack.setup(context, "subproof")
-        level = levelStack.currentLevel
-        removed = levelStack.wipeLevel(level)
-        levelStack.setLevel(level - 1)
+        subcontexts = SubContext.setup(context)
+        subcontext = subcontexts.pop()
+        return cls(subcontext)
 
-        levelCallbacks = LevelCallback.setup(context)
-        callbacks = levelCallbacks.dropToLevel(levelCallbacks.currentLevel - 1)
-
-        added = []
-        for callback in callbacks:
-            added.extend(callback())
-
-        return cls(removed, added)
-
-    def __init__(self, deleteConstraints, added):
-        self._deleteConstraints = deleteConstraints
-        self.added = added
+    def __init__(self, subcontext):
+        self.subcontext = subcontext
 
     def deleteConstraints(self):
-        return self._deleteConstraints
+        return self.subcontext.toDelete
 
     def compute(self, antecedents, context = None):
-        return self.added
+        return self.subcontext.toAdd
+
+    def allowedRules(self, context, currentRules):
+        if self.subcontext.previousRules is not None:
+            return self.subcontext.previousRules
+        else:
+            return currentRules
+
+class OrderVarsBase(EmptyRule):
+    @classmethod
+    def addLits(cls, order, lits):
+        pass
+
+    @classmethod
+    def parse(cls, line, context):
+        lits = []
+        with WordParser(line) as words:
+            for nxt in words:
+                lits.append(context.ineqFactory.lit2int(nxt))
+
+        order = OrderContext.setup(context)
+        cls.addLits(order.activeDefinition, lits)
+        return cls()
+
+
+class LeftVars(OrderVarsBase):
+    Id = "left"
+
+    @classmethod
+    def addLits(cls, order, lits):
+        order.leftVars.extend(lits)
+
+class RightVars(OrderVarsBase):
+    Id = "right"
+
+    @classmethod
+    def addLits(cls, order, lits):
+        order.rightVars.extend(lits)
+
+class AuxVars(OrderVarsBase):
+    Id = "aux"
+
+    @classmethod
+    def addLits(cls, order, lits):
+        order.auxVars.extend(lits)
+
+class OrderVars(EmptyRule):
+    # todo: add check that number of variables matches
+
+    Id = "vars"
+    subRules = [LeftVars, RightVars, AuxVars, EndOfProof]
+
+    @classmethod
+    def parse(cls, line, context):
+        subcontexts = SubContext.setup(context)
+        subcontext = subcontexts.push()
+
+        return cls(subcontext)
+
+    def __init__(self, subContext):
+        self.subContext = subContext
+
+    def allowedRules(self, context, currentRules):
+        self.subContext.previousRules = currentRules
+        return rulesToDict(self.subRules)
 
 @register_rule
 class StrictOrder(EmptyRule):
     Id = "strict_order"
+    subRules = [OrderVars, EndOfProof]
 
     @classmethod
     def parse(cls, line, context):
@@ -132,11 +194,17 @@ class StrictOrder(EmptyRule):
         orders = OrderContext.setup(context)
         orders.newOrder(name)
 
-        levelStack = LevelStack.setup(context, "subproof")
-        levelStack.setLevel(levelStack.currentLevel + 1)
+        subcontexts = SubContext.setup(context)
+        subcontext = subcontexts.push()
 
-        levelCallbacks = LevelCallback.setup(context)
-        levelCallbacks.setLevel(levelCallbacks.currentLevel + 1)
-        levelCallbacks.addToCurrentLevel(lambda: orders.qedNewOrder())
+        f = lambda subContext: orders.qedNewOrder()
+        subcontext.callbacks.append(f)
 
-        return cls()
+        return cls(subcontext)
+
+    def __init__(self, subContext):
+        self.subContext = subContext
+
+    def allowedRules(self, context, currentRules):
+        self.subContext.previousRules = currentRules
+        return rulesToDict(self.subRules)

@@ -97,9 +97,10 @@ class RuleParserBase():
 
                 columnOffset += idSize
 
-                self.rules = rule.allowedRules(self.context, self.rules)
                 try:
                     step = rule.parse(line[idSize:], self.context)
+                    self.rules = step.allowedRules(self.context, self.rules)
+
                     step.lineInFile = lineNum
                     numConstraints = step.numConstraints()
                     yield step

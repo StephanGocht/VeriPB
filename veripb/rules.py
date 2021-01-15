@@ -58,7 +58,7 @@ class Rule():
         """
         return []
 
-    def allowedRules(self, currentRules):
+    def allowedRules(self, context, currentRules):
         return currentRules
 
     def __str__(self):

@@ -339,8 +339,8 @@ class IneqFactory():
     def isVarName(self, name):
         assert(name == name.strip())
         if len(name) >= 2 \
-                and (ord(name[0]) in range(ord("A"), ord("Z")) \
-                    or ord(name[0]) in range(ord("a"), ord("z"))) \
+                and (ord(name[0]) in range(ord("A"), ord("Z") + 1) \
+                    or ord(name[0]) in range(ord("a"), ord("z") + 1)) \
                 and ";" not in name and "=" not in name:
             return True
         else:

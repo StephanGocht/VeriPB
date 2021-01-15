@@ -1,13 +1,15 @@
 from veripb import InvalidProof
 from veripb.rules import Rule, EmptyRule, register_rule
 from veripb.rules import LevelStack
+from veripb.rules import ReversePolishNotation, IsContradiction
 from veripb.rules_register import register_rule
 from veripb.parser import OPBParser, WordParser
 
 
 def rulesToDict(rules, default = None):
     res = {rule.Id: rule for rule in rules}
-    res[""] = default
+    if "" not in res:
+        res[""] = default
     return res
 
 class SubContextInfo():
@@ -32,6 +34,8 @@ class SubContext():
     def __init__(self, context):
         self.infos = []
 
+        self.context = context
+
         f = lambda ineqs, context: self.addToDelete(ineqs)
         context.addIneqListener.append(f)
 
@@ -47,7 +51,7 @@ class SubContext():
     def pop(self):
         oldContext = self.infos.pop()
         for callback in oldContext.callbacks:
-            callback(oldContext)
+            callback(self.context, oldContext)
         return oldContext
 
     def getCurrent(self):
@@ -56,7 +60,7 @@ class SubContext():
 class Order:
     def __init__(self, name = ""):
         self.name = name
-        self.definition = None
+        self.definition = []
         self.auxDefinition = None
         self.leftVars = []
         self.rightVars = []
@@ -183,10 +187,91 @@ class OrderVars(EmptyRule):
         self.subContext.previousRules = currentRules
         return rulesToDict(self.subRules)
 
+class OrderDefinition(EmptyRule):
+    Id = ""
+
+    @classmethod
+    def parse(cls, line, context):
+        lits = []
+        with WordParser(line) as words:
+            parser = OPBParser(
+                    ineqFactory = context.ineqFactory,
+                    allowEq = True)
+            ineqs = parser.parseConstraint(words)
+
+        orderContext = OrderContext.setup(context)
+        order = orderContext.activeDefinition
+        order.definition.extend(ineqs)
+
+        return cls()
+
+class OrderDefinitions(EmptyRule):
+    Id = "def"
+    subRules = [EndOfProof, OrderDefinition]
+
+    # todo enforce only one def
+
+    @classmethod
+    def parse(cls, line, context):
+        subcontexts = SubContext.setup(context)
+        subcontext = subcontexts.push()
+
+        return cls(subcontext)
+
+    def __init__(self, subContext):
+        self.subContext = subContext
+
+    def allowedRules(self, context, currentRules):
+        self.subContext.previousRules = currentRules
+        return rulesToDict(self.subRules)
+
+class Irreflexivity(EmptyRule):
+    Id = "irreflexive"
+    subRules = [EndOfProof, ReversePolishNotation, IsContradiction]
+
+    @classmethod
+    def parse(cls, line, context):
+        subcontexts = SubContext.setup(context)
+        subcontext = subcontexts.push()
+
+        orderContext = OrderContext.setup(context)
+        order = orderContext.activeDefinition
+
+        return cls(subcontext, order.definition)
+
+    def __init__(self, subContext, constraints):
+        self.subContext = subContext
+
+        self.constraints = constraints
+        # todo: add substituted version
+
+        f = lambda context, subContext: self.check(context)
+        subContext.callbacks.append(f)
+
+    def compute(self, antecedents, context = None):
+        return self.constraints
+
+    def numConstraints(self):
+        return len(self.constraints)
+
+    def check(self, context):
+        if not getattr(context, "containsContradiction", False):
+            # todo: activate check
+            print("Irreflexivity proof did not show contradiction.")
+            # raise InvalidProof("Irreflexivity proof did not show contradiction.")
+
+        context.containsContradiction = False
+
+
+    def allowedRules(self, context, currentRules):
+        self.subContext.previousRules = currentRules
+        return rulesToDict(self.subRules)
+
+
 @register_rule
 class StrictOrder(EmptyRule):
     Id = "strict_order"
-    subRules = [OrderVars, EndOfProof]
+    subRules = [OrderVars, OrderDefinitions, Irreflexivity, EndOfProof]
 
     @classmethod
     def parse(cls, line, context):
@@ -197,7 +282,7 @@ class StrictOrder(EmptyRule):
         subcontexts = SubContext.setup(context)
         subcontext = subcontexts.push()
 
-        f = lambda subContext: orders.qedNewOrder()
+        f = lambda context, subContext: orders.qedNewOrder()
         subcontext.callbacks.append(f)
 
         return cls(subcontext)

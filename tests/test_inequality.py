@@ -376,6 +376,35 @@ class TestInequality(unittest.TestCase):
         r = geq([(2,1), (1,3)], 2)
         assert r == i
 
+    def test_substitute_1(self):
+        a = geq([(1, 2), (1, 1), (1, 3)], 2)
+        b = geq([(1, 3)], 1)
+
+        a = a.substitute([1, -2], [], [])
+        assert(a == b)
+
+    def test_substitute_2(self):
+        a = geq([(1, 2), (1, 1), (1, 3)], 2)
+        b = geq([(1, 3)], 1)
+
+        a = a.substitute([-1, 2], [], [])
+        assert(a == b)
+
+    def test_substitute_3(self):
+        a = geq([(1, 2), (1, 1), (1, 3)], 2)
+        b = geq([(1, 3), (1,4)], 2)
+
+        a = a.substitute([-1], [2], [4])
+        assert(a == b)
+
+    def test_substitute_3(self):
+        a = geq([(1, 1), (1, 2), (1, 3)], 2)
+        b = geq([(1, 3), (1,4)], 1)
+
+        a = a.substitute([1], [2], [4])
+        assert(a == b)
+
+
     if not isinstance(ineqFactory, veripb.constraints.CppIneqFactory):
         def test_resolve_1(self):
             a = clause([1, 2])

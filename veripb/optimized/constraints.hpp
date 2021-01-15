@@ -118,6 +118,10 @@ public:
         return value > other.value;
     }
 
+    bool operator<(const Lit& other) const {
+        return value < other.value;
+    }
+
     explicit operator size_t() const {
         return value;
     }
@@ -243,7 +247,7 @@ inline std::ostream& operator<<(std::ostream& os, const Term<T>& term) {
 
 template<typename T>
 bool orderByVar(T &a, T &b) {
-    return a.lit > b.lit;
+    return b.lit > a.lit;
 }
 
 template<typename T>
@@ -673,6 +677,65 @@ public:
             }
         }
         return slack >= 0;
+    }
+
+    void substitute(
+        std::vector<Lit>& constants,
+        std::vector<Var>& from,
+        std::vector<Lit>& to)
+    {
+        assert(from.size() == to.size());
+        std::sort(this->terms.begin(), this->terms.end(), orderByVar<Term<T>>);
+        assert(std::is_sorted(constants.begin(), constants.end()));
+        assert(std::is_sorted(from.begin(), from.end()));
+
+        auto it = constants.begin();
+        this->terms.erase(
+            std::remove_if(
+                this->terms.begin(),
+                this->terms.end(),
+                [this, &it, &constants](Term<T>& term){
+                    while (it != constants.end()
+                        && it->var() < term.lit.var())
+                    { ++it; }
+
+                    if (it != constants.end()
+                        && it->var() == term.lit.var())
+                    {
+                        if (it->isNegated() == term.lit.isNegated()) {
+                            this->degree -= term.coeff;
+                        }
+
+                        term.coeff = 0;
+                    }
+
+                    return term.coeff == 0;
+                }),
+            this->terms.end());
+
+
+        auto itMe = this->terms.begin();
+        auto itFrom = from.begin();
+        auto itTo = to.begin();
+
+        while (itMe != this->terms.end()) {
+            if (itFrom == from.end()) {
+                break;
+            }
+            if (itMe->lit.var() < *itFrom) {
+                ++itMe;
+            } else if (itMe->lit.var() > *itFrom) {
+                ++itFrom;
+                ++itTo;
+            } else {
+                assert(itMe->lit.var() == *itFrom);
+                Lit l = *itTo;
+                if (itMe->lit.isNegated()) {
+                    l = ~l;
+                }
+                itMe->lit = l;
+            }
+        }
     }
 
     void restrictBy(const Assignment& a){
@@ -1510,6 +1573,34 @@ public:
             v.emplace_back(i);
         }
         return propEngine.ratCheck(*this->ineq, v);
+    }
+
+    Inequality* substitute(
+        std::vector<int>& _constants,
+        std::vector<int>& _from,
+        std::vector<int>& _to)
+    {
+        assert(!this->frozen);
+        this->contract();
+
+        std::vector<Lit> constants;
+        for (int i : _constants) {
+            constants.emplace_back(i);
+        }
+
+        std::vector<Var> from;
+        for (int i : _from) {
+            assert(i > 0);
+            from.emplace_back(i);
+        }
+
+        std::vector<Lit> to;
+        for (int i : _to) {
+            to.emplace_back(i);
+        }
+
+        this->ineq->substitute(constants, from, to);
+        return this;
     }
 
     Inequality* negated() {

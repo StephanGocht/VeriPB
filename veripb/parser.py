@@ -90,7 +90,7 @@ class RuleParserBase():
                     rule = self.rules[line[0:idSize]]
                 except KeyError as e:
                     if defaultRule is None:
-                        raise ParseError("Unsupported rule '%s'"%(line[0]), line = lineNum)
+                        raise ParseError("Unsupported rule '%s'"%(line[:idSize]), line = lineNum)
                     else:
                         rule = defaultRule
                         idSize = 0

@@ -3,6 +3,7 @@ import unittest
 from env import veripb
 from veripb.parser import *
 from veripb.rules import *
+from veripb.rules_register import get_registered_rules
 from veripb.constraints import Term
 from veripb.constraints import CppIneqFactory as IneqFactory
 
@@ -18,7 +19,7 @@ class TestParsing(unittest.TestCase):
 
     def test_header(self):
         parser = RuleParser(DummyContext())
-        print(parser.parse(registered_rules, ["pseudo-Boolean proof version 1.0"]))
+        print(parser.parse(get_registered_rules(), ["pseudo-Boolean proof version 1.0"]))
 
     def test_OPB_line_1(self):
         res = OPBParser(self.ineqFactory).parseOPB("3 x1 >= 2;".split())

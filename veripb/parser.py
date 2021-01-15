@@ -51,6 +51,7 @@ class RuleParserBase():
     @TimedFunction.timeIter("RuleParserBase.parse")
     def parse(self, rules, file, dumpLine = False, defaultRule = None):
         self.rules = {rule.Id: rule for rule in rules}
+        self.rules[""] = defaultRule
 
         lineNum = 1
         ineqId = 1
@@ -89,14 +90,14 @@ class RuleParserBase():
                 try:
                     rule = self.rules[line[0:idSize]]
                 except KeyError as e:
-                    if defaultRule is None:
+                    rule = self.rules.get("", None)
+                    if rule is None:
                         raise ParseError("Unsupported rule '%s'"%(line[:idSize]), line = lineNum)
-                    else:
-                        rule = defaultRule
-                        idSize = 0
+                    idSize = 0
 
                 columnOffset += idSize
 
+                self.rules = rule.allowedRules(self.context, self.rules)
                 try:
                     step = rule.parse(line[idSize:], self.context)
                     step.lineInFile = lineNum

@@ -12,7 +12,7 @@ from veripb import ParseError
 from veripb.verifier import Verifier, Context
 from veripb.parser import OPBParser, CNFParser
 from veripb.drat import DRATParser
-from veripb.rules import registered_rules
+from veripb.rules_register import get_registered_rules
 from veripb.timed_function import TimedFunction
 from veripb.parser import RuleParser
 from veripb.exceptions import ParseError
@@ -132,7 +132,7 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
 
     TimedFunction.startTotalTimer()
 
-    rules = list(registered_rules)
+    rules = list(get_registered_rules())
 
     context = Context()
     if miscSettings.arbitraryPrecision:

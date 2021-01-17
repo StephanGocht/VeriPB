@@ -5,6 +5,8 @@ from veripb.rules import ReversePolishNotation, IsContradiction
 from veripb.rules_register import register_rule
 from veripb.parser import OPBParser, WordParser
 
+from collections import deque
+
 
 def rulesToDict(rules, default = None):
     res = {rule.Id: rule for rule in rules}
@@ -12,12 +14,17 @@ def rulesToDict(rules, default = None):
         res[""] = default
     return res
 
+def sortSubstitution(mapping):
+    mapping.sort(key = lambda x: abs(x[0]))
+    return zip(*mapping)
+
 class SubContextInfo():
     def __init__(self):
         self.toDelete = []
         self.toAdd = []
         self.previousRules = None
         self.callbacks = []
+        self.subgoals = deque()
 
     def addToDelete(self, ineqs):
         self.toDelete.extend(ineqs)
@@ -33,7 +40,6 @@ class SubContext():
 
     def __init__(self, context):
         self.infos = []
-
         self.context = context
 
         f = lambda ineqs, context: self.addToDelete(ineqs)
@@ -52,10 +58,25 @@ class SubContext():
         oldContext = self.infos.pop()
         for callback in oldContext.callbacks:
             callback(self.context, oldContext)
+
+        if len(oldContext.subgoals) > 0:
+            ineqId, ineq = oldContext.subgoals[0]
+
+            ineq = self.context.ineqFactory.toString(ineq)
+            raise InvalidProof("Open subgoal not proven: %i:, %s"%(ineqId, ineq))
+
         return oldContext
 
     def getCurrent(self):
         return self.infos[-1]
+
+class TransitivityInfo:
+    def __init__(self):
+        self.fresh_right = []
+        self.fresh_aux_1 = []
+        self.fresh_aux_2 = []
+        self.isProoven = False
+
 
 class Order:
     def __init__(self, name = ""):
@@ -65,6 +86,8 @@ class Order:
         self.leftVars = []
         self.rightVars = []
         self.auxVars = []
+
+        self.transitivity = TransitivityInfo()
 
     def check(self):
         # todo: check that all proof goals were met
@@ -128,6 +151,57 @@ class EndOfProof(EmptyRule):
             return self.subcontext.previousRules
         else:
             return currentRules
+
+class SubProof(EmptyRule):
+    Id = "sub_proof"
+    subRules = [EndOfProof, ReversePolishNotation, IsContradiction]
+
+    # todo enforce only one def
+
+    @classmethod
+    def parse(cls, line, context):
+        subcontexts = SubContext.setup(context)
+
+        parentCtx = subcontexts.getCurrent()
+        ineqId, nxtGoal = parentCtx.subgoals.popleft()
+        subcontext = subcontexts.push()
+
+        with WordParser(line) as words:
+            goalId = words.nextInt()
+
+        if goalId != ineqId:
+            # todo try to be nice and figure stuff out by unit propagation
+            raise InvalidProof("Missing proof for subgoal.")
+
+        return cls(subcontext, nxtGoal)
+
+
+
+    def __init__(self, subContext, constraint):
+        self.subContext = subContext
+
+        self.constraint = constraint.copy().negated()
+
+        f = lambda context, subContext: self.check(context)
+        subContext.callbacks.append(f)
+
+
+
+    def compute(self, antecedents, context = None):
+        return [self.constraint]
+
+    def numConstraints(self):
+        return 1
+
+    def allowedRules(self, context, currentRules):
+        self.subContext.previousRules = currentRules
+        return rulesToDict(self.subRules)
+
+    def check(self, context):
+        if not getattr(context, "containsContradiction", False):
+            raise InvalidProof("Irreflexivity proof did not show contradiction.")
+
+        context.containsContradiction = False
 
 class OrderVarsBase(EmptyRule):
     @classmethod
@@ -237,13 +311,26 @@ class Irreflexivity(EmptyRule):
         orderContext = OrderContext.setup(context)
         order = orderContext.activeDefinition
 
-        return cls(subcontext, order.definition)
+        return cls(subcontext, order)
 
-    def __init__(self, subContext, constraints):
+    def __init__(self, subContext, order):
         self.subContext = subContext
 
-        self.constraints = constraints
-        # todo: add substituted version
+        self.constraints = []
+        for ineq in order.definition:
+            ineq = ineq.copy()
+            self.constraints.append(ineq)
+
+        mapping = []
+        mapping.extend(zip(order.leftVars,order.rightVars))
+        mapping.extend(zip(order.rightVars,order.leftVars))
+        frm, to = sortSubstitution(mapping)
+
+        for ineq in order.definition:
+            ineq = ineq.copy()
+
+            ineq.substitute([],frm,to)
+            self.constraints.append(ineq)
 
         f = lambda context, subContext: self.check(context)
         subContext.callbacks.append(f)
@@ -256,11 +343,160 @@ class Irreflexivity(EmptyRule):
 
     def check(self, context):
         if not getattr(context, "containsContradiction", False):
-            # todo: activate check
-            print("Irreflexivity proof did not show contradiction.")
-            # raise InvalidProof("Irreflexivity proof did not show contradiction.")
+            raise InvalidProof("Irreflexivity proof did not show contradiction.")
 
         context.containsContradiction = False
+
+
+    def allowedRules(self, context, currentRules):
+        self.subContext.previousRules = currentRules
+        return rulesToDict(self.subRules)
+
+
+class TransitivityFreshRight(OrderVarsBase):
+    Id = "fresh_right"
+
+    @classmethod
+    def addLits(cls, order, lits):
+        order.transitivity.fresh_right.extend(lits)
+
+
+class TransitivityFreshAux1(OrderVarsBase):
+    Id = "fresh_aux1"
+
+    @classmethod
+    def addLits(cls, order, lits):
+        order.transitivity.fresh_aux_1.extend(lits)
+
+class TransitivityFreshAux2(OrderVarsBase):
+    Id = "fresh_aux2"
+
+    @classmethod
+    def addLits(cls, order, lits):
+        order.transitivity.fresh_aux_2.extend(lits)
+
+
+class TransitivityVars(EmptyRule):
+    # todo: add check that number of variables matches
+
+    Id = "vars"
+    subRules = [TransitivityFreshRight,TransitivityFreshAux1,TransitivityFreshAux2, EndOfProof]
+
+    @classmethod
+    def parse(cls, line, context):
+        subcontexts = SubContext.setup(context)
+        subcontext = subcontexts.push()
+
+        return cls(subcontext)
+
+    def __init__(self, subContext):
+        self.subContext = subContext
+
+    def allowedRules(self, context, currentRules):
+        self.subContext.previousRules = currentRules
+        return rulesToDict(self.subRules)
+
+class TransitivityProof(EmptyRule):
+    Id = "proof"
+    subRules = [EndOfProof, ReversePolishNotation, SubProof]
+
+    @classmethod
+    def parse(cls, line, context):
+        subcontexts = SubContext.setup(context)
+        subContext = subcontexts.push()
+
+        orderContext = OrderContext.setup(context)
+        order = orderContext.activeDefinition
+
+        # This rule will fail if the proof is not correct so lets
+        # already mark it proven here.
+        order.transitivity.isProoven = True
+
+        displayGoals = context.verifierSettings.trace
+
+        return cls(context, subContext, order, context.firstFreeId, displayGoals)
+
+    def __init__(self, context, subContext, order, freeId, displayGoals):
+        self.subContext = subContext
+
+
+        self.constraints = []
+        freeId += len(order.definition)
+        for ineq in order.definition:
+            ineq = ineq.copy()
+            self.constraints.append(ineq)
+
+        substitution = []
+        substitution.extend(zip(order.leftVars,order.rightVars))
+        substitution.extend(zip(order.rightVars,order.transitivity.fresh_right))
+        frm, to = sortSubstitution(substitution)
+
+        freeId += len(order.definition)
+        for ineq in order.definition:
+            ineq = ineq.copy()
+
+            ineq.substitute([],frm,to)
+            self.constraints.append(ineq)
+
+
+        substitution = []
+        substitution.extend(zip(order.rightVars,order.transitivity.fresh_right))
+        frm, to = sortSubstitution(substitution)
+
+        for ineq in order.definition:
+            ineq = ineq.copy()
+
+            ineq.substitute([],frm,to)
+
+            if displayGoals:
+                ineqStr = context.ineqFactory.toString(ineq)
+                print("  subgoal %00i: %s"%(freeId, ineqStr))
+
+            self.subContext.subgoals.append((freeId, ineq))
+            self.constraints.append(None)
+
+            freeId += 1
+
+
+
+
+
+    def compute(self, antecedents, context = None):
+        return self.constraints
+
+    def numConstraints(self):
+        return len(self.constraints)
+
+    def allowedRules(self, context, currentRules):
+        self.subContext.previousRules = currentRules
+        return rulesToDict(self.subRules)
+
+
+class Transitivity(EmptyRule):
+    Id = "transitivity"
+    subRules = [EndOfProof,TransitivityVars,TransitivityProof]
+
+    @classmethod
+    def parse(cls, line, context):
+        subcontexts = SubContext.setup(context)
+        subcontext = subcontexts.push()
+
+        orderContext = OrderContext.setup(context)
+        order = orderContext.activeDefinition
+
+        return cls(subcontext, order)
+
+    def __init__(self, subContext, order):
+        self.subContext = subContext
+        self.order = order
+
+        f = lambda context, subContext: self.check(context)
+        subContext.callbacks.append(f)
+
+
+    def check(self, context):
+        if not self.order.transitivity.isProoven:
+            raise InvalidProof("Transitivity proof is missing.")
 
 
     def allowedRules(self, context, currentRules):
@@ -271,7 +507,7 @@ class Irreflexivity(EmptyRule):
 @register_rule
 class StrictOrder(EmptyRule):
     Id = "strict_order"
-    subRules = [OrderVars, OrderDefinitions, Irreflexivity, EndOfProof]
+    subRules = [OrderVars, OrderDefinitions, Irreflexivity, Transitivity, EndOfProof]
 
     @classmethod
     def parse(cls, line, context):

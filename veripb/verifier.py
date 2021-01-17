@@ -189,6 +189,8 @@ class Verifier():
         if context is None:
             context = Context()
             context.propEngine = DummyPropEngine()
+
+        context.verifierSettings = self.settings
         self.context = context
 
     @TimedFunction.time("propEngine.attach")
@@ -209,6 +211,9 @@ class Verifier():
         constraints = rule.compute(antecedents, self.context)
 
         for i, constraint in enumerate(constraints):
+            if constraint is None:
+                continue
+
             lineNum = len(self.db) + i
             self.attach(constraint)
             if self.settings.trace and ruleNum > 0:
@@ -238,12 +243,17 @@ class Verifier():
             })
 
         for i in deletedConstraints:
-            self.detach(self.db[i])
+            ineq = self.db[i]
+            if ineq is None:
+                continue
+
+            self.detach(ineq)
 
             # clean up references, to not get spicious warnings
             constraint = None
             antecedents = None
 
+            ineq = None
             refcount = sys.getrefcount(self.db[i])
             if (refcount > 3):
                 # todo: refcount should be at-most 2, except for
@@ -251,6 +261,10 @@ class Verifier():
                 logging.warn("Internal Warning: refcount of "
                     "deleted constraint too large (is %i), memory will "
                     "not be freed."%(refcount))
+                # import gc
+                # for refer in gc.get_referrers(self.db[i]):
+                #     print(refer)
+
             self.db[i] = None
 
         if not didPrint == True and self.settings.trace and ruleNum > 0:

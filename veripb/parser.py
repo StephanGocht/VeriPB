@@ -98,6 +98,7 @@ class RuleParserBase():
                 columnOffset += idSize
 
                 try:
+                    self.context.firstFreeId = ineqId
                     step = rule.parse(line[idSize:], self.context)
                     self.rules = step.allowedRules(self.context, self.rules)
 

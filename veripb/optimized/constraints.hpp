@@ -718,10 +718,9 @@ public:
         auto itFrom = from.begin();
         auto itTo = to.begin();
 
-        while (itMe != this->terms.end()) {
-            if (itFrom == from.end()) {
-                break;
-            }
+        while (itMe != this->terms.end()
+            && itFrom != from.end())
+        {
             if (itMe->lit.var() < *itFrom) {
                 ++itMe;
             } else if (itMe->lit.var() > *itFrom) {
@@ -734,6 +733,10 @@ public:
                     l = ~l;
                 }
                 itMe->lit = l;
+
+                ++itMe;
+                ++itFrom;
+                ++itTo;
             }
         }
     }

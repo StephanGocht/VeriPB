@@ -404,6 +404,13 @@ class TestInequality(unittest.TestCase):
         a = a.substitute([1], [2], [4])
         assert(a == b)
 
+    def test_substitute_4(self):
+        a = geq([(1, 1), (1, -2), (1, 3)], 2)
+        b = geq([(1, 2), (1, -1), (1, 3)], 2)
+
+        a = a.substitute([], [1,2], [2,1])
+        assert(a == b)
+
 
     if not isinstance(ineqFactory, veripb.constraints.CppIneqFactory):
         def test_resolve_1(self):

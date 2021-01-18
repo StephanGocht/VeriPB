@@ -409,19 +409,25 @@ class MultiGoalRule(EmptyRule):
 
     def addSubgoal(self, ineq, Id = None):
         if Id is None:
-            Id = self.addConstraint(None)
+            # block of a new Id for subgoal
+            Id = self.addAvailable(None)
 
         self.subContext.subgoals.append((Id, ineq))
         if self.displayGoals:
             ineqStr = self.ineqFactory.toString(ineq)
-            print("  proofgoal %00i: %s"%(Id, ineq))
+            print("  proofgoal %03i: %s"%(Id, ineq))
 
-    def addConstraint(self, ineq):
+    def addAvailable(self, ineq):
+        """add constraint available in sub proof"""
         Id = self.nextId
         self.constraints.append(ineq)
 
         self.nextId += 1
         return Id
+
+    def addIntroduced(self, ineq):
+        """add constraint introduced after all subgoals are proven"""
+        self.subContext.toAdd.append(ineq)
 
     def compute(self, antecedents, context = None):
         return self.constraints
@@ -453,7 +459,7 @@ class TransitivityProof(MultiGoalRule):
 
         for ineq in order.definition:
             ineq = ineq.copy()
-            self.addConstraint(ineq)
+            self.addAvailable(ineq)
 
         substitution = Substitution()
         substitution.mapAll(order.leftVars,order.rightVars)
@@ -463,7 +469,7 @@ class TransitivityProof(MultiGoalRule):
             ineq = ineq.copy()
 
             ineq.substitute(*substitution.get())
-            self.addConstraint(ineq)
+            self.addAvailable(ineq)
 
 
         substitution = Substitution()
@@ -551,16 +557,22 @@ class Substitution:
             raise ValueError("Substitution should only map variables.")
 
         if substitute == False:
-            self.constants.append(-var)
+            self.constants.append(-variable)
         elif substitute == True:
-            self.constants.append(var)
+            self.constants.append(variable)
         else:
             self.substitutions.append((variable,substitute))
 
     def get(self):
         if not self.isSorted:
             self.sort()
-        frm, to = zip(*self.substitutions)
+
+        if len(self.substitutions) > 0:
+            frm, to = zip(*self.substitutions)
+        else:
+            frm = []
+            to = []
+
         return (self.constants, frm, to)
 
     def sort(self):
@@ -590,8 +602,14 @@ class Substitution:
                 raise ValueError("Substitution is missing"
                     "a value for the last variable.")
 
-            to  = ineqFactory.lit2int(nxt)
-            result.map((frm,to))
+            if nxt == "0":
+                to = False
+            elif nxt == "1":
+                to = True
+            else:
+                to  = ineqFactory.lit2int(nxt)
+
+            result.map(frm,to)
 
             try:
                 nxt = next(words)
@@ -607,7 +625,7 @@ class Substitution:
 
 
 @register_rule
-class MapRedundancy(EmptyRule):
+class MapRedundancy(MultiGoalRule):
     Id = "map"
 
     @classmethod
@@ -619,14 +637,16 @@ class MapRedundancy(EmptyRule):
                 ineqFactory = context.ineqFactory,
                 allowEq = False)
             ineq = parser.parseConstraint(words)
-            peek = next(words)
 
-        return cls(ineq[0], substitution, context.ineqFactory.numVars())
+        return cls(context, ineq[0], substitution)
 
-    def __init__(self, constraint, wittness, numVars):
+    def __init__(self, context, constraint, wittness):
+        super().__init__(context)
+
         self.constraint = constraint
         self.wittness = wittness
-        self.numVars = numVars
+
+        self.addIntroduced(constraint)
 
     def numConstraints(self):
         return 1
@@ -642,10 +662,18 @@ class MapRedundancy(EmptyRule):
 
     #@TimedFunction.time("MapRedundancy.compute")
     def compute(self, antecedents, context):
-        context.propEngine.increaseNumVarsTo(self.numVars)
+        # todo: when should we make sure that the number of variables
+        # is OK in the propagator?
+        # context.propEngine.increaseNumVarsTo(self.numVars)
 
-        for ineq in antecedents:
+        for Id, ineq in antecedents:
             rhs = ineq.copy()
-            rhs.substitute(*self.substitution())
+            rhs.substitute(*self.wittness.get())
             if rhs != ineq:
-                pass
+                self.addSubgoal(rhs, Id)
+
+        ineq = self.constraint.copy()
+        ineq.substitute(*self.wittness.get())
+        self.addSubgoal(ineq)
+
+        return super().compute(antecedents, context)

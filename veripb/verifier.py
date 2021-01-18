@@ -162,9 +162,15 @@ class Verifier():
 
     def antecedents(self, ids, ruleNum):
         if ids == "all":
-            for c in self.db:
+            for Id, c in enumerate(self.db):
                 if c is not None:
-                    yield c
+                    # this is inconsitent now as we get (Id, c) for
+                    # "all" but the constraint directly if a list of
+                    # ids is provided. I don' have time to fix this
+                    # now and probably nobody (also not future me)
+                    # will notice as you ever only want the Ids if you
+                    # don't know them already.
+                    yield (Id, c)
         else:
             for i in ids:
                 if i >= len(self.db):

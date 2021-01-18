@@ -1191,6 +1191,10 @@ public:
             }
 
             for (Lit lit: w) {
+                // todo (performance): this will double check
+                // constraints that contain more than one literal from
+                // w, however each constraint should only be checked
+                // once.
                 for (const FixedSizeInequality<T>* ineq: occurs[~lit]) {
                     FixedSizeInequalityHandler<T> implied(*ineq);
                     // std::cout << "  [internal] checking implication of " << *implied << std::endl;

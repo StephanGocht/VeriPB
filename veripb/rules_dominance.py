@@ -75,7 +75,7 @@ class TransitivityInfo:
         self.fresh_right = []
         self.fresh_aux_1 = []
         self.fresh_aux_2 = []
-        self.isProoven = False
+        self.isProven = False
 
 
 class Order:
@@ -88,11 +88,13 @@ class Order:
         self.auxVars = []
 
         self.transitivity = TransitivityInfo()
+        self.irreflexivityProven = False
 
     def check(self):
-        # todo: check that all proof goals were met
-        # raise InvalidProof("Failed to add order.")
-        pass
+        if not self.irreflexivityProven:
+            raise InvalidProof("Proof did not show irreflexivity of order.")
+        if not self.transitivity.isProven:
+            raise InvalidProof("Proof did not show transitivity of order.")
 
 class OrderContext:
     @classmethod
@@ -153,7 +155,7 @@ class EndOfProof(EmptyRule):
             return currentRules
 
 class SubProof(EmptyRule):
-    Id = "sub_proof"
+    Id = "proofgoal"
     subRules = [EndOfProof, ReversePolishNotation, IsContradiction]
 
     # todo enforce only one def
@@ -316,6 +318,9 @@ class Irreflexivity(EmptyRule):
     def __init__(self, subContext, order):
         self.subContext = subContext
 
+
+        order.irreflexivityProven = True
+
         self.constraints = []
         for ineq in order.definition:
             ineq = ineq.copy()
@@ -410,7 +415,7 @@ class TransitivityProof(EmptyRule):
 
         # This rule will fail if the proof is not correct so lets
         # already mark it proven here.
-        order.transitivity.isProoven = True
+        order.transitivity.isProven = True
 
         displayGoals = context.verifierSettings.trace
 
@@ -450,7 +455,7 @@ class TransitivityProof(EmptyRule):
 
             if displayGoals:
                 ineqStr = context.ineqFactory.toString(ineq)
-                print("  subgoal %00i: %s"%(freeId, ineqStr))
+                print("  proofgoal %00i: %s"%(freeId, ineqStr))
 
             self.subContext.subgoals.append((freeId, ineq))
             self.constraints.append(None)
@@ -495,7 +500,7 @@ class Transitivity(EmptyRule):
 
 
     def check(self, context):
-        if not self.order.transitivity.isProoven:
+        if not self.order.transitivity.isProven:
             raise InvalidProof("Transitivity proof is missing.")
 
 

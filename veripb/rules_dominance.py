@@ -83,6 +83,10 @@ class Order:
         self.rightVars = []
         self.auxVars = []
 
+        # variables the order is actually defined over, will be set
+        # when order is loaded.
+        self.vars = []
+
         self.transitivity = TransitivityInfo()
         self.irreflexivityProven = False
 
@@ -104,11 +108,15 @@ class OrderContext:
     def __init__(self):
         self.orders = dict()
 
-        emptyOrder = Order()
-        self.activeOrder = emptyOrder
-        self.orders[emptyOrder.name] = emptyOrder
+        self.emptyOrder = Order()
+        self.orders[self.emptyOrder.name] = \
+            self.emptyOrder
+        self.resetToEmptyOrder()
 
         self.activeDefinition = None
+
+    def resetToEmptyOrder(self):
+        self.activeOrder = self.emptyOrder
 
     def newOrder(self, name):
         newOrder = Order(name)
@@ -125,6 +133,50 @@ class OrderContext:
         self.activeDefinition = None
 
         return []
+
+@register_rule
+class LoadOrder(EmptyRule):
+    Id = "load_order"
+
+    @classmethod
+    def parse(cls, line, context):
+        orderContext = OrderContext.setup(context)
+
+        with WordParser(line) as words:
+            try:
+                name = next(words)
+            except StopIteration:
+                orderContext.resetToEmptyOrder()
+                return cls()
+
+            lits = []
+            for nxt in words:
+                lit = context.ineqFactory.lit2int(nxt)
+
+                if lit < 0:
+                    raise ValueError("The order variables"
+                        "may not be negated variables.")
+
+                lits.append(lit)
+
+        try:
+            order = orderContext.orders[name]
+        except KeyError:
+            raise ValueError("Unkown order.")
+
+        order.vars = lits
+
+        if len(order.vars) != len(order.leftVars):
+            raise ValueError(
+                "Order does not specify right number of"
+                "variables. Expected: %i, Got: %i"
+                % (len(order.vars), len(order.leftVars)))
+
+        orderContext.activeOrder = order
+
+        return cls()
+
+
 
 class EndOfProof(EmptyRule):
     Id = "qed"
@@ -580,7 +632,7 @@ class Substitution:
         self.isSorted = True
 
     @classmethod
-    def parse(cls, words, ineqFactory):
+    def parse(cls, words, ineqFactory, forbidden = []):
         result = cls()
 
         try:
@@ -593,6 +645,8 @@ class Substitution:
             if frm < 0:
                 raise ValueError("Substitution should only"
                     "map variables, not negated literals.")
+            if frm in forbidden:
+                raise ValueError("Substitution contains forbidden variable.")
 
             try:
                 nxt = next(words)
@@ -630,8 +684,17 @@ class MapRedundancy(MultiGoalRule):
 
     @classmethod
     def parse(cls, line, context):
+        orderContext = OrderContext.setup(context)
+        order = orderContext.activeOrder
+
+        from pprint import pprint
+        pprint(vars(order))
+
         with WordParser(line) as words:
-            substitution = Substitution.parse(words, context.ineqFactory)
+            substitution = Substitution.parse(
+                words = words,
+                ineqFactory = context.ineqFactory,
+                forbidden = order.vars)
 
             parser = OPBParser(
                 ineqFactory = context.ineqFactory,

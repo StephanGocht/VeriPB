@@ -14,10 +14,6 @@ def rulesToDict(rules, default = None):
         res[""] = default
     return res
 
-def sortSubstitution(mapping):
-    mapping.sort(key = lambda x: abs(x[0]))
-    return zip(*mapping)
-
 class SubContextInfo():
     def __init__(self):
         self.toDelete = []
@@ -326,15 +322,14 @@ class Irreflexivity(EmptyRule):
             ineq = ineq.copy()
             self.constraints.append(ineq)
 
-        mapping = []
-        mapping.extend(zip(order.leftVars,order.rightVars))
-        mapping.extend(zip(order.rightVars,order.leftVars))
-        frm, to = sortSubstitution(mapping)
+        mapping = Substitution()
+        mapping.mapAll(order.leftVars,order.rightVars)
+        mapping.mapAll(order.rightVars,order.leftVars)
 
         for ineq in order.definition:
             ineq = ineq.copy()
 
-            ineq.substitute([],frm,to)
+            ineq.substitute(*mapping.get())
             self.constraints.append(ineq)
 
         f = lambda context, subContext: self.check(context)
@@ -401,70 +396,32 @@ class TransitivityVars(EmptyRule):
         self.subContext.previousRules = currentRules
         return rulesToDict(self.subRules)
 
-class TransitivityProof(EmptyRule):
-    Id = "proof"
+class MultiGoalRule(EmptyRule):
     subRules = [EndOfProof, ReversePolishNotation, SubProof]
 
-    @classmethod
-    def parse(cls, line, context):
-        subcontexts = SubContext.setup(context)
-        subContext = subcontexts.push()
-
-        orderContext = OrderContext.setup(context)
-        order = orderContext.activeDefinition
-
-        # This rule will fail if the proof is not correct so lets
-        # already mark it proven here.
-        order.transitivity.isProven = True
-
-        displayGoals = context.verifierSettings.trace
-
-        return cls(context, subContext, order, context.firstFreeId, displayGoals)
-
-    def __init__(self, context, subContext, order, freeId, displayGoals):
-        self.subContext = subContext
-
-
+    def __init__(self, context):
+        subContexts = SubContext.setup(context)
+        self.subContext = subContexts.push()
+        self.displayGoals = context.verifierSettings.trace
         self.constraints = []
-        freeId += len(order.definition)
-        for ineq in order.definition:
-            ineq = ineq.copy()
-            self.constraints.append(ineq)
+        self.ineqFactory = context.ineqFactory
+        self.nextId = context.firstFreeId
 
-        substitution = []
-        substitution.extend(zip(order.leftVars,order.rightVars))
-        substitution.extend(zip(order.rightVars,order.transitivity.fresh_right))
-        frm, to = sortSubstitution(substitution)
+    def addSubgoal(self, ineq, Id = None):
+        if Id is None:
+            Id = self.addConstraint(None)
 
-        freeId += len(order.definition)
-        for ineq in order.definition:
-            ineq = ineq.copy()
+        self.subContext.subgoals.append((Id, ineq))
+        if self.displayGoals:
+            ineqStr = self.ineqFactory.toString(ineq)
+            print("  proofgoal %00i: %s"%(Id, ineq))
 
-            ineq.substitute([],frm,to)
-            self.constraints.append(ineq)
+    def addConstraint(self, ineq):
+        Id = self.nextId
+        self.constraints.append(ineq)
 
-
-        substitution = []
-        substitution.extend(zip(order.rightVars,order.transitivity.fresh_right))
-        frm, to = sortSubstitution(substitution)
-
-        for ineq in order.definition:
-            ineq = ineq.copy()
-
-            ineq.substitute([],frm,to)
-
-            if displayGoals:
-                ineqStr = context.ineqFactory.toString(ineq)
-                print("  proofgoal %00i: %s"%(freeId, ineqStr))
-
-            self.subContext.subgoals.append((freeId, ineq))
-            self.constraints.append(None)
-
-            freeId += 1
-
-
-
-
+        self.nextId += 1
+        return Id
 
     def compute(self, antecedents, context = None):
         return self.constraints
@@ -476,6 +433,48 @@ class TransitivityProof(EmptyRule):
         self.subContext.previousRules = currentRules
         return rulesToDict(self.subRules)
 
+class TransitivityProof(MultiGoalRule):
+    Id = "proof"
+    subRules = [EndOfProof, ReversePolishNotation, SubProof]
+
+    @classmethod
+    def parse(cls, line, context):
+        orderContext = OrderContext.setup(context)
+        order = orderContext.activeDefinition
+
+        # This rule will fail if the proof is not correct so lets
+        # already mark it proven here.
+        order.transitivity.isProven = True
+
+        return cls(context, order)
+
+    def __init__(self, context, order):
+        super().__init__(context)
+
+        for ineq in order.definition:
+            ineq = ineq.copy()
+            self.addConstraint(ineq)
+
+        substitution = Substitution()
+        substitution.mapAll(order.leftVars,order.rightVars)
+        substitution.mapAll(order.rightVars,order.transitivity.fresh_right)
+
+        for ineq in order.definition:
+            ineq = ineq.copy()
+
+            ineq.substitute(*substitution.get())
+            self.addConstraint(ineq)
+
+
+        substitution = Substitution()
+        substitution.mapAll(order.rightVars,order.transitivity.fresh_right)
+
+        for ineq in order.definition:
+            ineq = ineq.copy()
+
+            ineq.substitute(*substitution.get())
+
+            self.addSubgoal(ineq)
 
 class Transitivity(EmptyRule):
     Id = "transitivity"
@@ -534,3 +533,119 @@ class StrictOrder(EmptyRule):
     def allowedRules(self, context, currentRules):
         self.subContext.previousRules = currentRules
         return rulesToDict(self.subRules)
+
+class Substitution:
+    def __init__(self):
+        self.constants = []
+        self.substitutions = []
+        self.isSorted = True
+
+    def mapAll(self, variables, substitutes):
+        for variable, substitute in zip(variables, substitutes):
+            self.map(variable, substitute)
+
+    def map(self, variable, substitute):
+        self.isSorted = False
+
+        if variable < 0:
+            raise ValueError("Substitution should only map variables.")
+
+        if substitute == False:
+            self.constants.append(-var)
+        elif substitute == True:
+            self.constants.append(var)
+        else:
+            self.substitutions.append((variable,substitute))
+
+    def get(self):
+        if not self.isSorted:
+            self.sort()
+        frm, to = zip(*self.substitutions)
+        return (self.constants, frm, to)
+
+    def sort(self):
+        self.substitutions.sort(key = lambda x: x[0])
+        self.isSorted = True
+
+    @classmethod
+    def parse(cls, words, ineqFactory):
+        result = cls()
+
+        try:
+            nxt = next(words)
+        except StopIteration:
+            raise ValueError("Expected substitution found nothing.")
+
+        while nxt != ";":
+            frm = ineqFactory.lit2int(nxt)
+            if frm < 0:
+                raise ValueError("Substitution should only"
+                    "map variables, not negated literals.")
+
+            try:
+                nxt = next(words)
+                if nxt == "→":
+                    nxt = next(words)
+            except StopIteration:
+                raise ValueError("Substitution is missing"
+                    "a value for the last variable.")
+
+            to  = ineqFactory.lit2int(nxt)
+            result.map((frm,to))
+
+            try:
+                nxt = next(words)
+
+                if nxt == ",":
+                    nxt = next(words)
+            except StopIteration:
+                break
+
+        result.sort()
+        return result
+
+
+
+@register_rule
+class MapRedundancy(EmptyRule):
+    Id = "map"
+
+    @classmethod
+    def parse(cls, line, context):
+        with WordParser(line) as words:
+            substitution = Substitution.parse(words, context.ineqFactory)
+
+            parser = OPBParser(
+                ineqFactory = context.ineqFactory,
+                allowEq = False)
+            ineq = parser.parseConstraint(words)
+            peek = next(words)
+
+        return cls(ineq[0], substitution, context.ineqFactory.numVars())
+
+    def __init__(self, constraint, wittness, numVars):
+        self.constraint = constraint
+        self.wittness = wittness
+        self.numVars = numVars
+
+    def numConstraints(self):
+        return 1
+
+    def antecedentIDs(self):
+        return "all"
+
+    def __eq__(self, other):
+        return self.constraint == other.constraint
+
+    def isGoal(self):
+        return False
+
+    #@TimedFunction.time("MapRedundancy.compute")
+    def compute(self, antecedents, context):
+        context.propEngine.increaseNumVarsTo(self.numVars)
+
+        for ineq in antecedents:
+            rhs = ineq.copy()
+            rhs.substitute(*self.substitution())
+            if rhs != ineq:
+                pass

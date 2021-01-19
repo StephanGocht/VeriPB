@@ -1352,6 +1352,11 @@ public:
 
         this->degree = ineq.degree;
         for (Term<T>& term: ineq.terms) {
+            if (term.coeff < 0) {
+                term.lit = ~term.lit;
+                term.coeff = -term.coeff;
+                this->degree += term.coeff;
+            }
             addLhs(term);
             // T coeff = cpsign(term.coeff, term.lit);
             // using namespace std;
@@ -1402,6 +1407,7 @@ public:
         this->coeffs[var] = 0;
     }
 
+    /* requires positive coefficients */
     void addLhs(const Term<T> &term) {
         using namespace std;
         T b = cpsign(term.coeff, term.lit);
@@ -1456,11 +1462,17 @@ public:
 
     Inequality(std::vector<Term<T>>& terms_, T degree_)
         : handler(terms_, degree_)
-    {}
+    {
+        expand();
+        contract();
+    }
 
     Inequality(std::vector<Term<T>>&& terms_, T degree_)
         : handler(terms_, degree_)
-    {}
+    {
+        expand();
+        contract();
+    }
 
     Inequality(
             std::vector<T>& coeffs,

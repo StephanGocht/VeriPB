@@ -401,11 +401,10 @@ class CppIneqFactory(IneqFactory):
         return CppInequality([1], [lit], 0)
 
     def fromTerms(self, terms, degree):
-        ineq = super().fromTerms(terms, degree)
-        coefs, lits = terms2lists(ineq.terms)
+        coefs, lits = terms2lists(terms)
         coefs = list(coefs)
         lits  = list(lits)
-        return CppInequality(coefs, lits, ineq.degree)
+        return CppInequality(coefs, lits, degree)
 
 class BigIntIneqFactory(IneqFactory):
     def __init__(self, enableFreeNames = True):
@@ -415,8 +414,7 @@ class BigIntIneqFactory(IneqFactory):
         return CppInequalityBigInt([1], [lit], 0)
 
     def fromTerms(self, terms, degree):
-        ineq = super().fromTerms(terms, degree)
-        coefs, lits = terms2lists(ineq.terms)
+        coefs, lits = terms2lists(terms)
         coefs = list(coefs)
         lits  = list(lits)
-        return CppInequalityBigInt(coefs, lits, ineq.degree)
+        return CppInequalityBigInt(coefs, lits, degree)

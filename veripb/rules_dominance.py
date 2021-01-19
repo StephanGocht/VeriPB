@@ -181,15 +181,6 @@ class LoadOrder(EmptyRule):
 
         return cls()
 
-    def allowedRules(self, context, currentRules):
-        # todo: reverse unit propagation is currently incompatible
-        # with orders
-
-        from veripb.rules import ReverseUnitPropagation
-        if ReverseUnitPropagation.Id in currentRules:
-            del currentRules[ReverseUnitPropagation.Id]
-        return currentRules
-
 def autoProof(context, db, subgoals, upTo = None):
     if not subgoals:
         return
@@ -712,12 +703,15 @@ class Substitution:
         return (self.constants, frm, to)
 
     def asDict(self):
-        res = {var: value for var, value in self.substitutions}
+        res = dict()
+        for var, value in self.substitutions:
+            res[var] = value
+            res[-var] = -value
+
         for lit in self.constants:
-            if lit < 0:
-                res[-lit] = False
-            else:
-                res[lit] = True
+            res[lit] = True
+            res[-lit] = False
+
         return res
 
     @classmethod
@@ -778,6 +772,28 @@ class Substitution:
         return result
 
 
+def objectiveCondition(context, witnessDict):
+    if getattr(context, "objective", None) is None:
+        return None
+
+    # obj(x\omega) \leq obj(x)
+    terms = []
+    degree = 0
+
+    for lit, coeff in context.objective.items():
+        if lit in witnessDict:
+            # note that literals that are not remaped will disapear
+            # anyway, so no reason to add them
+            terms.append((coeff,lit))
+
+            lit = witnessDict[lit]
+
+            if lit is True:
+                degree += coeff
+            elif lit is not False:
+                terms.append((-coeff,lit))
+
+    return context.ineqFactory.fromTerms(terms, degree)
 
 @register_rule
 class MapRedundancy(MultiGoalRule):
@@ -831,6 +847,10 @@ class MapRedundancy(MultiGoalRule):
         ineq = self.constraint.copy()
         ineq.substitute(*self.witness.get())
         self.addSubgoal(ineq)
+
+        obj = objectiveCondition(context, self.witness.asDict())
+        if obj is not None:
+            self.addSubgoal(obj)
 
         return super().compute(antecedents, context)
 
@@ -917,5 +937,9 @@ class MapRedundancy(MultiGoalRule):
             ineq = ineq.copy()
             ineq.substitute(*substitution.get())
             self.addSubgoal(ineq)
+
+        obj = objectiveCondition(context, witnessDict)
+        if obj is not None:
+            self.addSubgoal(obj)
 
         return super().compute(antecedents, context)

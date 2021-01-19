@@ -388,12 +388,8 @@ class Irreflexivity(EmptyRule):
         order.irreflexivityProven = True
 
         self.constraints = []
-        for ineq in order.definition:
-            ineq = ineq.copy()
-            self.constraints.append(ineq)
 
         mapping = Substitution()
-        mapping.mapAll(order.leftVars,order.rightVars)
         mapping.mapAll(order.rightVars,order.leftVars)
 
         for ineq in order.definition:

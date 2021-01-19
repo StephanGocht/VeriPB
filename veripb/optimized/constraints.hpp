@@ -1315,10 +1315,11 @@ public:
 
         this->degree = ineq.degree;
         for (Term<T>& term: ineq.terms) {
-            T coeff = cpsign(term.coeff, term.lit);
-            using namespace std;
+            addLhs(term);
+            // T coeff = cpsign(term.coeff, term.lit);
+            // using namespace std;
 
-            setCoeff(term.lit.var(), coeff);
+            // setCoeff(term.lit.var(), coeff);
         }
     }
 
@@ -1364,16 +1365,20 @@ public:
         this->coeffs[var] = 0;
     }
 
+    void addLhs(const Term<T> &term) {
+        using namespace std;
+        T b = cpsign(term.coeff, term.lit);
+        Var var = term.lit.var();
+        this->use(var);
+        T a = this->coeffs[var];
+        this->coeffs[var] = a + b;
+        T cancellation = max<T>(0, max(abs(a), abs(b)) - abs(this->coeffs[var]));
+        this->degree -= cancellation;
+    }
+
     void add(const FixedSizeInequality<T>& other) {
         for (const Term<T> &term:other.terms) {
-            using namespace std;
-            T b = cpsign(term.coeff, term.lit);
-            Var var = term.lit.var();
-            this->use(var);
-            T a = this->coeffs[var];
-            this->coeffs[var] = a + b;
-            T cancellation = max<T>(0, max(abs(a), abs(b)) - abs(this->coeffs[var]));
-            this->degree -= cancellation;
+            addLhs(term);
         }
 
         this->degree += other.degree;
@@ -1607,6 +1612,8 @@ public:
         }
 
         this->ineq->substitute(constants, from, to);
+        // normalize by loading into expanded constraint
+        this->expand();
         return this;
     }
 

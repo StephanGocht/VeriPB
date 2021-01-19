@@ -241,7 +241,7 @@ class Verifier():
 
         self.db.extend(constraints)
 
-        deletedConstraints = list(rule.deleteConstraints())
+        deletedConstraints = [i for i in rule.deleteConstraints() if self.db[i] is not None]
         if self.settings.trace and len(deletedConstraints) > 0:
             didPrint = True
             print("  ConstraintId  - : deleting %(ineq)s"%{

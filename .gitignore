@@ -8,6 +8,7 @@ __pycache__
 *.pyc
 *.so
 *.cppimporthash
+*.o
 veripb/constraints.c
 veripb/rules.c
 veripb/optimized/.rendered.*.cpp

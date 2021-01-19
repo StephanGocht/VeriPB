@@ -103,8 +103,8 @@ class RuleParserBase():
                     self.rules = step.allowedRules(self.context, self.rules)
 
                     step.lineInFile = lineNum
-                    numConstraints = step.numConstraints()
                     yield step
+                    numConstraints = step.numConstraints()
                     for listener in self.context.addIneqListener:
                         listener(range(ineqId, ineqId + numConstraints), self.context)
                     ineqId += numConstraints

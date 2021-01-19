@@ -273,8 +273,8 @@ class Verifier():
 
             self.db[i] = None
 
-        if not didPrint == True and self.settings.trace and ruleNum > 0:
-            print("  ConstraintId  - : check passed")
+        # if not didPrint == True and self.settings.trace and ruleNum > 0:
+        #    print("  ConstraintId  - : check passed")
 
     def __call__(self, rules):
         self.db = list()

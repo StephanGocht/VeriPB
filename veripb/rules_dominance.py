@@ -87,6 +87,10 @@ class Order:
         # when order is loaded.
         self.vars = []
 
+        # Id of the first auxiliary constraint that do not need to be
+        # checked during dominance breaking.
+        self.firstDomInvisible = 1
+
         self.transitivity = TransitivityInfo()
         self.irreflexivityProven = False
 
@@ -102,10 +106,10 @@ class OrderContext:
         try:
             return context.orderContext
         except AttributeError:
-            context.orderContext = cls()
+            context.orderContext = cls(context)
             return context.orderContext
 
-    def __init__(self):
+    def __init__(self, context):
         self.orders = dict()
 
         self.emptyOrder = Order()
@@ -165,6 +169,7 @@ class LoadOrder(EmptyRule):
             raise ValueError("Unkown order.")
 
         order.vars = lits
+        order.firstDomInvisible = context.firstFreeId
 
         if len(order.vars) != len(order.leftVars):
             raise ValueError(
@@ -176,6 +181,14 @@ class LoadOrder(EmptyRule):
 
         return cls()
 
+    def allowedRules(self, context, currentRules):
+        # todo: reverse unit propagation is currently incompatible
+        # with orders
+
+        from veripb.rules import ReverseUnitPropagation
+        if ReverseUnitPropagation.Id in currentRules:
+            del currentRules[ReverseUnitPropagation.Id]
+        return currentRules
 
 
 class EndOfProof(EmptyRule):
@@ -202,6 +215,9 @@ class EndOfProof(EmptyRule):
         else:
             return currentRules
 
+    def numConstraints(self):
+        return len(self.subcontext.toAdd)
+
 class SubProof(EmptyRule):
     Id = "proofgoal"
     subRules = [EndOfProof, ReversePolishNotation, IsContradiction]
@@ -219,9 +235,11 @@ class SubProof(EmptyRule):
         with WordParser(line) as words:
             goalId = words.nextInt()
 
-        if goalId != ineqId:
+        if goalId > ineqId:
             # todo try to be nice and figure stuff out by unit propagation
             raise InvalidProof("Missing proof for subgoal.")
+        elif goalId < ineqId:
+            raise InvalidProof("Invalid subgoal.")
 
         return cls(subcontext, nxtGoal)
 
@@ -467,7 +485,7 @@ class MultiGoalRule(EmptyRule):
         self.subContext.subgoals.append((Id, ineq))
         if self.displayGoals:
             ineqStr = self.ineqFactory.toString(ineq)
-            print("  proofgoal %03i: %s"%(Id, ineq))
+            print("  proofgoal %03i: %s"%(Id, ineqStr))
 
     def addAvailable(self, ineq):
         """add constraint available in sub proof"""
@@ -608,9 +626,9 @@ class Substitution:
         if variable < 0:
             raise ValueError("Substitution should only map variables.")
 
-        if substitute == False:
+        if substitute is False:
             self.constants.append(-variable)
-        elif substitute == True:
+        elif substitute is True:
             self.constants.append(variable)
         else:
             self.substitutions.append((variable,substitute))
@@ -626,6 +644,23 @@ class Substitution:
             to = []
 
         return (self.constants, frm, to)
+
+    def asDict(self):
+        res = {var: value for var, value in self.substitutions}
+        for lit in self.constants:
+            if lit < 0:
+                res[-lit] = False
+            else:
+                res[lit] = True
+        return res
+
+    @classmethod
+    def fromDict(cls, sub):
+        res = Substitution()
+        for key, value in sub.items():
+            res.map(key, value)
+        res.sort()
+        return res
 
     def sort(self):
         self.substitutions.sort(key = lambda x: x[0])
@@ -687,9 +722,6 @@ class MapRedundancy(MultiGoalRule):
         orderContext = OrderContext.setup(context)
         order = orderContext.activeOrder
 
-        from pprint import pprint
-        pprint(vars(order))
-
         with WordParser(line) as words:
             substitution = Substitution.parse(
                 words = words,
@@ -703,25 +735,16 @@ class MapRedundancy(MultiGoalRule):
 
         return cls(context, ineq[0], substitution)
 
-    def __init__(self, context, constraint, wittness):
+    def __init__(self, context, constraint, witness):
         super().__init__(context)
 
         self.constraint = constraint
-        self.wittness = wittness
+        self.witness = witness
 
         self.addIntroduced(constraint)
 
-    def numConstraints(self):
-        return 1
-
     def antecedentIDs(self):
         return "all"
-
-    def __eq__(self, other):
-        return self.constraint == other.constraint
-
-    def isGoal(self):
-        return False
 
     #@TimedFunction.time("MapRedundancy.compute")
     def compute(self, antecedents, context):
@@ -729,14 +752,105 @@ class MapRedundancy(MultiGoalRule):
         # is OK in the propagator?
         # context.propEngine.increaseNumVarsTo(self.numVars)
 
+        ineq = self.constraint.copy()
+        ineq = ineq.negated()
+        self.addAvailable(ineq)
+
         for Id, ineq in antecedents:
             rhs = ineq.copy()
-            rhs.substitute(*self.wittness.get())
+            rhs.substitute(*self.witness.get())
             if rhs != ineq:
                 self.addSubgoal(rhs, Id)
 
         ineq = self.constraint.copy()
-        ineq.substitute(*self.wittness.get())
+        ineq.substitute(*self.witness.get())
         self.addSubgoal(ineq)
+
+        return super().compute(antecedents, context)
+
+
+@register_rule
+class MapRedundancy(MultiGoalRule):
+    Id = "dom"
+
+    @classmethod
+    def parse(cls, line, context):
+        orderContext = OrderContext.setup(context)
+        order = orderContext.activeOrder
+
+        with WordParser(line) as words:
+            substitution = Substitution.parse(
+                words = words,
+                ineqFactory = context.ineqFactory)
+
+            parser = OPBParser(
+                ineqFactory = context.ineqFactory,
+                allowEq = False)
+            ineq = parser.parseConstraint(words)
+
+        return cls(context, ineq[0], substitution, order)
+
+    def __init__(self, context, constraint, witness, order):
+        super().__init__(context)
+
+        self.constraint = constraint
+        self.witness = witness
+        self.order = order
+
+        self.addIntroduced(constraint)
+
+    def antecedentIDs(self):
+        return "all"
+
+    #@TimedFunction.time("MapRedundancy.compute")
+    def compute(self, antecedents, context):
+        # todo: when should we make sure that the number of variables
+        # is OK in the propagator?
+        # context.propEngine.increaseNumVarsTo(self.numVars)
+
+        ineq = self.constraint.copy()
+        ineq = ineq.negated()
+        self.addAvailable(ineq)
+
+        print("from formula")
+        for Id, ineq in antecedents:
+            if Id >= self.order.firstDomInvisible:
+                break
+
+            rhs = ineq.copy()
+            rhs.substitute(*self.witness.get())
+            if rhs != ineq:
+                self.addSubgoal(rhs, Id)
+
+
+        witnessDict = self.witness.asDict()
+
+        zippedVars = zip(
+            self.order.leftVars,
+            self.order.rightVars,
+            self.order.vars)
+
+        mapping = dict()
+        for leftVar, rightVar, var in zippedVars:
+            mapping[leftVar] = witnessDict[var]
+            mapping[rightVar] = var
+
+        for key, value in witnessDict.items():
+            if key in self.order.auxVars:
+                mapping[key] = value
+
+        substitution = Substitution.fromDict(mapping)
+
+        # todo: we need to check that the auxVars are still fresh
+
+        # for ineq in self.order.auxDefinition:
+        #     ineq = self.constraint.copy()
+        #     ineq.substitute(*substitution.get())
+        #     self.addAvailable(ineq)
+
+        for ineq in self.order.definition:
+            ineq = ineq.copy()
+            ineq.substitute(*substitution.get())
+            self.addSubgoal(ineq)
 
         return super().compute(antecedents, context)

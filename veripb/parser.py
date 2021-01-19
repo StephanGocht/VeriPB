@@ -73,18 +73,18 @@ class RuleParserBase():
         for line in lines:
             lineNum += 1
 
+            if dumpLine:
+                print("line %03d: %s"% (lineNum, line.rstrip()))
+
             # skip indendation
             origLine = line
             line = line.lstrip()
-            columnOffset = len(line) - len(origLine)
+            columnOffset = len(origLine) - len(line)
             line = line.rstrip()
 
             # find first word
             ruleId = line.split(" ")[0]
             idSize = len(ruleId)
-
-            if dumpLine:
-                print("line %03d: %s"% (lineNum, line.rstrip()))
 
             if not self.isEmpty(line):
                 try:
@@ -92,7 +92,8 @@ class RuleParserBase():
                 except KeyError as e:
                     rule = self.rules.get("", None)
                     if rule is None:
-                        raise ParseError("Unsupported rule '%s'"%(line[:idSize]), line = lineNum)
+                        raise ParseError("Unsupported rule '%s'"%(line[:idSize]),
+                            line = lineNum, column = columnOffset)
                     idSize = 0
 
                 columnOffset += idSize
@@ -112,7 +113,7 @@ class RuleParserBase():
                 except veripb.ParseError as e:
                     e.line = lineNum
                     if e.column is not None:
-                        e.column += idSize
+                        e.column += columnOffset
                     raise e
 
 class RuleParser(RuleParserBase):

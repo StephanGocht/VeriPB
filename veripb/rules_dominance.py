@@ -1,8 +1,7 @@
 from veripb import InvalidProof
 from veripb.rules import Rule, EmptyRule, register_rule
-from veripb.rules import LevelStack
 from veripb.rules import ReversePolishNotation, IsContradiction
-from veripb.rules_register import register_rule
+from veripb.rules_register import register_rule, dom_friendly_rules
 from veripb.parser import OPBParser, WordParser
 
 from collections import deque
@@ -267,7 +266,7 @@ class EndOfProof(EmptyRule):
 
 class SubProof(EmptyRule):
     Id = "proofgoal"
-    subRules = [EndOfProof, ReversePolishNotation, IsContradiction]
+    subRules = dom_friendly_rules() + [EndOfProof]
 
     # todo enforce only one def
 
@@ -423,7 +422,7 @@ class OrderDefinitions(EmptyRule):
 
 class Irreflexivity(EmptyRule):
     Id = "irreflexive"
-    subRules = [EndOfProof, ReversePolishNotation, IsContradiction]
+    subRules = dom_friendly_rules() + [EndOfProof]
 
     @classmethod
     def parse(cls, line, context):
@@ -519,7 +518,7 @@ class TransitivityVars(EmptyRule):
         return rulesToDict(self.subRules)
 
 class MultiGoalRule(EmptyRule):
-    subRules = [EndOfProof, ReversePolishNotation, SubProof]
+    subRules = [EndOfProof, SubProof]
 
     def __init__(self, context):
         subContexts = SubContext.setup(context)

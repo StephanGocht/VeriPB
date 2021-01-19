@@ -195,12 +195,11 @@ class ReverseUnitPropagation(Rule):
                     allowEq = False)
             ineq = parser.parseConstraint(words)
 
-        return cls(ineq[0], w, context.ineqFactory.numVars())
+        return cls(ineq[0], w)
 
-    def __init__(self, constraint, w, numVars):
+    def __init__(self, constraint, w):
         self.constraint = constraint
         self.w = w
-        self.numVars = numVars
 
     def numConstraints(self):
         return 1
@@ -216,7 +215,7 @@ class ReverseUnitPropagation(Rule):
 
     @TimedFunction.time("ReverseUnitPropagation.compute")
     def compute(self, antecedents, context):
-        context.propEngine.increaseNumVarsTo(self.numVars)
+        context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
         success = self.constraint.ratCheck(self.w, context.propEngine)
 
         if success:

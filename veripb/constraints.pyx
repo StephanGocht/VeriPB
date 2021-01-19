@@ -329,6 +329,14 @@ class IneqFactory():
         else:
             return self.name2Num(lit)
 
+    def int2lit(self, lit):
+        res = ""
+        if lit < 0:
+            res = "~"
+            lit = -lit
+        res += self.num2Name(lit)
+        return res
+
     def intlit2int(self, lit):
         var = self.name2Num("x%i"%(abs(lit)))
         if lit < 0:

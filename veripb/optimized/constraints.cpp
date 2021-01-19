@@ -44,6 +44,7 @@ int main(int argc, char const *argv[])
             .def("detach", &PropEngine<CoefType>::detach)
             .def("reset", &PropEngine<CoefType>::reset)
             .def("checkSat", &PropEngine<CoefType>::checkSat)
+            .def("propagatedLits", &PropEngine<CoefType>::propagatedLits)
             .def("increaseNumVarsTo", &PropEngine<CoefType>::increaseNumVarsTo)
             .def("printStats", &PropEngine<CoefType>::printStats);
 
@@ -75,6 +76,7 @@ int main(int argc, char const *argv[])
             .def("detach", &PropEngine<BigInt>::detach)
             .def("reset", &PropEngine<BigInt>::reset)
             .def("checkSat", &PropEngine<BigInt>::checkSat)
+            .def("propagatedLits", &PropEngine<BigInt>::propagatedLits)
             .def("increaseNumVarsTo", &PropEngine<BigInt>::increaseNumVarsTo)
             .def("printStats", &PropEngine<BigInt>::printStats);
 

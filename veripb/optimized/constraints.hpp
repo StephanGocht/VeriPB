@@ -1168,6 +1168,26 @@ public:
         this->updateWatch = true;
     }
 
+    std::vector<int> propagatedLits() {
+        AutoReset reset(*this);
+        initPropagation();
+        propagate();
+
+        std::vector<int> assignment;
+        for (uint var = 1; var <= nVars; var++) {
+            State val = this->assignment.value[Lit(var)];
+            int lit = var;
+            if (val != State::Unassigned) {
+                if (val == State::True) {
+                    assignment.push_back(lit);
+                } else {
+                    assignment.push_back(-lit);
+                }
+            }
+        }
+        return assignment;
+    }
+
     bool ratCheck(const FixedSizeInequality<T>& redundant, const std::vector<Lit>& w) {
         AutoReset reset(*this);
         initPropagation();

@@ -50,12 +50,12 @@ class SubContext():
         self.infos.append(newSubContext)
         return self.infos[-1]
 
-    def pop(self):
+    def pop(self, checkSubgoals = True):
         oldContext = self.infos.pop()
         for callback in oldContext.callbacks:
             callback(self.context, oldContext)
 
-        if len(oldContext.subgoals) > 0:
+        if checkSubgoals and len(oldContext.subgoals) > 0:
             ineqId, ineq = oldContext.subgoals[0]
 
             ineq = self.context.ineqFactory.toString(ineq)
@@ -190,6 +190,58 @@ class LoadOrder(EmptyRule):
             del currentRules[ReverseUnitPropagation.Id]
         return currentRules
 
+def autoProof(context, db, subgoals, upTo = None):
+    if not subgoals:
+        return
+
+    verbose = context.verifierSettings.trace
+
+    context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
+    propEngine = context.propEngine
+
+    assignment = Substitution()
+    assignment.addConstants(propEngine.propagatedLits())
+    print("    automatically infered:", end = " ")
+    for i in assignment.constants:
+        print(context.ineqFactory.int2lit(i), end = " ")
+    print()
+
+    db = {Id: ineq.copy().substitute(*assignment.get()) for Id, ineq in db}
+    while subgoals:
+        nxtGoalId, nxtGoal = subgoals[0]
+        if upTo is not None and nxtGoalId >= upTo:
+            break
+        else:
+            subgoals.popleft()
+
+        nxtGoal = nxtGoal.substitute(*assignment.get())
+
+        if nxtGoalId in db:
+            if db[nxtGoalId].implies(nxtGoal):
+                if verbose:
+                    print("    automatically proved %03i by self implication" % (nxtGoalId))
+                continue
+
+        success = nxtGoal.ratCheck([], propEngine)
+        if success:
+            if verbose:
+                print("    automatically proved %03i by RUP check" % (nxtGoalId))
+            continue
+
+        for ineqId, ineq in db.items():
+            if ineq.implies(nxtGoal):
+                success = True
+                break
+
+        if success:
+            if verbose:
+                print("    automatically proved %03i by implication from %i" % (nxtGoalId, ineqId))
+            continue
+
+        raise InvalidProof("Could not proof proof goal %03i automatically." % (nxtGoalId))
+
+
+
 
 class EndOfProof(EmptyRule):
     Id = "qed"
@@ -197,7 +249,7 @@ class EndOfProof(EmptyRule):
     @classmethod
     def parse(cls, line, context):
         subcontexts = SubContext.setup(context)
-        subcontext = subcontexts.pop()
+        subcontext = subcontexts.pop(checkSubgoals = False)
         return cls(subcontext)
 
     def __init__(self, subcontext):
@@ -207,7 +259,11 @@ class EndOfProof(EmptyRule):
         return self.subcontext.toDelete
 
     def compute(self, antecedents, context = None):
+        autoProof(context, antecedents, self.subcontext.subgoals)
         return self.subcontext.toAdd
+
+    def antecedentIDs(self):
+        return "all"
 
     def allowedRules(self, context, currentRules):
         if self.subcontext.previousRules is not None:
@@ -227,36 +283,43 @@ class SubProof(EmptyRule):
     @classmethod
     def parse(cls, line, context):
         subcontexts = SubContext.setup(context)
-
         parentCtx = subcontexts.getCurrent()
-        ineqId, nxtGoal = parentCtx.subgoals.popleft()
-        subcontext = subcontexts.push()
+        subContext = subcontexts.push()
+
+        print(parentCtx.subgoals)
+        if not parentCtx.subgoals:
+            raise ValueError("No proofgoals left to proof.")
+
+        nxtGoalId, nxtGoal = parentCtx.subgoals[0]
 
         with WordParser(line) as words:
-            goalId = words.nextInt()
+            myGoal = words.nextInt()
 
-        if goalId > ineqId:
-            # todo try to be nice and figure stuff out by unit propagation
-            raise InvalidProof("Missing proof for subgoal.")
-        elif goalId < ineqId:
-            raise InvalidProof("Invalid subgoal.")
+        if myGoal < nxtGoalId:
+            raise ValueError("Invalid subgoal.")
 
-        return cls(subcontext, nxtGoal)
+        return cls(subContext, parentCtx.subgoals, myGoal)
 
 
 
-    def __init__(self, subContext, constraint):
+    def __init__(self, subContext, subgoals, myGoal):
         self.subContext = subContext
-
-        self.constraint = constraint.copy().negated()
+        self.subgoals = subgoals
+        self.myGoal = myGoal
 
         f = lambda context, subContext: self.check(context)
         subContext.callbacks.append(f)
 
 
 
-    def compute(self, antecedents, context = None):
-        return [self.constraint]
+    def compute(self, antecedents, context):
+        autoProof(context, antecedents, self.subgoals, self.myGoal)
+        nxtGoalId, constraint = self.subgoals.popleft()
+        assert(nxtGoalId == self.myGoal)
+        return [constraint.copy().negated()]
+
+    def antecedentIDs(self):
+        return "all"
 
     def numConstraints(self):
         return 1
@@ -619,6 +682,9 @@ class Substitution:
     def mapAll(self, variables, substitutes):
         for variable, substitute in zip(variables, substitutes):
             self.map(variable, substitute)
+
+    def addConstants(self, constants):
+        self.constants.extend(constants)
 
     def map(self, variable, substitute):
         self.isSorted = False

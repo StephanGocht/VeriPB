@@ -320,7 +320,7 @@ class SubProof(EmptyRule):
 
     def check(self, context):
         if not getattr(context, "containsContradiction", False):
-            raise InvalidProof("Irreflexivity proof did not show contradiction.")
+            raise InvalidProof("Sub proof did not show contradiction.")
 
         context.containsContradiction = False
 
@@ -829,10 +829,6 @@ class MapRedundancy(MultiGoalRule):
 
     #@TimedFunction.time("MapRedundancy.compute")
     def compute(self, antecedents, context):
-        # todo: when should we make sure that the number of variables
-        # is OK in the propagator?
-        # context.propEngine.increaseNumVarsTo(self.numVars)
-
         ineq = self.constraint.copy()
         ineq = ineq.negated()
         self.addAvailable(ineq)
@@ -889,10 +885,6 @@ class MapRedundancy(MultiGoalRule):
 
     #@TimedFunction.time("MapRedundancy.compute")
     def compute(self, antecedents, context):
-        # todo: when should we make sure that the number of variables
-        # is OK in the propagator?
-        # context.propEngine.increaseNumVarsTo(self.numVars)
-
         ineq = self.constraint.copy()
         ineq = ineq.negated()
         self.addAvailable(ineq)

@@ -382,6 +382,8 @@ class Irreflexivity(EmptyRule):
         return cls(subcontext, order)
 
     def __init__(self, subContext, order):
+        # todo: don't allow the use of outside constraints
+
         self.subContext = subContext
 
 
@@ -573,6 +575,8 @@ class Transitivity(EmptyRule):
     def check(self, context):
         if not self.order.transitivity.isProven:
             raise InvalidProof("Transitivity proof is missing.")
+
+        # todo: don't allow the use of outside constraints
 
 
     def allowedRules(self, context, currentRules):

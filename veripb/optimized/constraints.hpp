@@ -944,7 +944,9 @@ public:
     Assignment phase;
     LitIndexedVec<WatchList> watchlist;
     LitIndexedVec<OccursList> occurs;
-    LitIndexedVec<Inequality<T>*> unattached;
+    std::vector<Inequality<T>*> unattached;
+    std::vector<Inequality<T>*> propagatingAt0;
+
 
     long long visit = 0;
     long long visit_sat = 0;
@@ -1083,14 +1085,20 @@ public:
     }
 
     bool checkSat(std::vector<int>& lits) {
-        attachUnattached();
+        AutoReset reset(*this);
+        initPropagation();
         return propagate4sat(lits);
     }
 
     void _attach(Inequality<T>* ineq) {
+        AutoReset autoReset(*this);
+
+        assert(this->trail.size() == 0);
         ineq->freeze(this->nVars);
         ineq->updateWatch(*this);
-        propagate();
+        if (this->trail.size() > 0 || isConflicting()) {
+            this->propagatingAt0.push_back(ineq);
+        }
     }
 
     void attach(Inequality<T>* ineq) {
@@ -1100,6 +1108,14 @@ public:
             cumDbMem += ineq->mem();
             maxDbMem = std::max(dbMem, maxDbMem);
             unattached.push_back(ineq);
+        }
+    }
+
+    void initPropagation() {
+        assert(this->current.qhead == 0);
+        attachUnattached();
+        for (Inequality<T>* ineq: this->propagatingAt0) {
+            ineq->updateWatch(*this);
         }
     }
 
@@ -1153,7 +1169,8 @@ public:
     }
 
     bool ratCheck(const FixedSizeInequality<T>& redundant, const std::vector<Lit>& w) {
-        attachUnattached();
+        AutoReset reset(*this);
+        initPropagation();
         Assignment a(this->nVars);
         if (w.size() > 0) {
             for (Lit lit: w) {
@@ -1408,6 +1425,7 @@ private:
 
     static std::vector<FatInequalityPtr<T>> pool;
 
+    friend PropEngine<T>;
 public:
     bool isAttached = false;
 
@@ -1458,6 +1476,19 @@ public:
 
     void clearWatches(PropEngine<T>& prop) {
         assert(frozen);
+
+        auto& propagating = prop.propagatingAt0;
+        propagating.erase(
+            std::remove_if(
+                propagating.begin(),
+                propagating.end(),
+                [this](auto& ineq){
+                    return ineq == this;
+                }
+            ),
+            propagating.end()
+        );
+
         ineq->clearWatches(prop);
     }
 

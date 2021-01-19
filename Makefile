@@ -7,24 +7,35 @@ CPP_FILES:=\
 	./veripb/optimized/pybindings.cpp \
 	./veripb/optimized/parsing.cpp
 
+CPP_FILES_COMPILED=$(CPP_FILES:.cpp=.o)
+
 HPP_FILES:=\
 	./veripb/optimized/BigInt.hpp \
 	./veripb/optimized/constraints.hpp
+
+PYBINDINCLUDE:=`python3 -m pybind11 --includes`
 
 .PHONY: install test all
 
 all: install
 
-test: install
+test:
 	python3 -m pytest ${ROOT_DIR}
 
 install:
 	pip3 install --user -e ${ROOT_DIR}
 
-cpp ${CPP_FILES} ${HPP_FILES}:
+%.o: %.cpp ${HPP_FILES}
+	$(CXX) -c -Wall -std=c++17 -fPIC \
+			-o $@ \
+			${PYBINDINCLUDE} \
+			$< \
+			-DPY_BINDINGS
+
+
+cpp: ${CPP_FILES_COMPILED} ${HPP_FILES}
 	$(CXX) -Wall -shared -std=c++17 -fPIC \
-		`python3 -m pybind11 --includes` \
-		${CPP_FILES} \
+		${CPP_FILES_COMPILED} \
 		-o veripb/optimized/pybindings`python3-config --extension-suffix` \
 		-lgmp -lgmpxx -DPY_BINDINGS
 

@@ -1,0 +1,172 @@
+pseudo-Boolean proof version 1.2
+
+* load a formula with 10 constraitns
+f 10
+
+* define a new order named "simple"
+strict_order simple
+    vars
+        * define "left" variables
+        left u1
+        * define "right" variables
+        * check |left| = |right|
+        right v1
+        * define auxiliary variables
+        * (the list of aux variables is empty)
+        aux
+    qed
+
+
+    * * encoding of auxiliary variables
+    * aux_def
+    *    * allowed rules are: reifications, map redundancy limited to
+    *    * remaping auxiliary variables, polish notation, does not have
+    *    * access to constraints in the database
+    * qed
+
+    * define the encoding
+    def
+        -1 u1 1 v1 >= 1 ;
+    qed
+
+    * proof goal: reflexivity
+    irreflexive
+        * automatically creates constraints:
+        *   aux_def
+        *   def[right |-> left]
+        *       ID 11: >= 1 ;
+        *
+        * We now need to show contradiction
+        c 11
+        * the proof goal passes if contradiction was derived
+        * end of context implicitly deletes all derived constraints (11)
+    qed
+
+    * proof goal: transitivity
+    transitivity
+        vars
+            fresh_right w1
+            * fresh_aux
+            * fresh_aux2
+        qed
+        proof
+            * automatically creates constraints in the order:
+            *   def
+            *       ID 12: -1 u1 1 v1 >= 1 ;
+            *   def_aux
+            *   def[left->right, right->fresh_right, aux->fresh_aux]
+            *       ID 13: -1 v1 1 w1 >= 1 ;
+            *   def_aux[left->right, right->fresh_right, aux->fresh_aux]
+            *   def_aux[right->fresh_right, aux->fresh_aux2]
+
+            * proof goals are created for:
+            *   def[right->fresh_right, aux->fresh_aux2]
+            *       ID 14 (only reserved): -1 u1 1 w1 >= 1 ;
+
+            * It follows a sub proof for each proof goal, if an ID is
+            * missing the verifier tries to verify it using RUP. The sub
+            * proofs must be in the same order as the sub goal IDs. If a
+            * proof goal comes from a constraint of the formula it will
+            * have the same ID as the constraint, otherwise the ID will
+            * be fresh and will not be used for further constraints
+
+
+            * proof goal: show that proof goal [ID 14] is implied
+            proofgoal 14
+                * automatically creates \neg [ID 14]
+                *   ID 15: 1 u1 -1 v1 >= 0 ;
+                * We now need to show contradiction
+                p 12 13 + 15 +
+                c 16
+                * alternatively we could just write
+                *   u >= 1;
+                * in this case or omit the proof goal completely
+
+            * end of context implicitly deletes all added constraints (15,16)
+            qed
+
+        * end of context implicitly deletes all added constraints (12,13)
+        * the proof would fail if any of the proof goals is missing or failed at this point
+        qed
+    qed
+qed
+
+* Load previously defined order. After the name of the order to load
+* (simple) a list of variables (x1) follows that specifies the
+* variables the order is over (note that the order of the variables
+* matters)
+*
+* marks all constraints as fixed / non auxiliary
+load_order simple x1
+
+* new dominance rule with rho = x1->0
+dom x1 0 ; 1 ~x1 >= 1 ;
+    * automatically creates \neg [~x1 >= 1]
+    *   ID 17: x1 >= 1
+    * checks if aux are still fresh variables
+    * automatically creates constraints
+    *   def_aux [ left|->([vars][rho]), right|->vars,aux|->([aux][rho]) ]
+
+
+    * The following proof goals are added:
+    *
+    *  - for every constraint C in the database (fixed / non auxiliary) show
+    *    C[rho] is implied. No proof goal is introduced for constraints that
+    *    are not effected by rho.
+    *
+    *  - the order is respected by rho
+    *       def [ left|->([vars][rho]), right|->vars,aux|->([aux][rho]) ]
+    *       [ -1 u1 1 v1 >= 1 ;] [u1->0, v1->x1]
+    *       ID 18: 1 x1 >= 1;
+
+    * show C [rho] is implied
+    proofgoal 1
+        c 19
+    qed
+
+    * show that order is respected
+    proofgoal 18
+        * automatically creates \neg [ID 20]
+        *   ID 21: 1 ~x1 >= 1;
+        p 17 20 +
+        c 21
+
+        * end of context implicitly deletes all added constraints (20,21)
+    qed
+
+    * end of context implicitly deletes all added constraints (17)
+    * end of rule adds ID 23: ~x1 >= 1 ;
+qed
+
+* map redundancy rule introducing fresh variable x2 using rho = [x2 -> ~x1]
+map x2 ~x1 ; 1 x1 1 x2 >= 1 ;
+    * checks that rho does not touch left variables of order simple
+
+    * automatically creates \neg [1 x1 1 x2 >= 1]
+    *   ID 23 -1 x1 -1 x2 >= 0 ;
+
+    * The following proof goals are added:
+    *
+    *  - for every constraint C in the database (fixed and unfixed) show C
+    *    [rho] is implied no proof goal is introduced for constraints that
+    *    are not effected by rho
+    *
+    *  - for the constraint to be introduced [1 x1 1 x2 >= 1][rho]
+    *        ID 24: >= 0 ;
+
+    proofgoal 24
+        * automatically adds \neg [ID 24]
+        * ID 25: >= 1 ;
+        c 25
+
+        * end of context implicitly deletes all added constraints (25)
+    qed
+    * end of context implicitly deletes all added constraints (23)
+    * end of rule adds ID 26: 1 x1 1 x2 >= 1 ;
+qed
+
+p 22 26 +
+*  ID 27: x2 >= 1 ;
+
+* load the default order (0 >= 1), mark all constraints as fixed
+load_order

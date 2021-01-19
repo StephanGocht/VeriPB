@@ -1,0 +1,61 @@
+pseudo-Boolean proof version 1.2
+
+* load a formula with 10 constraitns
+f 10
+
+* define a new order named "simple"
+strict_order simple
+    vars
+        * define "left" variables
+        left u1
+        * define "right" variables
+        * check |left| = |right|
+        right v1
+        * define auxiliary variables
+        * (the list of aux variables is empty)
+        aux
+    qed
+
+    * define the encoding
+    def
+        -1 u1 1 v1 >= 1 ;
+    qed
+
+    irreflexive
+        p x1 ~x1 +
+        p x1 ~x1 +
+        c 11
+    qed
+
+    transitivity
+        vars
+            fresh_right w1
+        qed
+        proof
+            proofgoal 16
+                p 14 15 + 17 +
+                c 18
+            qed
+        qed
+    qed
+qed
+
+load_order simple x1
+
+p 1 2 +
+map a3 → 1 ; 1 a3 1 x1 >= 1 ;
+    proofgoal 021
+        c 22
+    qed
+qed
+
+dom x1 → x2 , x2 → x1 ; 1 ~x1 1 x2 >= 1 ;
+    proofgoal 025
+        p 24 26 +
+        c 27
+    qed
+qed
+
+load_order
+
+p 1 2 +

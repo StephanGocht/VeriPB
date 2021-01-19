@@ -1,0 +1,7 @@
+pseudo-Boolean proof version 1.2
+
+* load a formula with 10 constraitns
+f
+
+map a1 → a2 , a2 → a1 , a3 → 0 , a4 → 1  ; 1 a3 1 a4 >= 1 ;
+qed

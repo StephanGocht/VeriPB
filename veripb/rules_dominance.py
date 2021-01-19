@@ -812,7 +812,6 @@ class MapRedundancy(MultiGoalRule):
         ineq = ineq.negated()
         self.addAvailable(ineq)
 
-        print("from formula")
         for Id, ineq in antecedents:
             if Id >= self.order.firstDomInvisible:
                 break

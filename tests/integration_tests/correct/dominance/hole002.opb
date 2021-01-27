@@ -1,0 +1,21 @@
+* #variable= 6 #constraint= 9
+* pigeon~3_2: placing 3 pigeons into 2 holes
+*
+* The SAT encoding of this problem is very straightforward.  For each pigeon i
+* and each hole j we have a variable x_{n*(i~1)+j} which means that pigeon i
+* is placed in hole j.  Then we have m clauses which say that a pigeon has
+* to be placed in some hole.  Then for each hole we have a set of clauses
+* ensuring that only one single pigeon is placed into that hole.
+*
+* This encoding leads to a total of m * n propositional variables and
+* m + n * (n * m / 2) clauses.
+
+1 x1 1 x2 >= 1 ;
+1 x3 1 x4 >= 1 ;
+1 x5 1 x6 >= 1 ;
+1 ~x1 1 ~x3 >= 1 ;
+1 ~x1 1 ~x5 >= 1 ;
+1 ~x3 1 ~x5 >= 1 ;
+1 ~x2 1 ~x4 >= 1 ;
+1 ~x2 1 ~x6 >= 1 ;
+1 ~x4 1 ~x6 >= 1 ;

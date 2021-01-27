@@ -4,6 +4,8 @@ from veripb.rules import ReversePolishNotation, IsContradiction
 from veripb.rules_register import register_rule, dom_friendly_rules
 from veripb.parser import OPBParser, WordParser
 
+from veripb.timed_function import TimedFunction
+
 from collections import deque
 
 
@@ -180,6 +182,7 @@ class LoadOrder(EmptyRule):
 
         return cls()
 
+@TimedFunction.time("AutoProoving")
 def autoProof(context, db, subgoals, upTo = None):
     if not subgoals:
         return
@@ -835,7 +838,7 @@ class MapRedundancy(MultiGoalRule):
     def antecedentIDs(self):
         return "all"
 
-    #@TimedFunction.time("MapRedundancy.compute")
+    @TimedFunction.time("MapRedundancy.compute")
     def compute(self, antecedents, context):
         ineq = self.constraint.copy()
         ineq = ineq.negated()
@@ -891,7 +894,7 @@ class DominanceRule(MultiGoalRule):
     def antecedentIDs(self):
         return "all"
 
-    #@TimedFunction.time("MapRedundancy.compute")
+    @TimedFunction.time("DominanceRule.compute")
     def compute(self, antecedents, context):
         ineq = self.constraint.copy()
         ineq = ineq.negated()

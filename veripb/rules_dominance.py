@@ -919,7 +919,7 @@ class DominanceRule(MultiGoalRule):
             try:
                 mapping[leftVar] = witnessDict[var]
             except KeyError:
-                mapping[leftVar] = leftVar
+                mapping[leftVar] = var
             mapping[rightVar] = var
 
         for key, value in witnessDict.items():

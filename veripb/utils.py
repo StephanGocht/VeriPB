@@ -65,7 +65,8 @@ class Settings():
             "drat": False,
             "cnf": False,
             "arbitraryPrecision": False,
-            "enableFreeNames": True
+            "enableFreeNames": True,
+            "printStats": False
         }
 
     def computeNumUse(self):
@@ -107,6 +108,16 @@ class Settings():
             action="store_false",
             help="Disable use of arbitrary variable names.",
             dest=name+".enableFreeNames")
+
+        group.add_argument("--stats",
+            action="store_true",
+            default=defaults["printStats"],
+            help="Print statistics on terminations.",
+            dest=name+".printStats")
+        group.add_argument("--no-stats",
+            action="store_false",
+            help="Disable printing of statistics on terminations.",
+            dest=name+".printStats")
 
     @classmethod
     def extract(cls, result, name = "misc"):
@@ -181,8 +192,9 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
         e.fileName = rulesFile.name
         raise e
     finally:
-        TimedFunction.print_stats()
-        context.propEngine.printStats()
+        if miscSettings.printStats:
+            TimedFunction.print_stats()
+            context.propEngine.printStats()
 
         if profile:
             pr.disable()

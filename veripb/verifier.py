@@ -181,7 +181,7 @@ class Verifier():
                 constraint = self.db[i]
                 if constraint is None:
                     raise InvalidProof("Rule %i is trying to access constraint "\
-                        "(constraintId %i), that was marked as save to delete."\
+                        "(constraintId %i), that was marked as safe to delete."\
                         %(ruleNum, i))
 
                 yield constraint

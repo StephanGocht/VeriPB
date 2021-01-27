@@ -191,10 +191,11 @@ def autoProof(context, db, subgoals, upTo = None):
 
     assignment = Substitution()
     assignment.addConstants(propEngine.propagatedLits())
-    print("    automatically inferred:", end = " ")
-    for i in assignment.constants:
-        print(context.ineqFactory.int2lit(i), end = " ")
-    print()
+    if verbose:
+        print("    propagations:", end = " ")
+        for i in assignment.constants:
+            print(context.ineqFactory.int2lit(i), end = " ")
+        print()
 
     db = {Id: ineq.copy().substitute(*assignment.get()) for Id, ineq in db}
     while subgoals:
@@ -276,7 +277,6 @@ class SubProof(EmptyRule):
         parentCtx = subcontexts.getCurrent()
         subContext = subcontexts.push()
 
-        print(parentCtx.subgoals)
         if not parentCtx.subgoals:
             raise ValueError("No proofgoals left to proof.")
 

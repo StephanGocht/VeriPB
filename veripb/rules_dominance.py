@@ -200,7 +200,9 @@ def autoProof(context, db, subgoals, upTo = None):
             print(context.ineqFactory.int2lit(i), end = " ")
         print()
 
-    db = {Id: ineq.copy().substitute(*assignment.get()) for Id, ineq in db}
+    db = {Id: ineq for Id, ineq in db}
+    dbSubstituted = None
+
     while subgoals:
         nxtGoalId, nxtGoal = subgoals[0]
         if upTo is not None and nxtGoalId >= upTo:
@@ -222,7 +224,10 @@ def autoProof(context, db, subgoals, upTo = None):
                 print("    automatically proved %03i by RUP check" % (nxtGoalId))
             continue
 
-        for ineqId, ineq in db.items():
+        if dbSubstituted is None:
+            dbSubstituted = {Id: ineq.copy().substitute(*assignment.get()) for Id, ineq in db.items()}
+
+        for ineqId, ineq in dbSubstituted.items():
             if ineq.implies(nxtGoal):
                 success = True
                 break

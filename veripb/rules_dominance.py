@@ -277,16 +277,20 @@ class SubProof(EmptyRule):
         parentCtx = subcontexts.getCurrent()
         subContext = subcontexts.push()
 
-        if not parentCtx.subgoals:
-            raise ValueError("No proofgoals left to proof.")
-
-        nxtGoalId, nxtGoal = parentCtx.subgoals[0]
-
         with WordParser(line) as words:
             myGoal = words.nextInt()
 
-        if myGoal < nxtGoalId:
-            raise ValueError("Invalid subgoal.")
+            if not parentCtx.subgoals:
+                raise ValueError("No proofgoals left to proof.")
+
+            found = False
+            for nxtGoalId, nxtGoal in parentCtx.subgoals:
+                if nxtGoalId == myGoal:
+                    found = True
+                    break
+
+            if not found:
+                raise ValueError("Invalid subgoal.")
 
         return cls(subContext, parentCtx.subgoals, myGoal)
 
@@ -304,6 +308,7 @@ class SubProof(EmptyRule):
 
     def compute(self, antecedents, context):
         autoProof(context, antecedents, self.subgoals, self.myGoal)
+
         nxtGoalId, constraint = self.subgoals.popleft()
         assert(nxtGoalId == self.myGoal)
         return [constraint.copy().negated()]

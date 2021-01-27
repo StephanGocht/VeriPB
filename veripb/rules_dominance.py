@@ -191,7 +191,7 @@ def autoProof(context, db, subgoals, upTo = None):
 
     assignment = Substitution()
     assignment.addConstants(propEngine.propagatedLits())
-    print("    automatically infered:", end = " ")
+    print("    automatically inferred:", end = " ")
     for i in assignment.constants:
         print(context.ineqFactory.int2lit(i), end = " ")
     print()
@@ -744,7 +744,7 @@ class Substitution:
 
             try:
                 nxt = next(words)
-                if nxt == "→":
+                if nxt == "→" or nxt == "->":
                     nxt = next(words)
             except StopIteration:
                 raise ValueError("Substitution is missing"
@@ -851,7 +851,7 @@ class MapRedundancy(MultiGoalRule):
 
 
 @register_rule
-class MapRedundancy(MultiGoalRule):
+class DominanceRule(MultiGoalRule):
     Id = "dom"
 
     @classmethod

@@ -290,7 +290,7 @@ class SubProof(EmptyRule):
                     break
 
             if not found:
-                raise ValueError("Invalid subgoal.")
+                raise ValueError("Invalid proofgoal.")
 
         return cls(subContext, parentCtx.subgoals, myGoal)
 
@@ -785,17 +785,20 @@ def objectiveCondition(context, witnessDict):
     degree = 0
 
     for lit, coeff in context.objective.items():
-        if lit in witnessDict:
-            # note that literals that are not remaped will disapear
-            # anyway, so no reason to add them
+        try:
+            lit2 = witnessDict[lit]
+
             terms.append((coeff,lit))
 
-            lit = witnessDict[lit]
-
-            if lit is True:
+            if lit2 is True:
                 degree += coeff
-            elif lit is not False:
+            elif lit2 is not False:
                 terms.append((-coeff,lit))
+
+        except KeyError:
+            # note that literals that are not remaped will disapear
+            # anyway, so no reason to add them
+            pass
 
     return context.ineqFactory.fromTerms(terms, degree)
 
@@ -913,7 +916,10 @@ class DominanceRule(MultiGoalRule):
 
         mapping = dict()
         for leftVar, rightVar, var in zippedVars:
-            mapping[leftVar] = witnessDict[var]
+            try:
+                mapping[leftVar] = witnessDict[var]
+            except KeyError:
+                mapping[leftVar] = leftVar
             mapping[rightVar] = var
 
         for key, value in witnessDict.items():

@@ -168,7 +168,6 @@ class TermsUntil():
             raise StopIteration
 
         a = int(a)
-
         try:
             b = next(self.iterator)
         except StopIteration:

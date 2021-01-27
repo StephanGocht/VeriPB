@@ -174,7 +174,7 @@ public:
     }
 
     bool isEnd() const {
-        return start != string_view::npos;
+        return start == string_view::npos;
     }
 
     friend bool operator==(const WordIter& a, const WordIter& b) {
@@ -223,7 +223,7 @@ int parseInt(const WordIter& word, std::string msg, size_t start, size_t length)
     assert(word->size() >= start + length);
     assert(length > 0);
 
-    if (!word.isEnd()) {
+    if (word.isEnd()) {
         throw ParseError(word, "Expected Number.");
     }
 
@@ -246,7 +246,7 @@ int parseInt(const WordIter& word, std::string msg, size_t start, size_t length)
 
     int res = 0;
     for (; it != end; ++it) {
-        char chr = *it - '0';
+        uint8_t chr = *it - '0';
         res *= 10;
         res += chr;
         if (chr > 9) {
@@ -281,7 +281,7 @@ BigInt parseCoeff<BigInt>(const WordIter& word, size_t start, size_t length){
     assert(word->size() >= start + length);
     assert(length > 0);
 
-    if (!word.isEnd()) {
+    if (word.isEnd()) {
         throw ParseError(word, "Expected Number.");
     }
 

@@ -355,7 +355,8 @@ class IneqFactory():
             return False
 
     def name2Num(self, name):
-        assert(self.isVarName(name))
+        if not self.isVarName(name):
+            raise ValueError("Expected variable name, got '%s'."%(name))
         return self.varNameMgr.getVar(name)
 
     def num2Name(self, num):

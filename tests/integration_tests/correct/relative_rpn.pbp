@@ -1,0 +1,5 @@
+pseudo-Boolean proof version 1.2
+f
+p -1 -2 +
+p -1 1 +
+c -1

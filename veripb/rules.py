@@ -100,7 +100,7 @@ class ReverseUnitPropagationFailed(InvalidProof):
 
 @register_rule
 class DeleteConstraints(Rule):
-    Id = "d" #(d)elete
+    Ids = ["d"] #(d)elete
 
     @classmethod
     def parse(cls, line, context):
@@ -135,7 +135,7 @@ class DeleteConstraints(Rule):
 
 @register_rule
 class Assumption(Rule):
-    Id = "a"
+    Ids = ["a"]
 
     @classmethod
     def parse(cls, line, context):
@@ -170,7 +170,7 @@ class Assumption(Rule):
 
 @register_rule
 class ReverseUnitPropagation(Rule):
-    Id = "u"
+    Ids = ["u"]
 
     @classmethod
     def parse(cls, line, context):
@@ -262,7 +262,7 @@ class CompareToConstraint(Rule):
 
 @register_rule
 class ConstraintEquals(CompareToConstraint):
-    Id = "e"
+    Ids = ["e"]
 
     @TimedFunction.time("ConstraintEquals.compute")
     def compute(self, antecedents, context = None):
@@ -279,7 +279,7 @@ class ImpliesCheckFailed(InvalidProof):
 
 @register_rule
 class ConstraintImplies(CompareToConstraint):
-    Id = "i"
+    Ids = ["i"]
 
     def compute(self, antecedents, context = None):
         antecedents = list(antecedents)
@@ -289,7 +289,7 @@ class ConstraintImplies(CompareToConstraint):
 
 @register_rule
 class ConstraintImpliesGetImplied(ConstraintImplies):
-    Id = "j"
+    Ids = ["j"]
 
     @TimedFunction.time("ConstraintImpliesGetImplied.compute")
     def compute(self, antecedents, context = None):
@@ -314,7 +314,7 @@ class SolutionCheckFailed(InvalidProof):
 
 @register_rule
 class Solution(Rule):
-    Id = "v"
+    Ids = ["v"]
 
     @classmethod
     def parse(cls, line, context):
@@ -359,7 +359,7 @@ class ObjectiveNotFullyAssigned(InvalidProof):
 
 @register_rule
 class ObjectiveBound(Rule):
-    Id = "o"
+    Ids = ["o"]
 
     @classmethod
     def parse(cls, line, context):
@@ -415,7 +415,7 @@ class ObjectiveBound(Rule):
 
 @register_rule
 class IsContradiction(Rule):
-    Id = "c"
+    Ids = ["c"]
 
     @classmethod
     def parse(cls, line, context):
@@ -456,7 +456,7 @@ class IsContradiction(Rule):
 
 @register_rule
 class ReversePolishNotation(Rule):
-    Id = "p"
+    Ids = ["p"]
 
     @classmethod
     def parse(cls, line, context):
@@ -599,7 +599,7 @@ class ReversePolishNotation(Rule):
 
 @register_rule
 class LoadFormula(Rule):
-    Id = "f"
+    Ids = ["f"]
 
     @classmethod
     def parse(cls, line, context):
@@ -637,7 +637,7 @@ class LoadFormula(Rule):
 
 @register_rule
 class LoadAxiom(Rule):
-    Id = "l"
+    Ids = ["l"]
 
     @classmethod
     def parse(cls, line, context):
@@ -708,7 +708,7 @@ class LevelStack():
 
 @register_rule
 class SetLevel(EmptyRule):
-    Id = "#"
+    Ids = ["#"]
 
     @classmethod
     def parse(cls, line, context):
@@ -723,7 +723,7 @@ class SetLevel(EmptyRule):
 
 @register_rule
 class WipeLevel(EmptyRule):
-    Id = "w"
+    Ids = ["w"]
 
     @classmethod
     def parse(cls, line, context):

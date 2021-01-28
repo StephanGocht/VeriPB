@@ -12,6 +12,8 @@ from veripb.exceptions import ParseError
 
 from veripb.timed_function import TimedFunction
 
+from veripb.rules_register import rules_to_dict
+
 class ParseContext():
     def __init__(self, context):
         self.context = context
@@ -76,8 +78,7 @@ class RuleParserBase():
 
     @TimedFunction.timeIter("RuleParserBase.parse")
     def parse(self, rules, file, dumpLine = False, defaultRule = None):
-        self.parseContext.rules = {rule.Id: rule for rule in rules}
-        self.parseContext.rules[""] = defaultRule
+        self.parseContext.rules = rules_to_dict(rules, defaultRule)
 
         lineNum = 1
         lines = iter(file)

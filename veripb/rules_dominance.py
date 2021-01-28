@@ -1,7 +1,7 @@
 from veripb import InvalidProof
 from veripb.rules import Rule, EmptyRule, register_rule
 from veripb.rules import ReversePolishNotation, IsContradiction
-from veripb.rules_register import register_rule, dom_friendly_rules
+from veripb.rules_register import register_rule, dom_friendly_rules, rules_to_dict
 from veripb.parser import OPBParser, WordParser, ParseContext
 
 from veripb import verifier
@@ -11,11 +11,7 @@ from veripb.timed_function import TimedFunction
 from collections import deque
 
 
-def rulesToDict(rules, default = None):
-    res = {rule.Id: rule for rule in rules}
-    if "" not in res:
-        res[""] = default
-    return res
+
 
 class SubContextInfo():
     def __init__(self):
@@ -143,7 +139,7 @@ class OrderContext:
 
 @register_rule
 class LoadOrder(EmptyRule):
-    Id = "load_order"
+    Ids = ["load_order"]
 
     @classmethod
     def parse(cls, line, context):
@@ -245,7 +241,7 @@ def autoProof(context, db, subgoals, upTo = None):
 
 
 class EndOfProof(EmptyRule):
-    Id = "qed"
+    Ids = ["qed", "end"]
 
     @classmethod
     def parse(cls, line, context):
@@ -276,7 +272,7 @@ class EndOfProof(EmptyRule):
         return len(self.subcontext.toAdd)
 
 class SubProof(EmptyRule):
-    Id = "proofgoal"
+    Ids = ["proofgoal"]
     subRules = dom_friendly_rules() + [EndOfProof]
 
     # todo enforce only one def
@@ -334,7 +330,7 @@ class SubProof(EmptyRule):
 
     def allowedRules(self, context, currentRules):
         self.subContext.previousRules = currentRules
-        return rulesToDict(self.subRules)
+        return rules_to_dict(self.subRules)
 
     def check(self, context):
         if not getattr(context, "containsContradiction", False):
@@ -360,21 +356,21 @@ class OrderVarsBase(EmptyRule):
 
 
 class LeftVars(OrderVarsBase):
-    Id = "left"
+    Ids = ["left"]
 
     @classmethod
     def addLits(cls, order, lits):
         order.leftVars.extend(lits)
 
 class RightVars(OrderVarsBase):
-    Id = "right"
+    Ids = ["right"]
 
     @classmethod
     def addLits(cls, order, lits):
         order.rightVars.extend(lits)
 
 class AuxVars(OrderVarsBase):
-    Id = "aux"
+    Ids = ["aux"]
 
     @classmethod
     def addLits(cls, order, lits):
@@ -383,7 +379,7 @@ class AuxVars(OrderVarsBase):
 class OrderVars(EmptyRule):
     # todo: add check that number of variables matches
 
-    Id = "vars"
+    Ids = ["vars"]
     subRules = [LeftVars, RightVars, AuxVars, EndOfProof]
 
     @classmethod
@@ -398,10 +394,10 @@ class OrderVars(EmptyRule):
 
     def allowedRules(self, context, currentRules):
         self.subContext.previousRules = currentRules
-        return rulesToDict(self.subRules)
+        return rules_to_dict(self.subRules)
 
 class OrderDefinition(EmptyRule):
-    Id = ""
+    Ids = [""]
 
     @classmethod
     def parse(cls, line, context):
@@ -419,7 +415,7 @@ class OrderDefinition(EmptyRule):
         return cls()
 
 class OrderDefinitions(EmptyRule):
-    Id = "def"
+    Ids = ["def"]
     subRules = [EndOfProof, OrderDefinition]
 
     # todo enforce only one def
@@ -436,10 +432,10 @@ class OrderDefinitions(EmptyRule):
 
     def allowedRules(self, context, currentRules):
         self.subContext.previousRules = currentRules
-        return rulesToDict(self.subRules)
+        return rules_to_dict(self.subRules)
 
 class Irreflexivity(EmptyRule):
-    Id = "irreflexive"
+    Ids = ["irreflexive"]
     subRules = dom_friendly_rules() + [EndOfProof]
 
     @classmethod
@@ -489,11 +485,11 @@ class Irreflexivity(EmptyRule):
 
     def allowedRules(self, context, currentRules):
         self.subContext.previousRules = currentRules
-        return rulesToDict(self.subRules)
+        return rules_to_dict(self.subRules)
 
 
 class TransitivityFreshRight(OrderVarsBase):
-    Id = "fresh_right"
+    Ids = ["fresh_right"]
 
     @classmethod
     def addLits(cls, order, lits):
@@ -501,14 +497,14 @@ class TransitivityFreshRight(OrderVarsBase):
 
 
 class TransitivityFreshAux1(OrderVarsBase):
-    Id = "fresh_aux1"
+    Ids = ["fresh_aux1"]
 
     @classmethod
     def addLits(cls, order, lits):
         order.transitivity.fresh_aux_1.extend(lits)
 
 class TransitivityFreshAux2(OrderVarsBase):
-    Id = "fresh_aux2"
+    Ids = ["fresh_aux2"]
 
     @classmethod
     def addLits(cls, order, lits):
@@ -518,7 +514,7 @@ class TransitivityFreshAux2(OrderVarsBase):
 class TransitivityVars(EmptyRule):
     # todo: add check that number of variables matches
 
-    Id = "vars"
+    Ids = ["vars"]
     subRules = [TransitivityFreshRight,TransitivityFreshAux1,TransitivityFreshAux2, EndOfProof]
 
     @classmethod
@@ -533,7 +529,7 @@ class TransitivityVars(EmptyRule):
 
     def allowedRules(self, context, currentRules):
         self.subContext.previousRules = currentRules
-        return rulesToDict(self.subRules)
+        return rules_to_dict(self.subRules)
 
 class MultiGoalRule(EmptyRule):
     subRules = [EndOfProof, SubProof]
@@ -576,10 +572,10 @@ class MultiGoalRule(EmptyRule):
 
     def allowedRules(self, context, currentRules):
         self.subContext.previousRules = currentRules
-        return rulesToDict(self.subRules)
+        return rules_to_dict(self.subRules)
 
 class TransitivityProof(MultiGoalRule):
-    Id = "proof"
+    Ids = ["proof"]
     subRules = [EndOfProof, ReversePolishNotation, SubProof]
 
     @classmethod
@@ -622,7 +618,7 @@ class TransitivityProof(MultiGoalRule):
             self.addSubgoal(ineq)
 
 class Transitivity(EmptyRule):
-    Id = "transitivity"
+    Ids = ["transitivity"]
     subRules = [EndOfProof,TransitivityVars,TransitivityProof]
 
     @classmethod
@@ -652,13 +648,13 @@ class Transitivity(EmptyRule):
 
     def allowedRules(self, context, currentRules):
         self.subContext.previousRules = currentRules
-        return rulesToDict(self.subRules)
+        return rules_to_dict(self.subRules)
 
 class StopSubVerifier(Exception):
     pass
 
 class SubVerifierEnd(EmptyRule):
-    Id = "qed"
+    Ids = ["qed", "end"]
 
     def __init__(self, oldParseContext):
         self.oldParseContext = oldParseContext
@@ -719,16 +715,16 @@ class SubVerifier(EmptyRule):
             self.allowedRules(
                 parseContext.context,
                 parseContext.rules)
-        self._newParseContext.rules[SubVerifierEnd.Id] = \
-            SubVerifierEndRule(parseContext)
+
+        rule = SubVerifierEndRule(parseContext)
+        for Id in SubVerifierEnd.Ids:
+            self._newParseContext.rules[Id] = rule
+
         return self._newParseContext
-
-
-
 
 @register_rule
 class StrictOrder(SubVerifier):
-    Id = "strict_order"
+    Ids = ["strict_order"]
     subRules = [OrderVars, OrderDefinitions, Irreflexivity, Transitivity]
 
     @classmethod
@@ -751,7 +747,7 @@ class StrictOrder(SubVerifier):
         orders.orders[self.name] = ordersSub.orders[self.name]
 
     def allowedRules(self, context, currentRules):
-        return rulesToDict(self.subRules)
+        return rules_to_dict(self.subRules)
 
 class Substitution:
     def __init__(self):
@@ -889,7 +885,7 @@ def objectiveCondition(context, witnessDict):
 
 @register_rule
 class MapRedundancy(MultiGoalRule):
-    Id = "map"
+    Ids = ["map"]
 
     @classmethod
     def parse(cls, line, context):
@@ -945,7 +941,7 @@ class MapRedundancy(MultiGoalRule):
 
 @register_rule
 class DominanceRule(MultiGoalRule):
-    Id = "dom"
+    Ids = ["dom"]
 
     @classmethod
     def parse(cls, line, context):

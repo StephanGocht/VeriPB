@@ -24,3 +24,12 @@ def dom_friendly_rules():
         veripb.rules.SetLevel,
         veripb.rules.WipeLevel,
     ]
+
+def rules_to_dict(rules, default = None):
+    res = dict()
+    for rule in rules:
+        for Id in rule.Ids:
+            res[Id] = rule
+    if "" not in res:
+        res[""] = default
+    return res

@@ -6,11 +6,11 @@ strict_order exp
         left u1 u2 u3 u4 u5 u6
         right v1 v2 v3 v4 v5 v6
         aux
-    qed
+    end
 
     def
        -32 u1 -16 u2 -8 u3 -4 u4 -2 u5 -1 u6 32 v1 16 v2 8 v3 4 v4 2 v5 1 v6 >= 1 ;
-    qed
+    end
 
     irreflexive
     qed
@@ -18,7 +18,7 @@ strict_order exp
     transitivity
         vars
             fresh_right w1 w2 w3 w4 w5 w6
-        qed
+        end
         proof
             proofgoal -1
                 p -3 -4 + -1 +
@@ -26,7 +26,7 @@ strict_order exp
             qed
         qed
     qed
-qed
+end
 
 u >= 0 ;
 u >= 0 ;

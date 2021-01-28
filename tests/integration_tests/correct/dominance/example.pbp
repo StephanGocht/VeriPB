@@ -92,7 +92,7 @@ strict_order simple
         * the proof would fail if any of the proof goals is missing or failed at this point
         qed
     qed
-qed
+end
 
 * Load previously defined order. After the name of the order to load
 * (simple) a list of variables (x1) follows that specifies the

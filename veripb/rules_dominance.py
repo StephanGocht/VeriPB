@@ -142,6 +142,8 @@ class OrderVarsBase(EmptyRule):
             for nxt in words:
                 lits.append(context.ineqFactory.lit2int(nxt))
 
+        context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
+
         order = OrderContext.setup(context)
         cls.addLits(order.activeDefinition, lits)
         return cls()
@@ -499,6 +501,34 @@ def objectiveCondition(context, witnessDict):
 
     return context.ineqFactory.fromTerms(terms, degree)
 
+def computeEffected(context, antecedents, witness):
+    reverseId = {ineq: Id for Id, ineq in antecedents}
+    effected = set()
+
+    witnessDict = witness.asDict()
+    for lit in witnessDict.keys():
+        for ineq in context.propEngine.occurence(lit):
+            effected.add(ineq)
+
+    result = [(reverseId[ineq], ineq) for ineq in effected]
+    result.sort()
+    return result
+
+class Stats:
+    def __init__(self):
+        self.numGoalCandidates = 0
+        self.numSubgoals = 0
+
+    def print_stats(self):
+        for attr in dir(self):
+            value = getattr(self, attr)
+            if not callable(value) and not attr.startswith("__"):
+                print("c statistic: %s: %s"%(attr, str(value)))
+
+stats = Stats()
+
+
+
 @register_rule
 class MapRedundancy(MultiGoalRule):
     Ids = ["map"]
@@ -519,6 +549,8 @@ class MapRedundancy(MultiGoalRule):
                 allowEq = False)
             ineq = parser.parseConstraint(words)
 
+            context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
+
         return cls(context, ineq[0], substitution)
 
     def __init__(self, context, constraint, witness):
@@ -538,10 +570,14 @@ class MapRedundancy(MultiGoalRule):
         ineq = ineq.negated()
         self.addAvailable(ineq)
 
-        for Id, ineq in antecedents:
+        effected = computeEffected(context, antecedents, self.witness)
+
+        for Id, ineq in effected:
+            stats.numGoalCandidates += 1
             rhs = ineq.copy()
             rhs.substitute(*self.witness.get())
             if rhs != ineq:
+                stats.numSubgoals += 1
                 self.addSubgoal(rhs, Id)
 
         ineq = self.constraint.copy()
@@ -574,6 +610,8 @@ class DominanceRule(MultiGoalRule):
                 allowEq = False)
             ineq = parser.parseConstraint(words)
 
+            context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
+
         return cls(context, ineq[0], substitution, order)
 
     def __init__(self, context, constraint, witness, order):
@@ -594,13 +632,18 @@ class DominanceRule(MultiGoalRule):
         ineq = ineq.negated()
         self.addAvailable(ineq)
 
-        for Id, ineq in antecedents:
+        effected = computeEffected(context, antecedents, self.witness)
+
+        for Id, ineq in effected:
             if Id >= self.order.firstDomInvisible:
                 break
+
+            stats.numGoalCandidates += 1
 
             rhs = ineq.copy()
             rhs.substitute(*self.witness.get())
             if rhs != ineq:
+                stats.numSubgoals += 1
                 self.addSubgoal(rhs, Id)
 
 

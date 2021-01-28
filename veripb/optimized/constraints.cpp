@@ -78,7 +78,12 @@ int main(int argc, char const *argv[])
             .def("checkSat", &PropEngine<BigInt>::checkSat)
             .def("propagatedLits", &PropEngine<BigInt>::propagatedLits)
             .def("increaseNumVarsTo", &PropEngine<BigInt>::increaseNumVarsTo)
-            .def("printStats", &PropEngine<BigInt>::printStats);
+            .def("printStats", &PropEngine<BigInt>::printStats)
+            .def("occurence", [](PropEngine<BigInt>& propEngine, int intLit){
+                Lit lit(intLit);
+                auto& occurence = propEngine.occurs[lit];
+                return py::make_iterator(occurence.begin(), occurence.end());
+            });
 
 
         py::class_<Inequality<BigInt>>(m, "CppInequalityBigInt")

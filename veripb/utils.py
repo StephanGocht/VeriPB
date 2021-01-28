@@ -21,7 +21,9 @@ from veripb.optimized.parsing import parseOpb,parseOpbBigInt
 from veripb.constraints import PropEngine,CppIneqFactory,BigIntIneqFactory
 from time import perf_counter
 
-profile = False
+from veripb.rules_dominance import stats as dominance_stats
+
+profile = True
 
 if profile:
     import cProfile
@@ -201,9 +203,11 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
             TimedFunction.print_stats()
             context.propEngine.printStats()
 
+            dominance_stats.print_stats()
+
         if profile:
             pr.disable()
-            convert2kcachegrind(pr.getstats(), 'pyprof.callgrind')
+            convert2kcachegrind(pr.getstats(), 'callgrind.out.py.profile')
 
 def runUI(*args, **kwargs):
     try:

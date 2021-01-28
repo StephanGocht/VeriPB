@@ -11,4 +11,6 @@ VERIPB_DIR=`dirname ${BASH_SOURCE[0]}`
 LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libprofiler.so CPUPROFILE=prof.out CPUPROFILE_FREQUENCY=1000 python3 $VERIPB_DIR/veripb "$@"
 # heap only
 # LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc.so HEAPPROFILE=./heap.prof veripb "$@"
-google-pprof --addresses --callgrind $VERIPB_DIR/veripb/optimized/pybindings.cpython-36m-x86_64-linux-gnu.so prof.out > prof.callgrind
+
+py_suffix=`python3-config --extension-suffix`
+google-pprof --addresses --callgrind $VERIPB_DIR/veripb/optimized/pybindings${py_suffix} prof.out > callgrind.out.cpp.profile

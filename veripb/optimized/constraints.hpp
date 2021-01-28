@@ -464,21 +464,8 @@ private:
         watchSize = i;
     }
 
-    void registerOccurence(PropEngine<T>& prop) {
-        for (Term<T>& term: this->terms) {
-            prop.addOccurence(term.lit, *this);
-        }
-    }
-
-    void unRegisterOccurence(PropEngine<T>& prop) {
-        for (Term<T>& term: this->terms) {
-            prop.rmOccurence(term.lit, *this);
-        }
-    }
-
 public:
     void clearWatches(PropEngine<T>& prop) {
-        unRegisterOccurence(prop);
         for (size_t i = 0; i < this->watchSize; i++) {
             auto& ws = prop.watchlist[terms[i].lit];
             ws.erase(
@@ -534,7 +521,6 @@ public:
         const bool init = autoInit && (watchSize == 0);
         if (init) {
             computeWatchSize();
-            registerOccurence(prop);
         }
 
         T slack = -this->degree;
@@ -905,7 +891,7 @@ class PropEngine {
 private:
     typedef WatchInfo<T> WatchedType;
     typedef std::vector<WatchedType> WatchList;
-    typedef std::unordered_set<FixedSizeInequality<T>*> OccursList;
+    typedef std::unordered_set<Inequality<T>*>  OccursList;
 
     size_t nVars;
     std::vector<Lit> trail;
@@ -1094,7 +1080,6 @@ public:
         AutoReset autoReset(*this);
 
         assert(this->trail.size() == 0);
-        ineq->freeze(this->nVars);
         ineq->updateWatch(*this);
         if (this->trail.size() > 0 || isConflicting()) {
             this->propagatingAt0.push_back(ineq);
@@ -1104,6 +1089,8 @@ public:
     void attach(Inequality<T>* ineq) {
         if (!ineq->isAttached) {
             ineq->isAttached = true;
+            ineq->freeze(this->nVars);
+            ineq->registerOccurence(*this);
             dbMem += ineq->mem();
             cumDbMem += ineq->mem();
             maxDbMem = std::max(dbMem, maxDbMem);
@@ -1132,6 +1119,7 @@ public:
         if (ineq != nullptr) {
             if (ineq->isAttached) {
                 ineq->isAttached = false;
+                ineq->unRegisterOccurence(*this);
 
                 dbMem -= ineq->mem();
                 auto foundIt = std::find(
@@ -1232,7 +1220,8 @@ public:
                 // constraints that contain more than one literal from
                 // w, however each constraint should only be checked
                 // once.
-                for (const FixedSizeInequality<T>* ineq: occurs[~lit]) {
+                for (const Inequality<T>* ineqFull: occurs[~lit]) {
+                    const FixedSizeInequality<T>* ineq = ineqFull->ineq;
                     FixedSizeInequalityHandler<T> implied(*ineq);
                     // std::cout << "  [internal] checking implication of " << *implied << std::endl;
                     implied->restrictBy(a);
@@ -1294,13 +1283,13 @@ public:
         }
     }
 
-    void addOccurence(Lit lit, FixedSizeInequality<T>& w) {
+    void addOccurence(Lit lit, Inequality<T>& w) {
         if (this->updateWatch) {
             occurs[lit].emplace(&w);
         }
     }
 
-    void rmOccurence(Lit lit, FixedSizeInequality<T>& w) {
+    void rmOccurence(Lit lit, Inequality<T>& w) {
         if (this->updateWatch) {
             occurs[lit].erase(&w);
         }
@@ -1713,6 +1702,20 @@ public:
     size_t mem() {
         contract();
         return ineq->mem();
+    }
+
+    void registerOccurence(PropEngine<T>& prop) {
+        assert(frozen);
+        for (Term<T>& term: this->ineq->terms) {
+            prop.addOccurence(term.lit, *this);
+        }
+    }
+
+    void unRegisterOccurence(PropEngine<T>& prop) {
+        assert(frozen);
+        for (Term<T>& term: this->ineq->terms) {
+            prop.rmOccurence(term.lit, *this);
+        }
     }
 };
 

@@ -89,6 +89,8 @@ class OrderContext:
 class LoadOrder(EmptyRule):
     Ids = ["load_order"]
 
+    # todo: allow negated literals
+
     @classmethod
     def parse(cls, line, context):
         orderContext = OrderContext.setup(context)
@@ -365,8 +367,6 @@ class Transitivity(EmptyRule):
         if not self.order.transitivity.isProven:
             raise InvalidProof("Transitivity proof is missing.")
 
-        # todo: don't allow the use of outside constraints
-
 
     def allowedRules(self, context, currentRules):
         self.subContext.previousRules = currentRules
@@ -464,9 +464,9 @@ class StrictOrder(SubVerifier):
         orders.newOrder(self.name)
 
     def onExitSubVerifier(self, context, subContext):
-        ordersSub = OrderContext.setup(subContext)
-        orders = OrderContext.setup(context)
-        orders.orders[self.name] = ordersSub.orders[self.name]
+        orderSubContext = OrderContext.setup(subContext)
+        orderContext = OrderContext.setup(context)
+        orderContext.orders[self.name] = orderSubContext.orders[self.name]
 
     def allowedRules(self, context, currentRules):
         return rules_to_dict(self.subRules)

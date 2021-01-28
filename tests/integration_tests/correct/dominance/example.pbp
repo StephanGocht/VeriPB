@@ -14,7 +14,7 @@ strict_order simple
         * define auxiliary variables
         * (the list of aux variables is empty)
         aux
-    qed
+    end
 
 
     * * encoding of auxiliary variables
@@ -27,7 +27,7 @@ strict_order simple
     * define the encoding
     def
         -1 u1 1 v1 >= 1 ;
-    qed
+    end
 
     * proof goal: reflexivity
     irreflexive
@@ -51,7 +51,7 @@ strict_order simple
             fresh_right w1
             * fresh_aux
             * fresh_aux2
-        qed
+        end
         proof
             * automatically creates constraints in the order:
             *   def

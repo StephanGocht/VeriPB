@@ -32,8 +32,8 @@ strict_order simple
             fresh_right w1
         qed
         proof
-            proofgoal 6
-                p 4 5 + 7 +
+            proofgoal -1
+                p -3 -4 + -1 +
                 c 8
             qed
         qed

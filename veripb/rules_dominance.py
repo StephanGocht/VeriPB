@@ -293,6 +293,9 @@ class SubProof(EmptyRule):
             if not parentCtx.subgoals:
                 raise ValueError("No proofgoals left to proof.")
 
+            if myGoal < 0:
+                myGoal += context.firstFreeId
+
             found = False
             for nxtGoalId, nxtGoal in parentCtx.subgoals:
                 if nxtGoalId == myGoal:

@@ -10,60 +10,8 @@ from veripb.timed_function import TimedFunction
 
 from collections import deque
 
-
-
-
-class SubContextInfo():
-    def __init__(self):
-        self.toDelete = []
-        self.toAdd = []
-        self.previousRules = None
-        self.callbacks = []
-        self.subgoals = deque()
-
-    def addToDelete(self, ineqs):
-        self.toDelete.extend(ineqs)
-
-class SubContext():
-    @classmethod
-    def setup(cls, context):
-        try:
-            return context.subContexts
-        except AttributeError:
-            context.subContexts = cls(context)
-            return context.subContexts
-
-    def __init__(self, context):
-        self.infos = []
-        self.context = context
-
-        f = lambda ineqs, context: self.addToDelete(ineqs)
-        context.addIneqListener.append(f)
-
-    def addToDelete(self, ineqs):
-        if len(self.infos) > 0:
-            self.infos[-1].addToDelete(ineqs)
-
-    def push(self):
-        newSubContext = SubContextInfo()
-        self.infos.append(newSubContext)
-        return self.infos[-1]
-
-    def pop(self, checkSubgoals = True):
-        oldContext = self.infos.pop()
-        for callback in oldContext.callbacks:
-            callback(self.context, oldContext)
-
-        if checkSubgoals and len(oldContext.subgoals) > 0:
-            ineqId, ineq = oldContext.subgoals[0]
-
-            ineq = self.context.ineqFactory.toString(ineq)
-            raise InvalidProof("Open subgoal not proven: %i:, %s"%(ineqId, ineq))
-
-        return oldContext
-
-    def getCurrent(self):
-        return self.infos[-1]
+from veripb.rules_multigoal import *
+from veripb.autoproving import *
 
 class TransitivityInfo:
     def __init__(self):
@@ -180,164 +128,6 @@ class LoadOrder(EmptyRule):
 
         return cls()
 
-@TimedFunction.time("AutoProoving")
-def autoProof(context, db, subgoals, upTo = None):
-    if not subgoals:
-        return
-
-    verbose = context.verifierSettings.trace
-
-    context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
-    propEngine = context.propEngine
-
-    assignment = Substitution()
-    assignment.addConstants(propEngine.propagatedLits())
-    if verbose:
-        print("    propagations:", end = " ")
-        for i in assignment.constants:
-            print(context.ineqFactory.int2lit(i), end = " ")
-        print()
-
-    db = {Id: ineq for Id, ineq in db}
-    dbSubstituted = None
-
-    while subgoals:
-        nxtGoalId, nxtGoal = subgoals[0]
-        if upTo is not None and nxtGoalId >= upTo:
-            break
-        else:
-            subgoals.popleft()
-
-        nxtGoal = nxtGoal.substitute(*assignment.get())
-
-        if nxtGoalId in db:
-            if db[nxtGoalId].implies(nxtGoal):
-                if verbose:
-                    print("    automatically proved %03i by self implication" % (nxtGoalId))
-                continue
-
-        success = nxtGoal.ratCheck([], propEngine)
-        if success:
-            if verbose:
-                print("    automatically proved %03i by RUP check" % (nxtGoalId))
-            continue
-
-        if dbSubstituted is None:
-            dbSubstituted = {Id: ineq.copy().substitute(*assignment.get()) for Id, ineq in db.items()}
-
-        for ineqId, ineq in dbSubstituted.items():
-            if ineq.implies(nxtGoal):
-                success = True
-                break
-
-        if success:
-            if verbose:
-                print("    automatically proved %03i by implication from %i" % (nxtGoalId, ineqId))
-            continue
-
-        raise InvalidProof("Could not proof proof goal %03i automatically." % (nxtGoalId))
-
-
-
-
-class EndOfProof(EmptyRule):
-    Ids = ["qed", "end"]
-
-    @classmethod
-    def parse(cls, line, context):
-        subcontexts = SubContext.setup(context)
-        subcontext = subcontexts.pop(checkSubgoals = False)
-        return cls(subcontext)
-
-    def __init__(self, subcontext):
-        self.subcontext = subcontext
-
-    def deleteConstraints(self):
-        return self.subcontext.toDelete
-
-    def compute(self, antecedents, context = None):
-        autoProof(context, antecedents, self.subcontext.subgoals)
-        return self.subcontext.toAdd
-
-    def antecedentIDs(self):
-        return "all"
-
-    def allowedRules(self, context, currentRules):
-        if self.subcontext.previousRules is not None:
-            return self.subcontext.previousRules
-        else:
-            return currentRules
-
-    def numConstraints(self):
-        return len(self.subcontext.toAdd)
-
-class SubProof(EmptyRule):
-    Ids = ["proofgoal"]
-    subRules = dom_friendly_rules() + [EndOfProof]
-
-    # todo enforce only one def
-
-    @classmethod
-    def parse(cls, line, context):
-        subcontexts = SubContext.setup(context)
-        parentCtx = subcontexts.getCurrent()
-        subContext = subcontexts.push()
-
-        with WordParser(line) as words:
-            myGoal = words.nextInt()
-
-            if not parentCtx.subgoals:
-                raise ValueError("No proofgoals left to proof.")
-
-            if myGoal < 0:
-                myGoal += context.firstFreeId
-
-            found = False
-            for nxtGoalId, nxtGoal in parentCtx.subgoals:
-                if nxtGoalId == myGoal:
-                    found = True
-                    break
-
-            if not found:
-                raise ValueError("Invalid proofgoal.")
-
-        return cls(subContext, parentCtx.subgoals, myGoal)
-
-
-
-    def __init__(self, subContext, subgoals, myGoal):
-        self.subContext = subContext
-        self.subgoals = subgoals
-        self.myGoal = myGoal
-
-        f = lambda context, subContext: self.check(context)
-        subContext.callbacks.append(f)
-
-
-
-    def compute(self, antecedents, context):
-        autoProof(context, antecedents, self.subgoals, self.myGoal)
-
-        nxtGoalId, constraint = self.subgoals.popleft()
-        assert(nxtGoalId == self.myGoal)
-        return [constraint.copy().negated()]
-
-    def antecedentIDs(self):
-        return "all"
-
-    def numConstraints(self):
-        return 1
-
-    def allowedRules(self, context, currentRules):
-        self.subContext.previousRules = currentRules
-        return rules_to_dict(self.subRules)
-
-    def check(self, context):
-        if not getattr(context, "containsContradiction", False):
-            raise InvalidProof("Sub proof did not show contradiction.")
-
-        context.containsContradiction = False
-
 class OrderVarsBase(EmptyRule):
     @classmethod
     def addLits(cls, order, lits):
@@ -434,29 +224,21 @@ class OrderDefinitions(EmptyRule):
         self.subContext.previousRules = currentRules
         return rules_to_dict(self.subRules)
 
-class Irreflexivity(EmptyRule):
+class Irreflexivity(MultiGoalRule):
     Ids = ["irreflexive"]
-    subRules = dom_friendly_rules() + [EndOfProof]
+    subRules = dom_friendly_rules() + [EndOfProof, SubProof]
 
     @classmethod
     def parse(cls, line, context):
-        subcontexts = SubContext.setup(context)
-        subcontext = subcontexts.push()
-
         orderContext = OrderContext.setup(context)
         order = orderContext.activeDefinition
 
-        return cls(subcontext, order)
+        return cls(context, order)
 
-    def __init__(self, subContext, order):
-        # todo: don't allow the use of outside constraints
-
-        self.subContext = subContext
-
+    def __init__(self, context, order):
+        super().__init__(context)
 
         order.irreflexivityProven = True
-
-        self.constraints = []
 
         mapping = Substitution()
         mapping.mapAll(order.rightVars,order.leftVars)
@@ -465,27 +247,10 @@ class Irreflexivity(EmptyRule):
             ineq = ineq.copy()
 
             ineq.substitute(*mapping.get())
-            self.constraints.append(ineq)
+            self.addAvailable(ineq)
 
-        f = lambda context, subContext: self.check(context)
-        subContext.callbacks.append(f)
-
-    def compute(self, antecedents, context = None):
-        return self.constraints
-
-    def numConstraints(self):
-        return len(self.constraints)
-
-    def check(self, context):
-        if not getattr(context, "containsContradiction", False):
-            raise InvalidProof("Irreflexivity proof did not show contradiction.")
-
-        context.containsContradiction = False
-
-
-    def allowedRules(self, context, currentRules):
-        self.subContext.previousRules = currentRules
-        return rules_to_dict(self.subRules)
+        contradiction = context.ineqFactory.fromTerms([], 1)
+        self.addSubgoal(contradiction)
 
 
 class TransitivityFreshRight(OrderVarsBase):
@@ -531,52 +296,9 @@ class TransitivityVars(EmptyRule):
         self.subContext.previousRules = currentRules
         return rules_to_dict(self.subRules)
 
-class MultiGoalRule(EmptyRule):
-    subRules = [EndOfProof, SubProof]
-
-    def __init__(self, context):
-        subContexts = SubContext.setup(context)
-        self.subContext = subContexts.push()
-        self.displayGoals = context.verifierSettings.trace
-        self.constraints = []
-        self.ineqFactory = context.ineqFactory
-        self.nextId = context.firstFreeId
-
-    def addSubgoal(self, ineq, Id = None):
-        if Id is None:
-            # block of a new Id for subgoal
-            Id = self.addAvailable(None)
-
-        self.subContext.subgoals.append((Id, ineq))
-        if self.displayGoals:
-            ineqStr = self.ineqFactory.toString(ineq)
-            print("  proofgoal %03i: %s"%(Id, ineqStr))
-
-    def addAvailable(self, ineq):
-        """add constraint available in sub proof"""
-        Id = self.nextId
-        self.constraints.append(ineq)
-
-        self.nextId += 1
-        return Id
-
-    def addIntroduced(self, ineq):
-        """add constraint introduced after all subgoals are proven"""
-        self.subContext.toAdd.append(ineq)
-
-    def compute(self, antecedents, context = None):
-        return self.constraints
-
-    def numConstraints(self):
-        return len(self.constraints)
-
-    def allowedRules(self, context, currentRules):
-        self.subContext.previousRules = currentRules
-        return rules_to_dict(self.subRules)
-
 class TransitivityProof(MultiGoalRule):
     Ids = ["proof"]
-    subRules = [EndOfProof, ReversePolishNotation, SubProof]
+    subRules = dom_friendly_rules() + [EndOfProof, SubProof]
 
     @classmethod
     def parse(cls, line, context):
@@ -749,112 +471,6 @@ class StrictOrder(SubVerifier):
     def allowedRules(self, context, currentRules):
         return rules_to_dict(self.subRules)
 
-class Substitution:
-    def __init__(self):
-        self.constants = []
-        self.substitutions = []
-        self.isSorted = True
-
-    def mapAll(self, variables, substitutes):
-        for variable, substitute in zip(variables, substitutes):
-            self.map(variable, substitute)
-
-    def addConstants(self, constants):
-        self.constants.extend(constants)
-
-    def map(self, variable, substitute):
-        self.isSorted = False
-
-        if variable < 0:
-            raise ValueError("Substitution should only map variables.")
-
-        if substitute is False:
-            self.constants.append(-variable)
-        elif substitute is True:
-            self.constants.append(variable)
-        else:
-            self.substitutions.append((variable,substitute))
-
-    def get(self):
-        if not self.isSorted:
-            self.sort()
-
-        if len(self.substitutions) > 0:
-            frm, to = zip(*self.substitutions)
-        else:
-            frm = []
-            to = []
-
-        return (self.constants, frm, to)
-
-    def asDict(self):
-        res = dict()
-        for var, value in self.substitutions:
-            res[var] = value
-            res[-var] = -value
-
-        for lit in self.constants:
-            res[lit] = True
-            res[-lit] = False
-
-        return res
-
-    @classmethod
-    def fromDict(cls, sub):
-        res = Substitution()
-        for key, value in sub.items():
-            res.map(key, value)
-        res.sort()
-        return res
-
-    def sort(self):
-        self.substitutions.sort(key = lambda x: x[0])
-        self.isSorted = True
-
-    @classmethod
-    def parse(cls, words, ineqFactory, forbidden = []):
-        result = cls()
-
-        try:
-            nxt = next(words)
-        except StopIteration:
-            raise ValueError("Expected substitution found nothing.")
-
-        while nxt != ";":
-            frm = ineqFactory.lit2int(nxt)
-            if frm < 0:
-                raise ValueError("Substitution should only"
-                    "map variables, not negated literals.")
-            if frm in forbidden:
-                raise ValueError("Substitution contains forbidden variable.")
-
-            try:
-                nxt = next(words)
-                if nxt == "→" or nxt == "->":
-                    nxt = next(words)
-            except StopIteration:
-                raise ValueError("Substitution is missing"
-                    "a value for the last variable.")
-
-            if nxt == "0":
-                to = False
-            elif nxt == "1":
-                to = True
-            else:
-                to  = ineqFactory.lit2int(nxt)
-
-            result.map(frm,to)
-
-            try:
-                nxt = next(words)
-
-                if nxt == ",":
-                    nxt = next(words)
-            except StopIteration:
-                break
-
-        result.sort()
-        return result
 
 
 def objectiveCondition(context, witnessDict):

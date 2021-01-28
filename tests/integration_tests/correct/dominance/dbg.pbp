@@ -22,9 +22,6 @@ strict_order simple
     qed
 
     irreflexive
-        p x1 ~x1 +
-        p x1 ~x1 +
-        c 1
     qed
 
     transitivity
@@ -34,7 +31,7 @@ strict_order simple
         proof
             proofgoal -1
                 p -3 -4 + -1 +
-                c 8
+                c -1
             qed
         qed
     qed

@@ -36,9 +36,12 @@ strict_order simple
         *   def[right |-> left]
         *       ID 1: >= 1 ;
         *
-        * We now need to show contradiction
-        c 1
-        * the proof goal passes if contradiction was derived
+        * proof goals are created for:
+        *       ID 2 (only reserved):
+        *           0 >= 1 ;
+        proofgoal 2
+            c 1
+        qed
         * end of context implicitly deletes all derived constraints (1)
     qed
 
@@ -52,16 +55,16 @@ strict_order simple
         proof
             * automatically creates constraints in the order:
             *   def
-            *       ID 2: -1 u1 1 v1 >= 1 ;
+            *       ID 4: -1 u1 1 v1 >= 1 ;
             *   def_aux
             *   def[left->right, right->fresh_right, aux->fresh_aux]
-            *       ID 3: -1 v1 1 w1 >= 1 ;
+            *       ID 5: -1 v1 1 w1 >= 1 ;
             *   def_aux[left->right, right->fresh_right, aux->fresh_aux]
             *   def_aux[right->fresh_right, aux->fresh_aux2]
 
             * proof goals are created for:
             *   def[right->fresh_right, aux->fresh_aux2]
-            *       ID 4 (only reserved): -1 u1 1 w1 >= 1 ;
+            *       ID 6 (only reserved): -1 u1 1 w1 >= 1 ;
 
             * It follows a sub proof for each proof goal, if an ID is
             * missing the verifier tries to verify it using RUP. The sub
@@ -72,12 +75,12 @@ strict_order simple
 
 
             * proof goal: show that proof goal [ID 4] is implied
-            proofgoal 4
+            proofgoal 6
                 * automatically creates \neg [ID 4]
                 *   ID 5: 1 u1 -1 v1 >= 0 ;
                 * We now need to show contradiction
-                p 2 3 + 5 +
-                c 6
+                p 4 5 + 7 +
+                c 8
                 * alternatively we could just write
                 *   u >= 1;
                 * in this case or omit the proof goal completely

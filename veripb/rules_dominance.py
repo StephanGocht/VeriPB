@@ -501,6 +501,7 @@ def objectiveCondition(context, witnessDict):
 
     return context.ineqFactory.fromTerms(terms, degree)
 
+#@TimedFunction.time("__computeEffected")
 def computeEffected(context, antecedents, witness):
     reverseId = {ineq: Id for Id, ineq in antecedents}
     effected = set()

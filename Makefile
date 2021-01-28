@@ -13,6 +13,8 @@ HPP_FILES:=\
 	./veripb/optimized/BigInt.hpp \
 	./veripb/optimized/constraints.hpp
 
+CXX_FLAGS?=-O3 -g
+
 PYBINDINCLUDE:=`python3 -m pybind11 --includes`
 
 .PHONY: install test all
@@ -26,7 +28,7 @@ install:
 	pip3 install --user -e ${ROOT_DIR}
 
 %.o: %.cpp ${HPP_FILES}
-	$(CXX) -c -Wall -std=c++17 -fPIC \
+	$(CXX) -c -Wall -std=c++17 -fPIC ${CXX_FLAGS}\
 			-o $@ \
 			${PYBINDINCLUDE} \
 			$< \

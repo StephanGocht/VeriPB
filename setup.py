@@ -28,7 +28,11 @@ ext_modules = [
     ),
     Extension('veripb.constraints', sources=['veripb/constraints.pyx']),
     # Extension('veripb.rules', sources=['veripb/rules.pyx']),
+    # Extension('veripb.autoproving', sources=['veripb/autoproving.pyx']),
 ]
+
+for e in ext_modules:
+    e.cython_directives = {'language_level': "3"} #all are Python-3
 
 setup(
     name='veripb',

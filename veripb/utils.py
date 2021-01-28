@@ -23,7 +23,7 @@ from time import perf_counter
 
 from veripb.rules_dominance import stats as dominance_stats
 
-profile = True
+profile = False
 
 if profile:
     import cProfile

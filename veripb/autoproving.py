@@ -161,9 +161,9 @@ def autoProof(context, db, subgoals, upTo = None):
             continue
 
         if dbSubstituted is None:
-            dbSubstituted = {Id: ineq.copy().substitute(*assignment.get()) for Id, ineq in db.items()}
+            dbSubstituted = [(Id, ineq.copy().substitute(*assignment.get())) for Id, ineq in db.items()]
 
-        for ineqId, ineq in dbSubstituted.items():
+        for ineqId, ineq in dbSubstituted:
             if ineq.implies(nxtGoal):
                 success = True
                 break

@@ -167,10 +167,14 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
     context.formula = formula["constraints"]
     context.objective = formula["objective"]
 
-    if miscSettings.arbitraryPrecision:
-        context.propEngine = PropEngineBigInt(formula["numVariables"])
-    else:
-        context.propEngine = CppPropEngine(formula["numVariables"])
+    def newPropEngine():
+        if miscSettings.arbitraryPrecision:
+            return PropEngineBigInt(formula["numVariables"])
+        else:
+            return CppPropEngine(formula["numVariables"])
+
+    context.propEngine = newPropEngine()
+    context.newPropEngine = newPropEngine
 
 
     verify = Verifier(
@@ -178,6 +182,9 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
         settings = verifierSettings)
 
     try:
+        if verifierSettings.progressBar:
+            context.ruleCount = ruleParser.numRules(rulesFile)
+
         if not miscSettings.drat:
             ruleParser = RuleParser(context)
             rules = ruleParser.parse(rules, rulesFile, dumpLine = verifierSettings.trace)
@@ -185,8 +192,6 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
             ruleParser = DRATParser(context)
             rules = ruleParser.parse(rulesFile)
 
-        if verifierSettings.progressBar:
-            context.ruleCount = ruleParser.numRules(rulesFile)
         return verify(rules)
     except ParseError as e:
         e.fileName = rulesFile.name

@@ -34,12 +34,12 @@ strict_order simple
         * automatically creates constraints:
         *   aux_def
         *   def[right |-> left]
-        *       ID 11: >= 1 ;
+        *       ID 1: >= 1 ;
         *
         * We now need to show contradiction
-        c 11
+        c 1
         * the proof goal passes if contradiction was derived
-        * end of context implicitly deletes all derived constraints (11)
+        * end of context implicitly deletes all derived constraints (1)
     qed
 
     * proof goal: transitivity
@@ -52,16 +52,16 @@ strict_order simple
         proof
             * automatically creates constraints in the order:
             *   def
-            *       ID 12: -1 u1 1 v1 >= 1 ;
+            *       ID 2: -1 u1 1 v1 >= 1 ;
             *   def_aux
             *   def[left->right, right->fresh_right, aux->fresh_aux]
-            *       ID 13: -1 v1 1 w1 >= 1 ;
+            *       ID 3: -1 v1 1 w1 >= 1 ;
             *   def_aux[left->right, right->fresh_right, aux->fresh_aux]
             *   def_aux[right->fresh_right, aux->fresh_aux2]
 
             * proof goals are created for:
             *   def[right->fresh_right, aux->fresh_aux2]
-            *       ID 14 (only reserved): -1 u1 1 w1 >= 1 ;
+            *       ID 4 (only reserved): -1 u1 1 w1 >= 1 ;
 
             * It follows a sub proof for each proof goal, if an ID is
             * missing the verifier tries to verify it using RUP. The sub
@@ -71,21 +71,21 @@ strict_order simple
             * be fresh and will not be used for further constraints
 
 
-            * proof goal: show that proof goal [ID 14] is implied
-            proofgoal 14
-                * automatically creates \neg [ID 14]
-                *   ID 15: 1 u1 -1 v1 >= 0 ;
+            * proof goal: show that proof goal [ID 4] is implied
+            proofgoal 4
+                * automatically creates \neg [ID 4]
+                *   ID 5: 1 u1 -1 v1 >= 0 ;
                 * We now need to show contradiction
-                p 12 13 + 15 +
-                c 16
+                p 2 3 + 5 +
+                c 6
                 * alternatively we could just write
                 *   u >= 1;
                 * in this case or omit the proof goal completely
 
-            * end of context implicitly deletes all added constraints (15,16)
+            * end of context implicitly deletes all added constraints (5,6)
             qed
 
-        * end of context implicitly deletes all added constraints (12,13)
+        * end of context implicitly deletes all added constraints (2,3)
         * the proof would fail if any of the proof goals is missing or failed at this point
         qed
     qed
@@ -102,7 +102,7 @@ load_order simple x1
 * new dominance rule with rho = x1->0
 dom x1 0 ; 1 ~x1 >= 1 ;
     * automatically creates \neg [~x1 >= 1]
-    *   ID 17: x1 >= 1
+    *   ID 11: x1 >= 1
     * checks if aux are still fresh variables
     * automatically creates constraints
     *   def_aux [ left|->([vars][rho]), right|->vars,aux|->([aux][rho]) ]
@@ -117,25 +117,25 @@ dom x1 0 ; 1 ~x1 >= 1 ;
     *  - the order is respected by rho
     *       def [ left|->([vars][rho]), right|->vars,aux|->([aux][rho]) ]
     *       [ -1 u1 1 v1 >= 1 ;] [u1->0, v1->x1]
-    *       ID 18: 1 x1 >= 1;
+    *       ID 12: 1 x1 >= 1;
 
     * show C [rho] is implied
     proofgoal 1
-        c 19
+        c 13
     qed
 
     * show that order is respected
-    proofgoal 18
-        * automatically creates \neg [ID 20]
-        *   ID 21: 1 ~x1 >= 1;
-        p 17 20 +
-        c 21
+    proofgoal 12
+        * automatically creates \neg [ID 12]
+        *   ID 13: 1 ~x1 >= 1;
+        p 11 14 +
+        c 15
 
-        * end of context implicitly deletes all added constraints (20,21)
+        * end of context implicitly deletes all added constraints (14,15)
     qed
 
-    * end of context implicitly deletes all added constraints (17)
-    * end of rule adds ID 23: ~x1 >= 1 ;
+    * end of context implicitly deletes all added constraints (11)
+    * end of rule adds ID 16: ~x1 >= 1 ;
 qed
 
 * map redundancy rule introducing fresh variable x2 using rho = [x2 -> ~x1]
@@ -143,7 +143,7 @@ map x2 ~x1 ; 1 x1 1 x2 >= 1 ;
     * checks that rho does not touch left variables of order simple
 
     * automatically creates \neg [1 x1 1 x2 >= 1]
-    *   ID 23 -1 x1 -1 x2 >= 0 ;
+    *   ID 17 -1 x1 -1 x2 >= 0 ;
 
     * The following proof goals are added:
     *
@@ -152,21 +152,21 @@ map x2 ~x1 ; 1 x1 1 x2 >= 1 ;
     *    are not effected by rho
     *
     *  - for the constraint to be introduced [1 x1 1 x2 >= 1][rho]
-    *        ID 24: >= 0 ;
+    *        ID 18: >= 0 ;
 
-    proofgoal 24
-        * automatically adds \neg [ID 24]
-        * ID 25: >= 1 ;
-        c 25
+    proofgoal 18
+        * automatically adds \neg [ID 18]
+        * ID 19: >= 1 ;
+        c 19
 
-        * end of context implicitly deletes all added constraints (25)
+        * end of context implicitly deletes all added constraints (19)
     qed
-    * end of context implicitly deletes all added constraints (23)
-    * end of rule adds ID 26: 1 x1 1 x2 >= 1 ;
+    * end of context implicitly deletes all added constraints (17)
+    * end of rule adds ID 20: 1 x1 1 x2 >= 1 ;
 qed
 
-p 22 26 +
-*  ID 27: x2 >= 1 ;
+p 16 20 +
+*  ID 21: x2 >= 1 ;
 
 * load the default order (0 >= 1), mark all constraints as fixed
 load_order

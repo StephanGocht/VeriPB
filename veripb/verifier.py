@@ -277,6 +277,9 @@ class Verifier():
         #    print("  ConstraintId  - : check passed")
 
     def __call__(self, rules):
+        rules = iter(rules)
+        self.context.rules = rules
+
         self.db = list()
         self.result = VerificationResult()
         self.result.requireUnsat = self.settings.requireUnsat;

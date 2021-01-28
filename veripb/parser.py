@@ -12,16 +12,42 @@ from veripb.exceptions import ParseError
 
 from veripb.timed_function import TimedFunction
 
+class ParseContext():
+    def __init__(self, context):
+        self.context = context
+
+        # todo: these to should probably be in the verifier but some
+        # rules are using them during parsing
+        self.firstFreeId = 1
+        self.context.addIneqListener = list()
+
+    @property
+    def rules(self):
+        return self.context.allowedRules
+
+    @rules.setter
+    def rules(self, value):
+        self.context.allowedRules = value
+
+    @property
+    def firstFreeId(self):
+        return self.context.firstFreeId
+
+    @firstFreeId.setter
+    def firstFreeId(self, value):
+        self.context.firstFreeId = value
+
+    @property
+    def addIneqListener(self):
+        return self.context.addIneqListener
+
+
 
 class RuleParserBase():
     commentChar = None
 
     def __init__(self, context):
-        self.context = context
-        try:
-            self.context.addIneqListener
-        except AttributeError:
-            self.context.addIneqListener = list()
+        self.parseContext = ParseContext(context)
 
     def numRules(self, file):
         pos = file.tell()
@@ -50,11 +76,10 @@ class RuleParserBase():
 
     @TimedFunction.timeIter("RuleParserBase.parse")
     def parse(self, rules, file, dumpLine = False, defaultRule = None):
-        self.rules = {rule.Id: rule for rule in rules}
-        self.rules[""] = defaultRule
+        self.parseContext.rules = {rule.Id: rule for rule in rules}
+        self.parseContext.rules[""] = defaultRule
 
         lineNum = 1
-        ineqId = 1
         lines = iter(file)
 
         defaultIdSize = 1
@@ -88,9 +113,9 @@ class RuleParserBase():
 
             if not self.isEmpty(line):
                 try:
-                    rule = self.rules[line[0:idSize]]
+                    rule = self.parseContext.rules[line[0:idSize]]
                 except KeyError as e:
-                    rule = self.rules.get("", None)
+                    rule = self.parseContext.rules.get("", None)
                     if rule is None:
                         raise ParseError("Unsupported rule '%s'"%(line[:idSize]),
                             line = lineNum, column = columnOffset)
@@ -99,16 +124,18 @@ class RuleParserBase():
                 columnOffset += idSize
 
                 try:
-                    self.context.firstFreeId = ineqId
-                    step = rule.parse(line[idSize:], self.context)
-                    self.rules = step.allowedRules(self.context, self.rules)
+                    step = rule.parse(line[idSize:], self.parseContext.context)
 
                     step.lineInFile = lineNum
                     yield step
+
+                    self.parseContext = step.newParseContext(self.parseContext)
                     numConstraints = step.numConstraints()
-                    for listener in self.context.addIneqListener:
-                        listener(range(ineqId, ineqId + numConstraints), self.context)
-                    ineqId += numConstraints
+                    oldFree = self.parseContext.firstFreeId
+                    newFree = oldFree + numConstraints
+                    self.parseContext.firstFreeId = newFree
+                    for listener in self.parseContext.addIneqListener:
+                        listener(range(oldFree, newFree), self.parseContext.context)
 
                 except veripb.ParseError as e:
                     e.line = lineNum
@@ -427,7 +454,7 @@ class WordParser():
 
     def raiseParseError(self, wordNum, error):
         column = None
-        if wordNum >= len(self.words):
+        if wordNum >= len(self.words) or wordNum < 0:
             column = len(self.line)
         else:
             for idx, match in enumerate(re.finditer(r" *(?P<word>[^ ]+)", self.line)):

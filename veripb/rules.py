@@ -61,6 +61,10 @@ class Rule():
     def allowedRules(self, context, currentRules):
         return currentRules
 
+    def newParseContext(self, parseContext):
+        parseContext.rules = self.allowedRules(parseContext.context, parseContext.rules)
+        return parseContext
+
     def __str__(self):
         return type(self).__name__
 
@@ -489,11 +493,12 @@ class ReversePolishNotation(Rule):
         with WordParser(line) as words:
             sequence = list(map(f, words))
 
-            if sequence[-1] == 0:
-                sequence.pop()
-                stackSize -= 1
-            if sequence[-1] == ";":
-                sequence.pop()
+            if len(sequence) > 0:
+                if sequence[-1] == 0:
+                    sequence.pop()
+                    stackSize -= 1
+                if sequence[-1] == ";":
+                    sequence.pop()
 
             if stackSize != 1:
                 raise ValueError("Stack should contain exactly one element at end of polish notation.");

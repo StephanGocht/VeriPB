@@ -24,7 +24,7 @@ strict_order simple
     irreflexive
         p x1 ~x1 +
         p x1 ~x1 +
-        c 11
+        c 1
     qed
 
     transitivity
@@ -32,9 +32,9 @@ strict_order simple
             fresh_right w1
         qed
         proof
-            proofgoal 16
-                p 14 15 + 17 +
-                c 18
+            proofgoal 6
+                p 4 5 + 7 +
+                c 8
             qed
         qed
     qed
@@ -44,15 +44,15 @@ load_order simple x1
 
 p 1 2 +
 map a3 → 1 ; 1 a3 1 x1 >= 1 ;
-    proofgoal 021
-        c 22
+    proofgoal 13
+        c 14
     qed
 qed
 
 dom x1 → x2 , x2 → x1 ; 1 ~x1 1 x2 >= 1 ;
-    proofgoal 025
-        p 24 26 +
-        c 27
+    proofgoal 17
+        p 16 18 +
+        c 19
     qed
 qed
 

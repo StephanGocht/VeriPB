@@ -2,7 +2,9 @@ from veripb import InvalidProof
 from veripb.rules import Rule, EmptyRule, register_rule
 from veripb.rules import ReversePolishNotation, IsContradiction
 from veripb.rules_register import register_rule, dom_friendly_rules
-from veripb.parser import OPBParser, WordParser
+from veripb.parser import OPBParser, WordParser, ParseContext
+
+from veripb import verifier
 
 from veripb.timed_function import TimedFunction
 
@@ -164,10 +166,10 @@ class LoadOrder(EmptyRule):
 
                 lits.append(lit)
 
-        try:
-            order = orderContext.orders[name]
-        except KeyError:
-            raise ValueError("Unkown order.")
+            try:
+                order = orderContext.orders[name]
+            except KeyError:
+                raise ValueError("Unkown order '%s'." %(name))
 
         order.vars = lits
         order.firstDomInvisible = context.firstFreeId
@@ -649,31 +651,103 @@ class Transitivity(EmptyRule):
         self.subContext.previousRules = currentRules
         return rulesToDict(self.subRules)
 
+class StopSubVerifier(Exception):
+    pass
+
+class SubVerifierEnd(EmptyRule):
+    Id = "qed"
+
+    def __init__(self, oldParseContext):
+        self.oldParseContext = oldParseContext
+
+    def compute(self, antecedents, context):
+        orders = OrderContext.setup(context)
+        orders.qedNewOrder()
+        raise StopSubVerifier()
+
+    def newParseContext(self, parseContext):
+        return self.oldParseContext
+
+class SubVerifierEndRule():
+    def __init__(self, oldParseContext):
+        self.oldParseContext = oldParseContext
+
+    def parse(self, line, context):
+        return SubVerifierEnd(self.oldParseContext)
+
+
+class SubVerifier(EmptyRule):
+    def compute(self, antecedents, context):
+        # context for sub verifier
+        svContext = verifier.Context()
+        svContext.newPropEngine = context.newPropEngine
+        svContext.propEngine = svContext.newPropEngine()
+        svContext.ineqFactory = context.ineqFactory
+
+        self._newParseContext = ParseContext(svContext)
+
+
+        self.onEnterSubVerifier(context, svContext)
+
+        try:
+            verify = verifier.Verifier(
+                context = svContext,
+                settings = context.verifierSettings)
+            verify(context.rules)
+        except StopSubVerifier:
+            self.exitSubVerifier(context, svContext)
+        else:
+            raise InvalidProof("Subproof not finished.")
+
+        return []
+
+    def exitSubVerifier(self, context, subVerifierContext):
+        context.usesAssumptions = getattr(subVerifierContext, "usesAssumptions", False)
+        self.onExitSubVerifier(context, subVerifierContext)
+
+    def onEnterSubVerifier(self, context, subVerifierContext):
+        pass
+
+    def onExitSubVerifier(self, context, subVerifierContext):
+        pass
+
+    def newParseContext(self, parseContext):
+        self._newParseContext.rules = \
+            self.allowedRules(
+                parseContext.context,
+                parseContext.rules)
+        self._newParseContext.rules[SubVerifierEnd.Id] = \
+            SubVerifierEndRule(parseContext)
+        return self._newParseContext
+
+
+
 
 @register_rule
-class StrictOrder(EmptyRule):
+class StrictOrder(SubVerifier):
     Id = "strict_order"
-    subRules = [OrderVars, OrderDefinitions, Irreflexivity, Transitivity, EndOfProof]
+    subRules = [OrderVars, OrderDefinitions, Irreflexivity, Transitivity]
 
     @classmethod
     def parse(cls, line, context):
-        name = line.strip()
+        with WordParser(line) as words:
+            name = next(words)
+
+        return cls(name)
+
+    def __init__(self, name):
+        self.name = name
+
+    def onEnterSubVerifier(self, context, subContext):
+        orders = OrderContext.setup(subContext)
+        orders.newOrder(self.name)
+
+    def onExitSubVerifier(self, context, subContext):
+        ordersSub = OrderContext.setup(subContext)
         orders = OrderContext.setup(context)
-        orders.newOrder(name)
-
-        subcontexts = SubContext.setup(context)
-        subcontext = subcontexts.push()
-
-        f = lambda context, subContext: orders.qedNewOrder()
-        subcontext.callbacks.append(f)
-
-        return cls(subcontext)
-
-    def __init__(self, subContext):
-        self.subContext = subContext
+        orders.orders[self.name] = ordersSub.orders[self.name]
 
     def allowedRules(self, context, currentRules):
-        self.subContext.previousRules = currentRules
         return rulesToDict(self.subRules)
 
 class Substitution:

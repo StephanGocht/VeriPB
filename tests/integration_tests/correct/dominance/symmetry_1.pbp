@@ -20,9 +20,9 @@ strict_order exp
             fresh_right w1 w2 w3 w4 w5 w6
         qed
         proof
-            proofgoal 5
-                p 3 4 + 6 +
-                c 7
+            proofgoal -1
+                p -3 -4 + -1 +
+                c -1
             qed
         qed
     qed

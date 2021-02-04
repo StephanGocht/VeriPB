@@ -503,7 +503,6 @@ def objectiveCondition(context, witnessDict):
 
 #@TimedFunction.time("computeEffected")
 def computeEffected(context, antecedents, witness):
-    reverseId = {ineq: Id for Id, ineq in antecedents}
     effected = set()
 
     witnessDict = witness.asDict()
@@ -511,7 +510,7 @@ def computeEffected(context, antecedents, witness):
         for ineq in context.propEngine.occurence(lit):
             effected.add(ineq)
 
-    result = [(reverseId[ineq], ineq) for ineq in effected]
+    result = [(ineq.id, ineq) for ineq in effected]
     result.sort()
     return result
 

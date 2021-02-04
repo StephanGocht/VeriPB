@@ -220,12 +220,13 @@ class Verifier():
             if constraint is None:
                 continue
 
-            lineNum = len(self.db) + i
+            constraintId = len(self.db) + i
+            constraint.id = constraintId
             self.attach(constraint)
             if self.settings.trace and ruleNum > 0:
                 didPrint = True
                 print("  ConstraintId %(line)03d: %(ineq)s"%{
-                    "line": lineNum,
+                    "line": constraintId,
                     "ineq": self.context.ineqFactory.toString(constraint)
                 })
             if self.settings.proofGraph is not None and ruleNum > 0:
@@ -234,7 +235,7 @@ class Verifier():
                     ids = (i for (i,c) in enumerate(self.db) if c is not None and i > 0)
                 f = self.settings.proofGraph
                 print("%(ineq)s ; %(line)d = %(antecedents)s"%{
-                        "line": lineNum,
+                        "line": constraintId,
                         "ineq": self.context.ineqFactory.toString(constraint),
                         "antecedents": " ".join(map(str,ids))
                     }, file=f)

@@ -1443,6 +1443,7 @@ private:
     friend PropEngine<T>;
 public:
     bool isAttached = false;
+    uint64_t id = 0;
 
     Inequality(Inequality& other)
         : handler(other.handler) {

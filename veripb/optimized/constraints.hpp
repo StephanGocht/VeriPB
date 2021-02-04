@@ -1648,17 +1648,20 @@ public:
         this->contract();
 
         std::vector<Lit> constants;
+        constants.reserve(_constants.size());
         for (int i : _constants) {
             constants.emplace_back(i);
         }
 
         std::vector<Var> from;
+        from.reserve(_from.size());
         for (int i : _from) {
             assert(i > 0);
             from.emplace_back(i);
         }
 
         std::vector<Lit> to;
+        to.reserve(_to.size());
         for (int i : _to) {
             to.emplace_back(i);
         }

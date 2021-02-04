@@ -46,7 +46,12 @@ int main(int argc, char const *argv[])
             .def("checkSat", &PropEngine<CoefType>::checkSat)
             .def("propagatedLits", &PropEngine<CoefType>::propagatedLits)
             .def("increaseNumVarsTo", &PropEngine<CoefType>::increaseNumVarsTo)
-            .def("printStats", &PropEngine<CoefType>::printStats);
+            .def("printStats", &PropEngine<CoefType>::printStats)
+            .def("occurence", [](PropEngine<CoefType>& propEngine, int intLit){
+                Lit lit(intLit);
+                auto& occurence = propEngine.occurs[lit];
+                return py::make_iterator(occurence.begin(), occurence.end());
+            });
 
 
         py::class_<Inequality<CoefType>>(m, "CppInequality")

@@ -117,60 +117,104 @@ class Substitution:
         result.sort()
         return result
 
+class Autoprover():
+    @TimedFunction.time("Autoprover::setup")
+    def __init__(self, context, db, subgoals, upTo = None):
+        self.context = context
+        self.db = {Id: ineq for Id, ineq in db}
+        self.subgoals = subgoals
+        self.upTo = upTo
+        self.verbose = context.verifierSettings.trace
+        self.context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
+        self.propEngine = context.propEngine
 
-@TimedFunction.time("AutoProoving")
-def autoProof(context, db, subgoals, upTo = None):
-    if not subgoals:
-        return
+        self.dbSubstituted = None
+        self.dbSet = None
 
-    verbose = context.verifierSettings.trace
+    @TimedFunction.time("Autoprover::propagate")
+    def propagate(self):
+        self.assignment = Substitution()
+        self.assignment.addConstants(self.propEngine.propagatedLits())
+        #todo: do we want to check if the constraint is already rup?
+        if self.verbose:
+            print("    propagations:", end = " ")
+            for i in self.assignment.constants:
+                print(self.context.ineqFactory.int2lit(i), end = " ")
+            print()
 
-    context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
-    propEngine = context.propEngine
-
-    assignment = Substitution()
-    assignment.addConstants(propEngine.propagatedLits())
-    if verbose:
-        print("    propagations:", end = " ")
-        for i in assignment.constants:
-            print(context.ineqFactory.int2lit(i), end = " ")
-        print()
-
-    db = {Id: ineq for Id, ineq in db}
-    dbSubstituted = None
-
-    while subgoals:
-        nxtGoalId, nxtGoal = subgoals[0]
-        if upTo is not None and nxtGoalId >= upTo:
-            break
-        else:
-            subgoals.popleft()
-
-        nxtGoal = nxtGoal.substitute(*assignment.get())
-
-        if nxtGoalId in db:
-            if db[nxtGoalId].implies(nxtGoal):
-                if verbose:
+    @TimedFunction.time("Autoprover::selfImplication")
+    def selfImplication(self, nxtGoalId, nxtGoal):
+        if nxtGoalId in self.db:
+            if self.db[nxtGoalId].implies(nxtGoal):
+                if self.verbose:
                     print("    automatically proved %03i by self implication" % (nxtGoalId))
-                continue
+                return True
+        return False
 
-        success = nxtGoal.ratCheck([], propEngine)
-        if success:
-            if verbose:
-                print("    automatically proved %03i by RUP check" % (nxtGoalId))
-            continue
+    @TimedFunction.time("Autoprover::inDB")
+    def inDB(self, nxtGoalId, nxtGoal):
+        if self.dbSet is None:
+            self.dbSet = set(self.db.values())
 
-        if dbSubstituted is None:
-            dbSubstituted = [(Id, ineq.copy().substitute(*assignment.get())) for Id, ineq in db.items()]
+        return nxtGoal in self.dbSet
 
-        for ineqId, ineq in dbSubstituted:
+
+    @TimedFunction.time("Autoprover::dbImplication")
+    def dbImplication(self, nxtGoalId, nxtGoal):
+        success = False
+        if self.dbSubstituted is None:
+            self.dbSubstituted = [(Id, ineq.copy().substitute(*self.assignment.get())) for Id, ineq in self.db.items()]
+
+        for ineqId, ineq in self.dbSubstituted:
             if ineq.implies(nxtGoal):
                 success = True
                 break
 
         if success:
-            if verbose:
+            if self.verbose:
                 print("    automatically proved %03i by implication from %i" % (nxtGoalId, ineqId))
-            continue
+            return True
+        return False
 
-        raise InvalidProof("Could not proof proof goal %03i automatically." % (nxtGoalId))
+    @TimedFunction.time("Autoprover::rupImplication")
+    def rupImplication(self, nxtGoalId, nxtGoal):
+        success = nxtGoal.ratCheck([], self.propEngine)
+        if success:
+            if self.verbose:
+                print("    automatically proved %03i by RUP check" % (nxtGoalId))
+            return True
+        return False
+
+    def __call__(self):
+        self.propagate()
+
+        while self.subgoals:
+            nxtGoalId, nxtGoal = self.subgoals[0]
+            if self.upTo is not None and nxtGoalId >= self.upTo:
+                break
+            else:
+                self.subgoals.popleft()
+
+            nxtGoal = nxtGoal.substitute(*self.assignment.get())
+
+            if self.selfImplication(nxtGoalId, nxtGoal):
+                continue
+
+            # if self.inDB(nxtGoalId, nxtGoal):
+            #     continue
+
+            if self.rupImplication(nxtGoalId, nxtGoal):
+                continue
+
+            if self.dbImplication(nxtGoalId, nxtGoal):
+                continue
+
+            raise InvalidProof("Could not proof proof goal %03i automatically." % (nxtGoalId))
+
+
+def autoProof(context, db, subgoals, upTo = None):
+    if not subgoals:
+        return
+
+    prover = Autoprover(context, db, subgoals, upTo)
+    prover()

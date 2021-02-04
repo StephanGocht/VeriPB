@@ -47,7 +47,9 @@ class TimedFunction:
     @classmethod
     def print_stats(cls):
         total = 0
-        for name, time in cls.times.items():
+        times = list(cls.times.items())
+        times.sort(key = lambda x:x[1], reverse=True)
+        for name, time in times:
             total += time
             print("c statistic: time %s: %.2fs"%(name,time))
 

@@ -247,10 +247,11 @@ class Irreflexivity(MultiGoalRule):
         mapping = Substitution()
         mapping.mapAll(order.rightVars,order.leftVars)
 
+        sub = mapping.get()
         for ineq in order.definition:
             ineq = ineq.copy()
 
-            ineq.substitute(*mapping.get())
+            ineq.substitute(sub)
             self.addAvailable(ineq)
 
         contradiction = context.ineqFactory.fromTerms([], 1)
@@ -326,20 +327,22 @@ class TransitivityProof(MultiGoalRule):
         substitution.mapAll(order.leftVars,order.rightVars)
         substitution.mapAll(order.rightVars,order.transitivity.fresh_right)
 
+        sub =  substitution.get()
         for ineq in order.definition:
             ineq = ineq.copy()
 
-            ineq.substitute(*substitution.get())
+            ineq.substitute(sub)
             self.addAvailable(ineq)
 
 
         substitution = Substitution()
         substitution.mapAll(order.rightVars,order.transitivity.fresh_right)
 
+        sub = substitution.get()
         for ineq in order.definition:
             ineq = ineq.copy()
 
-            ineq.substitute(*substitution.get())
+            ineq.substitute(sub)
 
             self.addSubgoal(ineq)
 
@@ -572,16 +575,17 @@ class MapRedundancy(MultiGoalRule):
 
         effected = computeEffected(context, antecedents, self.witness)
 
+        sub = self.witness.get()
         for Id, ineq in effected:
             stats.numGoalCandidates += 1
             rhs = ineq.copy()
-            rhs.substitute(*self.witness.get())
+            rhs.substitute(sub)
             if rhs != ineq:
                 stats.numSubgoals += 1
                 self.addSubgoal(rhs, Id)
 
         ineq = self.constraint.copy()
-        ineq.substitute(*self.witness.get())
+        ineq.substitute(self.witness.get())
         self.addSubgoal(ineq)
 
         obj = objectiveCondition(context, self.witness.asDict())
@@ -634,6 +638,7 @@ class DominanceRule(MultiGoalRule):
 
         effected = computeEffected(context, antecedents, self.witness)
 
+        sub = self.witness.get()
         for Id, ineq in effected:
             if Id >= self.order.firstDomInvisible:
                 break
@@ -641,7 +646,7 @@ class DominanceRule(MultiGoalRule):
             stats.numGoalCandidates += 1
 
             rhs = ineq.copy()
-            rhs.substitute(*self.witness.get())
+            rhs.substitute(sub)
             if rhs != ineq:
                 stats.numSubgoals += 1
                 self.addSubgoal(rhs, Id)
@@ -669,15 +674,16 @@ class DominanceRule(MultiGoalRule):
         substitution = Substitution.fromDict(mapping)
 
         # todo: we need to check that the auxVars are still fresh
+        sub = substitution.get()
 
         # for ineq in self.order.auxDefinition:
         #     ineq = self.constraint.copy()
-        #     ineq.substitute(*substitution.get())
+        #     ineq.substitute(sub)
         #     self.addAvailable(ineq)
 
         for ineq in self.order.definition:
             ineq = ineq.copy()
-            ineq.substitute(*substitution.get())
+            ineq.substitute(sub)
             self.addSubgoal(ineq)
 
         obj = objectiveCondition(context, witnessDict)

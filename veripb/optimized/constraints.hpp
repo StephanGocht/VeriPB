@@ -81,6 +81,7 @@ class Lit {
 private:
     LitData value;
 
+    friend std::hash<Lit>;
 public:
     Lit(){}
 
@@ -138,6 +139,15 @@ public:
     };
 };
 
+namespace std {
+    template <>
+    struct hash<Lit> {
+        std::size_t operator()(const Lit& lit) const {
+            return hash<LitData>()(lit.value);
+        }
+    };
+}
+
 inline std::ostream& operator<<(std::ostream& os, const Var& v) {
     os << "x" << v.value;
     return os;
@@ -150,6 +160,45 @@ inline std::ostream& operator<<(std::ostream& os, const Lit& v) {
     os << v.var();
     return os;
 }
+
+class Substitution {
+public:
+    static Lit zero() {
+        // note that variable 0 is not a valid variable, hence we use
+        // it to represent constants 0 as literal ~Var(0) and 1 as
+        // literal Var(0). You may not swap the values of isNegated
+        // passed to the constructor!
+
+        return Lit(Var(0), true);
+    }
+
+    static Lit one() {
+        return Lit(Var(0), false);
+    }
+
+    std::unordered_map<Lit, Lit> map;
+    // var -> lit or 0 or 1
+
+    Substitution(
+        std::vector<int>& constants,
+        std::vector<int>& from,
+        std::vector<int>& to)
+    {
+        assert(from.size() == to.size());
+        map.reserve(constants.size() + from.size());
+        for (int intLit : constants) {
+            Lit lit(intLit);
+            map.emplace( lit, Substitution::one());
+            map.emplace(~lit, Substitution::zero());
+        }
+        for (size_t i = 0; i < from.size(); i++) {
+            Lit a(from[i]);
+            Lit b(to[i]);
+            map.emplace( a, b);
+            map.emplace(~a,~b);
+        }
+    }
+};
 
 /*
  * some syntactic suggar to prevent us from accidentally using Var to
@@ -665,64 +714,13 @@ public:
         return slack >= 0;
     }
 
-    void substitute(
-        std::vector<Lit>& constants,
-        std::vector<Var>& from,
-        std::vector<Lit>& to)
-    {
-        assert(from.size() == to.size());
-        std::sort(this->terms.begin(), this->terms.end(), orderByVar<Term<T>>);
-        assert(std::is_sorted(constants.begin(), constants.end()));
-        assert(std::is_sorted(from.begin(), from.end()));
-
-        auto it = constants.begin();
-        this->terms.erase(
-            std::remove_if(
-                this->terms.begin(),
-                this->terms.end(),
-                [this, &it, &constants](Term<T>& term){
-                    while (it != constants.end()
-                        && it->var() < term.lit.var())
-                    { ++it; }
-
-                    if (it != constants.end()
-                        && it->var() == term.lit.var())
-                    {
-                        if (it->isNegated() == term.lit.isNegated()) {
-                            this->degree -= term.coeff;
-                        }
-
-                        term.coeff = 0;
-                    }
-
-                    return term.coeff == 0;
-                }),
-            this->terms.end());
-
-
-        auto itMe = this->terms.begin();
-        auto itFrom = from.begin();
-        auto itTo = to.begin();
-
-        while (itMe != this->terms.end()
-            && itFrom != from.end())
-        {
-            if (itMe->lit.var() < *itFrom) {
-                ++itMe;
-            } else if (itMe->lit.var() > *itFrom) {
-                ++itFrom;
-                ++itTo;
-            } else {
-                assert(itMe->lit.var() == *itFrom);
-                Lit l = *itTo;
-                if (itMe->lit.isNegated()) {
-                    l = ~l;
-                }
-                itMe->lit = l;
-
-                ++itMe;
-                ++itFrom;
-                ++itTo;
+    void substitute(Substitution& sub) {
+        // warning: after this operation the constraint is no longer
+        // normalized, load to FatInequality to normalize
+        for (Term<T>& term: this->terms) {
+            auto it = sub.map.find(term.lit);
+            if (it != sub.map.end()) {
+                term.lit = it->second;
             }
         }
     }
@@ -1352,6 +1350,15 @@ public:
 
             // setCoeff(term.lit.var(), coeff);
         }
+
+        if (this->coeffs.size() > 0) {
+            Var one = Substitution::one().var();
+            T& coeff = this->coeffs[one];
+            if (coeff > 0) {
+                this->degree -= coeff;
+            }
+            this->coeffs[one] = 0;
+        }
     }
 
     void unload(FixedSizeInequality<T>& ineq) {
@@ -1365,6 +1372,7 @@ public:
             coeff = abs(coeff);
 
             if (coeff > 0) {
+                assert(var != Substitution::one().var());
                 assert(pos != ineq.terms.end());
                 pos->coeff = coeff;
                 pos->lit = lit;
@@ -1640,35 +1648,11 @@ public:
         return propEngine.ratCheck(*this->ineq, v);
     }
 
-    Inequality* substitute(
-        std::vector<int>& _constants,
-        std::vector<int>& _from,
-        std::vector<int>& _to)
-    {
+    Inequality* substitute(Substitution& sub) {
         assert(!this->frozen);
         this->contract();
-
-        std::vector<Lit> constants;
-        constants.reserve(_constants.size());
-        for (int i : _constants) {
-            constants.emplace_back(i);
-        }
-
-        std::vector<Var> from;
-        from.reserve(_from.size());
-        for (int i : _from) {
-            assert(i > 0);
-            from.emplace_back(i);
-        }
-
-        std::vector<Lit> to;
-        to.reserve(_to.size());
-        for (int i : _to) {
-            to.emplace_back(i);
-        }
-
-        this->ineq->substitute(constants, from, to);
-        // normalize by loading into expanded constraint
+        this->ineq->substitute(sub);
+        // need to normalize, we do so by expanding the constraint
         this->expand();
         return this;
     }

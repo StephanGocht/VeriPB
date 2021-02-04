@@ -38,6 +38,9 @@ int main(int argc, char const *argv[])
     void init_constraints(py::module &m){
         m.doc() = "Efficient implementation for linear combinations of constraints.";
 
+        py::class_<Substitution>(m, "Substitution")
+            .def(py::init<std::vector<int>&,std::vector<int>&,std::vector<int>&>());
+
         py::class_<PropEngine<CoefType>>(m, "PropEngine")
             .def(py::init<size_t>())
             .def("attach", &PropEngine<CoefType>::attach)

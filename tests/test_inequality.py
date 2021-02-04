@@ -6,6 +6,7 @@ from env import veripb
 
 from veripb.constraints import Term
 from veripb.constraints import CppIneqFactory as IneqFactory
+from veripb.optimized.constraints import Substitution as CppSubstitution
 
 ineqFactory = IneqFactory()
 
@@ -380,35 +381,35 @@ class TestInequality(unittest.TestCase):
         a = geq([(1, 2), (1, 1), (1, 3)], 2)
         b = geq([(1, 3)], 1)
 
-        a = a.substitute([1, -2], [], [])
+        a = a.substitute(CppSubstitution([1, -2], [], []))
         assert(a == b)
 
     def test_substitute_2(self):
         a = geq([(1, 2), (1, 1), (1, 3)], 2)
         b = geq([(1, 3)], 1)
 
-        a = a.substitute([-1, 2], [], [])
+        a = a.substitute(CppSubstitution([-1, 2], [], []))
         assert(a == b)
 
     def test_substitute_3(self):
         a = geq([(1, 2), (1, 1), (1, 3)], 2)
         b = geq([(1, 3), (1,4)], 2)
 
-        a = a.substitute([-1], [2], [4])
+        a = a.substitute(CppSubstitution([-1], [2], [4]))
         assert(a == b)
 
     def test_substitute_3(self):
         a = geq([(1, 1), (1, 2), (1, 3)], 2)
         b = geq([(1, 3), (1,4)], 1)
 
-        a = a.substitute([1], [2], [4])
+        a = a.substitute(CppSubstitution([1], [2], [4]))
         assert(a == b)
 
     def test_substitute_4(self):
         a = geq([(1, 1), (1, -2), (1, 3)], 2)
         b = geq([(1, 2), (1, -1), (1, 3)], 2)
 
-        a = a.substitute([], [1,2], [2,1])
+        a = a.substitute(CppSubstitution([], [1,2], [2,1]))
         assert(a == b)
 
 

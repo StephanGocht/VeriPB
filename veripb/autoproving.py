@@ -3,6 +3,7 @@ from veripb.rules import Rule, EmptyRule, register_rule
 from veripb.rules import ReversePolishNotation, IsContradiction
 from veripb.rules_register import register_rule, dom_friendly_rules, rules_to_dict
 from veripb.parser import OPBParser, WordParser, ParseContext
+from veripb.optimized.constraints import Substitution as CppSubstitution
 
 from veripb import verifier
 
@@ -37,16 +38,13 @@ class Substitution:
             self.substitutions.append((variable,substitute))
 
     def get(self):
-        if not self.isSorted:
-            self.sort()
-
         if len(self.substitutions) > 0:
             frm, to = zip(*self.substitutions)
         else:
             frm = []
             to = []
 
-        return (self.constants, frm, to)
+        return CppSubstitution(self.constants, frm, to)
 
     def asDict(self):
         res = dict()
@@ -163,7 +161,7 @@ class Autoprover():
     def dbImplication(self, nxtGoalId, nxtGoal):
         success = False
         if self.dbSubstituted is None:
-            self.dbSubstituted = [(Id, ineq.copy().substitute(*self.assignment.get())) for Id, ineq in self.db.items()]
+            self.dbSubstituted = [(Id, ineq.copy().substitute(self.assignment.get())) for Id, ineq in self.db.items()]
 
         for ineqId, ineq in self.dbSubstituted:
             if ineq.implies(nxtGoal):
@@ -188,6 +186,7 @@ class Autoprover():
     def __call__(self):
         self.propagate()
 
+        sub = self.assignment.get()
         while self.subgoals:
             nxtGoalId, nxtGoal = self.subgoals[0]
             if self.upTo is not None and nxtGoalId >= self.upTo:
@@ -195,7 +194,7 @@ class Autoprover():
             else:
                 self.subgoals.popleft()
 
-            nxtGoal = nxtGoal.substitute(*self.assignment.get())
+            nxtGoal = nxtGoal.substitute(sub)
 
             if self.selfImplication(nxtGoalId, nxtGoal):
                 continue

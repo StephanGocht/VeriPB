@@ -27,7 +27,7 @@ test:
 install:
 	pip3 install --user -e ${ROOT_DIR}
 
-%.o: %.cpp ${HPP_FILES}
+%.o: %.cpp ${HPP_FILES} Makefile
 	$(CXX) -c -Wall -std=c++17 -fPIC ${CXX_FLAGS}\
 			-o $@ \
 			${PYBINDINCLUDE} \

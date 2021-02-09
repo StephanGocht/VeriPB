@@ -13,6 +13,16 @@ HPP_FILES:=\
 	./veripb/optimized/BigInt.hpp \
 	./veripb/optimized/constraints.hpp
 
+CYTHON:=\
+	./veripb/rules.py \
+	./veripb/rules_dominance.py \
+	./veripb/parser.py \
+	./veripb/autoproving.py \
+	./veripb/rules_multigoal.py \
+	./veripb/constraints.py
+
+CYTHON_COMPILED_C=$(CYTHON:.py=.c)
+
 # if you want to use asan you need prepend the following
 # when running veripb, if compiled with gcc
 # LD_PRELOAD=$(gcc -print-file-name=libasan.so)
@@ -58,3 +68,4 @@ dist:
 clean:
 	find . -name "*.so" -delete
 	find . -name "*.o" -delete
+	rm $(CYTHON_COMPILED_C) -f

@@ -60,13 +60,6 @@ public:
 extern int hashColision;
 
 
-template <class T>
-inline void hash_combine(std::size_t& seed, const T& v)
-{
-    std::hash<T> hasher;
-    seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
-}
-
 template<typename T>
 struct PointedEq {
     bool operator () ( T const * lhs, T const * rhs ) const {
@@ -1359,7 +1352,7 @@ public:
             if (ineq->id <= includeIds) {
                 InequalityPtr<T> rhs(ineq->copy());
                 rhs->substitute(sub);
-                if (!ineq->implies(rhs.get()) // && !contains(rhs.get())
+                if (!ineq->implies(rhs.get()) && !contains(rhs.get())
                     ) {
                     result.emplace_back(std::move(rhs));
                 }
@@ -1376,6 +1369,7 @@ public:
 
     bool contains(Inequality<T>* ineq) {
         Timer timer(timeContains);
+        ineq->contract();
         lookup_requests += 1;
         return constraintLookup.find(ineq) != constraintLookup.end();
     }

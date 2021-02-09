@@ -26,9 +26,10 @@ ext_modules = [
         libraries=['gmp', 'gmpxx'],
         language='c++'
     ),
-    Extension('veripb.constraints', sources=['veripb/constraints.pyx']),
-    # Extension('veripb.rules', sources=['veripb/rules.pyx']),
-    # Extension('veripb.autoproving', sources=['veripb/autoproving.pyx']),
+    Extension('veripb.constraints', sources=['veripb/constraints.py']),
+    Extension('veripb.rules', sources=['veripb/rules.py']),
+    # Extension('veripb.autoproving', sources=['veripb/autoproving.py']),
+    # Extension('veripb.rules_dominance', sources=['veripb/rules_dominance.py']),
 ]
 
 for e in ext_modules:

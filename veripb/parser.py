@@ -96,53 +96,56 @@ class RuleParserBase():
         else:
             lineNum = 0
 
-        for line in lines:
-            lineNum += 1
+        try:
+            for line in lines:
+                lineNum += 1
 
-            if dumpLine:
-                print("line %03d: %s"% (lineNum, line.rstrip()))
+                if dumpLine:
+                    print("line %03d: %s"% (lineNum, line.rstrip()))
 
-            # skip indendation
-            origLine = line
-            line = line.lstrip()
-            columnOffset = len(origLine) - len(line)
-            line = line.rstrip()
+                # skip indendation
+                origLine = line
+                line = line.lstrip()
+                columnOffset = len(origLine) - len(line)
+                line = line.rstrip()
 
-            # find first word
-            ruleId = line.split(" ")[0]
-            idSize = len(ruleId)
+                # find first word
+                ruleId = line.split(" ")[0]
+                idSize = len(ruleId)
 
-            if not self.isEmpty(line):
-                try:
-                    rule = self.parseContext.rules[line[0:idSize]]
-                except KeyError as e:
-                    rule = self.parseContext.rules.get("", None)
-                    if rule is None:
-                        raise ParseError("Unsupported rule '%s'"%(line[:idSize]),
-                            line = lineNum, column = columnOffset)
-                    idSize = 0
+                if not self.isEmpty(line):
+                    try:
+                        rule = self.parseContext.rules[line[0:idSize]]
+                    except KeyError as e:
+                        rule = self.parseContext.rules.get("", None)
+                        if rule is None:
+                            raise ParseError("Unsupported rule '%s'"%(line[:idSize]),
+                                line = lineNum, column = columnOffset)
+                        idSize = 0
 
-                columnOffset += idSize
+                    columnOffset += idSize
 
-                try:
-                    step = rule.parse(line[idSize:], self.parseContext.context)
+                    try:
+                        step = rule.parse(line[idSize:], self.parseContext.context)
 
-                    step.lineInFile = lineNum
-                    yield step
+                        step.lineInFile = lineNum
+                        yield step
 
-                    self.parseContext = step.newParseContext(self.parseContext)
-                    numConstraints = step.numConstraints()
-                    oldFree = self.parseContext.firstFreeId
-                    newFree = oldFree + numConstraints
-                    self.parseContext.firstFreeId = newFree
-                    for listener in self.parseContext.addIneqListener:
-                        listener(range(oldFree, newFree), self.parseContext.context)
+                        self.parseContext = step.newParseContext(self.parseContext)
+                        numConstraints = step.numConstraints()
+                        oldFree = self.parseContext.firstFreeId
+                        newFree = oldFree + numConstraints
+                        self.parseContext.firstFreeId = newFree
+                        for listener in self.parseContext.addIneqListener:
+                            listener(range(oldFree, newFree), self.parseContext.context)
 
-                except veripb.ParseError as e:
-                    e.line = lineNum
-                    if e.column is not None:
-                        e.column += columnOffset
-                    raise e
+                    except veripb.ParseError as e:
+                        e.line = lineNum
+                        if e.column is not None:
+                            e.column += columnOffset
+                        raise e
+        except UnicodeDecodeError as e:
+            raise ParseError(e, line = lineNum + 1)
 
 class RuleParser(RuleParserBase):
     commentChar = "*"

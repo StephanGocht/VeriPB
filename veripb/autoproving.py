@@ -116,7 +116,7 @@ class Substitution:
         return result
 
 class Autoprover():
-    @TimedFunction.time("Autoprover::setup")
+    #@TimedFunction.time("Autoprover::setup")
     def __init__(self, context, db, subgoals, upTo = None):
         self.context = context
         self.subgoals = subgoals
@@ -128,7 +128,7 @@ class Autoprover():
         self.dbSubstituted = None
         self.dbSet = None
 
-    @TimedFunction.time("Autoprover::propagate")
+    #@TimedFunction.time("Autoprover::propagate")
     def propagate(self):
         self.assignment = Substitution()
         self.assignment.addConstants(self.propEngine.propagatedLits())
@@ -139,7 +139,7 @@ class Autoprover():
                 print(self.context.ineqFactory.int2lit(i), end = " ")
             print()
 
-    @TimedFunction.time("Autoprover::selfImplication")
+    #@TimedFunction.time("Autoprover::selfImplication")
     def selfImplication(self, nxtGoalId, nxtGoal):
         if nxtGoalId in self.db:
             if self.db[nxtGoalId].implies(nxtGoal):
@@ -148,13 +148,15 @@ class Autoprover():
                 return True
         return False
 
-    @TimedFunction.time("Autoprover::inDB")
     def inDB(self, nxtGoalId, nxtGoal):
-        nxtGoal.contract()
-        return self.propEngine.contains(nxtGoal);
+        success = self.propEngine.contains(nxtGoal)
+        if success:
+            if self.verbose:
+                print("    automatically proved %03i by finding constraint in database" % (nxtGoalId))
+            return True
+        return False
 
-
-    @TimedFunction.time("Autoprover::dbImplication")
+    #@TimedFunction.time("Autoprover::dbImplication")
     def dbImplication(self, nxtGoalId, nxtGoal):
         success = False
         if self.dbSubstituted is None:
@@ -171,7 +173,7 @@ class Autoprover():
             return True
         return False
 
-    @TimedFunction.time("Autoprover::rupImplication")
+    #@TimedFunction.time("Autoprover::rupImplication")
     def rupImplication(self, nxtGoalId, nxtGoal):
         success = nxtGoal.ratCheck([], self.propEngine)
         if success:
@@ -180,6 +182,7 @@ class Autoprover():
             return True
         return False
 
+    @TimedFunction.time("Autoprover")
     def __call__(self):
         self.propagate()
 
@@ -191,13 +194,16 @@ class Autoprover():
             else:
                 self.subgoals.popleft()
 
-            nxtGoal = nxtGoal.substitute(sub)
-
+            ## for performance reasons the following two checks are
+            ## done directly when the effected constraints are computed
+            #
             # if self.selfImplication(nxtGoalId, nxtGoal):
             #     continue
+            #
+            # if self.inDB(nxtGoalId, nxtGoal):
+            #     continue
 
-            if self.inDB(nxtGoalId, nxtGoal):
-                continue
+            nxtGoal = nxtGoal.substitute(sub)
 
             if self.rupImplication(nxtGoalId, nxtGoal):
                 continue

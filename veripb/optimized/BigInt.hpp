@@ -20,6 +20,13 @@
 // }
 #include <string_view>
 
+template <class T>
+inline void hash_combine(std::size_t& seed, const T& v)
+{
+    std::hash<T> hasher;
+    seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+}
+
 #include <gmpxx.h>
 using BigInt = mpz_class;
 namespace std {
@@ -32,16 +39,21 @@ namespace std {
         std::size_t operator()(const mpz_class& y) const {
             const mpz_srcptr x = y.get_mpz_t();
 
-            string_view view { reinterpret_cast<char*>(x->_mp_d), abs(x->_mp_size)
-                    * sizeof(mp_limb_t) };
-            size_t result = hash<string_view> { }(view);
+            size_t hash = 0;
+            hash_combine(hash, x->_mp_size);
 
-            // produce different hashes for negative x
-            if (x->_mp_size < 0) {
-                result ^= std::hash<size_t>()(0);
+            size_t limb_size = abs(x->_mp_size);
+
+            if (limb_size > 2) {
+                hash_combine(hash, x->_mp_d[0]);
+                hash_combine(hash, x->_mp_d[limb_size - 1]);
+            } else {
+                for (size_t i = 0; i < limb_size; i++) {
+                    hash_combine(hash, x->_mp_d[i]);
+                }
             }
 
-            return result;
+            return hash;
         }
     };
 }

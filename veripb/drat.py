@@ -62,7 +62,7 @@ def parseIntList(words):
     return lits
 
 class DRATFind(EmptyRule):
-    Id = "f"
+    Ids = ["f"]
 
     @classmethod
     def parse(cls, line, context):
@@ -82,7 +82,7 @@ class DRATFind(EmptyRule):
 
 
 class DRATDeletion(EmptyRule):
-    Id = "d"
+    Ids = ["d"]
 
     """
     Delete clauses based on DRAT input.
@@ -134,7 +134,7 @@ class DRAT(ReverseUnitPropagation):
                 return EmptyRule()
 
     def __init__(self, ineq, w, numVars, isContradiction):
-        super().__init__(ineq, w, numVars)
+        super().__init__(ineq, w)
         self.isContradiction = isContradiction
 
     def compute(self, antecedents, context):
@@ -149,6 +149,6 @@ class DRATParser(RuleParserBase):
     commentChar = "c"
 
     def parse(self, file):
-        yield LoadFormula(len(self.context.formula))
+        yield LoadFormula(len(self.parseContext.context.formula))
         for x in super().parse([DRATDeletion, DRATFind], file, defaultRule = DRAT):
             yield x

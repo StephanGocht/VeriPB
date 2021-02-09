@@ -646,21 +646,21 @@ class DominanceRule(MultiGoalRule):
             self.order.rightVars,
             self.order.vars)
 
-        mapping = dict()
+        substitution = Substitution()
         for leftVar, rightVar, var in zippedVars:
             try:
-                mapping[leftVar] = witnessDict[var]
+                substitution.map(leftVar, witnessDict[var])
             except KeyError:
-                mapping[leftVar] = var
-            mapping[rightVar] = var
+                substitution.map(leftVar, var)
+            substitution.map(rightVar, var)
 
-        for key, value in witnessDict.items():
-            if key in self.order.auxVars:
-                mapping[key] = value
+        for var in self.order.auxVars:
+            try:
+                substitution.map(var, witnessDict[var])
+            except KeyError:
+                pass
 
-        substitution = Substitution.fromDict(mapping)
-
-        # todo: we need to check that the auxVars are still fresh
+        # # todo: we need to check that the auxVars are still fresh
         sub = substitution.get()
 
         # for ineq in self.order.auxDefinition:

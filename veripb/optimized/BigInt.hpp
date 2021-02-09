@@ -18,6 +18,7 @@
 // inline std::string toString(BigInt& num, int base = 10) {
 //     num.str(base);
 // }
+#include <string_view>
 
 #include <gmpxx.h>
 using BigInt = mpz_class;
@@ -25,6 +26,24 @@ namespace std {
     inline BigInt abs(BigInt& num) {
         return ::abs(num);
     }
+
+    template<>
+    struct hash<mpz_class> {
+        std::size_t operator()(const mpz_class& y) const {
+            const mpz_srcptr x = y.get_mpz_t();
+
+            string_view view { reinterpret_cast<char*>(x->_mp_d), abs(x->_mp_size)
+                    * sizeof(mp_limb_t) };
+            size_t result = hash<string_view> { }(view);
+
+            // produce different hashes for negative x
+            if (x->_mp_size < 0) {
+                result ^= std::hash<size_t>()(0);
+            }
+
+            return result;
+        }
+    };
 }
 
 inline std::string toString(BigInt& num, int base = 10) {

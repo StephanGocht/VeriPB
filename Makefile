@@ -13,7 +13,10 @@ HPP_FILES:=\
 	./veripb/optimized/BigInt.hpp \
 	./veripb/optimized/constraints.hpp
 
-CXX_FLAGS?=-O3 -g
+# if you want to use asan you need prepend the following
+# when running veripb, if compiled with gcc
+# LD_PRELOAD=$(gcc -print-file-name=libasan.so)
+CXX_FLAGS?=-O3 -g #-fsanitize=address
 
 PYBINDINCLUDE:=`python3 -m pybind11 --includes`
 

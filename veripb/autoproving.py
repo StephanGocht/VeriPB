@@ -124,7 +124,7 @@ class Autoprover():
         self.verbose = context.verifierSettings.trace
         self.context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
         self.propEngine = context.propEngine
-
+        self.db = db
         self.dbSubstituted = None
         self.dbSet = None
 
@@ -150,17 +150,15 @@ class Autoprover():
 
     @TimedFunction.time("Autoprover::inDB")
     def inDB(self, nxtGoalId, nxtGoal):
-        if self.dbSet is None:
-            self.dbSet = set(self.db.values())
-
-        return nxtGoal in self.dbSet
+        nxtGoal.contract()
+        return self.propEngine.contains(nxtGoal);
 
 
     @TimedFunction.time("Autoprover::dbImplication")
     def dbImplication(self, nxtGoalId, nxtGoal):
         success = False
         if self.dbSubstituted is None:
-            self.dbSubstituted = [(Id, ineq.copy().substitute(self.assignment.get())) for Id, ineq in self.db.items()]
+            self.dbSubstituted = [(Id, ineq.copy().substitute(self.assignment.get())) for Id, ineq in self.db]
 
         for ineqId, ineq in self.dbSubstituted:
             if ineq.implies(nxtGoal):
@@ -198,8 +196,8 @@ class Autoprover():
             # if self.selfImplication(nxtGoalId, nxtGoal):
             #     continue
 
-            # if self.inDB(nxtGoalId, nxtGoal):
-            #     continue
+            if self.inDB(nxtGoalId, nxtGoal):
+                continue
 
             if self.rupImplication(nxtGoalId, nxtGoal):
                 continue

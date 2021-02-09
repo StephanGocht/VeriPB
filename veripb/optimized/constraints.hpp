@@ -57,6 +57,34 @@ public:
     }
 };
 
+extern int hashColision;
+
+
+template <class T>
+inline void hash_combine(std::size_t& seed, const T& v)
+{
+    std::hash<T> hasher;
+    seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+}
+
+template<typename T>
+struct PointedEq {
+    bool operator () ( T const * lhs, T const * rhs ) const {
+        bool result = (*lhs == *rhs);
+        if (!result) {
+            hashColision += 1;
+        }
+        return result;
+    }
+};
+
+template<typename T>
+struct PointedHash {
+    std::size_t operator () ( T const * element ) const {
+        return std::hash<T>()(*element);
+    }
+};
+
 template<typename T>
 T divideAndRoundUp(T value, T divisor) {
     return (value + divisor - 1) / divisor;
@@ -468,6 +496,7 @@ public:
 
 private:
     friend FixedSizeInequalityHandler<T>;
+    friend std::hash<FixedSizeInequality<T>>;
 
     FixedSizeInequality(size_t size)
         :terms(size) {
@@ -775,6 +804,26 @@ public:
     }
 };
 
+namespace std {
+    template <typename T>
+    struct hash<FixedSizeInequality<T>> {
+        std::size_t operator()(const FixedSizeInequality<T>& ineq) const {
+            std::vector<Term<T>> mine(ineq.terms.begin(), ineq.terms.end());
+            sort(mine.begin(), mine.end(), orderByVar<Term<T>>);
+
+            std::size_t seed = 0;
+
+            for (const Term<T>& term: mine) {
+                hash_combine(seed, term.coeff);
+                hash_combine(seed, term.lit);
+            }
+
+            hash_combine(seed, ineq.degree);
+            return seed;
+        }
+    };
+}
+
 template<typename T>
 inline std::ostream& operator<<(std::ostream& os, const FixedSizeInequality<T>& v) {
     for (const Term<T>& term: v.terms) {
@@ -894,6 +943,9 @@ private:
     typedef std::vector<WatchedType> WatchList;
     typedef std::unordered_set<Inequality<T>*>  OccursList;
 
+    typedef Inequality<T> Ineq;
+    std::unordered_set<Ineq*, PointedHash<Ineq>, PointedEq<Ineq>> constraintLookup;
+
     size_t nVars;
     std::vector<Lit> trail;
 
@@ -934,11 +986,13 @@ public:
     std::vector<Inequality<T>*> unattached;
     std::vector<Inequality<T>*> propagatingAt0;
     std::chrono::duration<double> timeEffected;
+    std::chrono::duration<double> timeContains;
 
 
     long long visit = 0;
     long long visit_sat = 0;
     long long visit_required = 0;
+    long long lookup_requests = 0;
 
 
     PropEngine(size_t _nVars)
@@ -947,6 +1001,8 @@ public:
         , phase(_nVars)
         , watchlist(2 * (_nVars + 1))
         , occurs(2 * (_nVars + 1))
+        , timeEffected(0)
+        , timeContains(0)
     {
         for (auto& ws: watchlist) {
             ws.reserve(50);
@@ -971,10 +1027,16 @@ public:
         std::cout << "c statistic: visit_sat: " << visit_sat << std::endl;
         std::cout << "c statistic: visit_required: " << visit_required << std::endl;
 
-        std::chrono::seconds sec(1);
         std::cout << "c statistic: time effected: "
-            << std::fixed << std::setprecision(3)
+            << std::fixed << std::setprecision(2)
             << timeEffected.count() << std::endl ;
+
+        std::cout << "c statistic: time contains: "
+            << std::fixed << std::setprecision(2)
+            << timeContains.count() << std::endl ;
+
+        std::cout << "c statistic: hashColisions: " << hashColision << std::endl;
+        std::cout << "c statistic: lookup_requests: " << lookup_requests << std::endl;
     }
 
     void enqueue(Lit lit) {
@@ -1098,6 +1160,8 @@ public:
             ineq->isAttached = true;
             ineq->freeze(this->nVars);
             ineq->registerOccurence(*this);
+            constraintLookup.insert(ineq);
+            lookup_requests += 1;
             dbMem += ineq->mem();
             cumDbMem += ineq->mem();
             maxDbMem = std::max(dbMem, maxDbMem);
@@ -1127,6 +1191,8 @@ public:
             if (ineq->isAttached) {
                 ineq->isAttached = false;
                 ineq->unRegisterOccurence(*this);
+                constraintLookup.erase(ineq);
+                lookup_requests += 1;
 
                 dbMem -= ineq->mem();
                 auto foundIt = std::find(
@@ -1293,7 +1359,8 @@ public:
             if (ineq->id <= includeIds) {
                 InequalityPtr<T> rhs(ineq->copy());
                 rhs->substitute(sub);
-                if (!ineq->implies(rhs.get())) {
+                if (!ineq->implies(rhs.get()) // && !contains(rhs.get())
+                    ) {
                     result.emplace_back(std::move(rhs));
                 }
             }
@@ -1305,6 +1372,12 @@ public:
             });
 
         return result;
+    }
+
+    bool contains(Inequality<T>* ineq) {
+        Timer timer(timeContains);
+        lookup_requests += 1;
+        return constraintLookup.find(ineq) != constraintLookup.end();
     }
 
 
@@ -1498,6 +1571,7 @@ private:
     static std::vector<FatInequalityPtr<T>> pool;
 
     friend PropEngine<T>;
+    friend std::hash<Inequality<T>>;
 public:
     bool isAttached = false;
     uint64_t id = 0;
@@ -1665,6 +1739,16 @@ public:
         return (mine == theirs) && (ineq->degree == other.ineq->degree);
     }
 
+    bool operator==(const Inequality<T>& other) const {
+        assert(!this->loaded);
+        assert(!other.loaded);
+        std::vector<Term<T>> mine(ineq->terms.begin(), ineq->terms.end());
+        sort(mine.begin(), mine.end(), orderByVar<Term<T>>);
+        std::vector<Term<T>> theirs(other.ineq->terms.begin(), other.ineq->terms.end());
+        sort(theirs.begin(), theirs.end(), orderByVar<Term<T>>);
+        return (mine == theirs) && (ineq->degree == other.ineq->degree);
+    }
+
     bool operator!=(Inequality<T>& other) {
         return !(*this == other);
     }
@@ -1766,6 +1850,15 @@ public:
         }
     }
 };
+
+namespace std {
+    template <typename T>
+    struct hash<Inequality<T>> {
+        std::size_t operator()(const Inequality<T>& ineq) const {
+            return std::hash<FixedSizeInequality<T>>()(*ineq.ineq);
+        }
+    };
+}
 
 // we need to initialzie the static template member manually;
 template<typename T>

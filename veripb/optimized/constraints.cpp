@@ -32,7 +32,7 @@ int main(int argc, char const *argv[])
     return 0;
 }
 
-
+int hashColision = 0;
 
 #ifdef PY_BINDINGS
     void init_constraints(py::module &m){
@@ -51,7 +51,8 @@ int main(int argc, char const *argv[])
             .def("propagatedLits", &PropEngine<CoefType>::propagatedLits)
             .def("increaseNumVarsTo", &PropEngine<CoefType>::increaseNumVarsTo)
             .def("printStats", &PropEngine<CoefType>::printStats)
-            .def("computeEffected", &PropEngine<CoefType>::computeEffected);
+            .def("computeEffected", &PropEngine<CoefType>::computeEffected)
+            .def("contains", &PropEngine<CoefType>::contains);
 
         py::class_<Inequality<CoefType>>(m, "CppInequality")
             .def(py::init<std::vector<CoefType>&, std::vector<int>&, CoefType>())
@@ -83,7 +84,8 @@ int main(int argc, char const *argv[])
             .def("propagatedLits", &PropEngine<BigInt>::propagatedLits)
             .def("increaseNumVarsTo", &PropEngine<BigInt>::increaseNumVarsTo)
             .def("printStats", &PropEngine<BigInt>::printStats)
-            .def("computeEffected", &PropEngine<BigInt>::computeEffected);
+            .def("computeEffected", &PropEngine<BigInt>::computeEffected)
+            .def("contains", &PropEngine<BigInt>::contains);
 
 
         py::class_<Inequality<BigInt>>(m, "CppInequalityBigInt")

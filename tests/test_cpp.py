@@ -1,10 +1,7 @@
 import unittest
 from env import veripb
 
-import cppimport
-constraints = cppimport.imp("veripb.optimized.constraints")
-
-Inequality = constraints.CppInequality
+from veripb.optimized.constraints import CppInequality as Inequality
 
 def getParser():
     return True

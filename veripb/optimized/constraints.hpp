@@ -1293,7 +1293,7 @@ public:
             if (ineq->id <= includeIds) {
                 InequalityPtr<T> rhs(ineq->copy());
                 rhs->substitute(sub);
-                if (*rhs != *ineq) {
+                if (!ineq->implies(rhs.get())) {
                     result.emplace_back(std::move(rhs));
                 }
             }

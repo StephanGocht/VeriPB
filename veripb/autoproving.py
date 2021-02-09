@@ -119,7 +119,6 @@ class Autoprover():
     @TimedFunction.time("Autoprover::setup")
     def __init__(self, context, db, subgoals, upTo = None):
         self.context = context
-        self.db = {Id: ineq for Id, ineq in db}
         self.subgoals = subgoals
         self.upTo = upTo
         self.verbose = context.verifierSettings.trace
@@ -196,8 +195,8 @@ class Autoprover():
 
             nxtGoal = nxtGoal.substitute(sub)
 
-            if self.selfImplication(nxtGoalId, nxtGoal):
-                continue
+            # if self.selfImplication(nxtGoalId, nxtGoal):
+            #     continue
 
             # if self.inDB(nxtGoalId, nxtGoal):
             #     continue

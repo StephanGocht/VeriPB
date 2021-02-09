@@ -509,7 +509,7 @@ def objectiveCondition(context, witnessDict):
 
 constraintMaxId = getMaxConstraintId()
 
-@TimedFunction.time("computeEffected")
+#@TimedFunction.time("computeEffected")
 def computeEffected(context, substitution, maxId = constraintMaxId):
     return context.propEngine.computeEffected(substitution, maxId)
 

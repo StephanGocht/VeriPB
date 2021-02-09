@@ -4,6 +4,8 @@ from veripb.rules import ReversePolishNotation, IsContradiction
 from veripb.rules_register import register_rule, dom_friendly_rules, rules_to_dict
 from veripb.parser import OPBParser, WordParser, ParseContext
 
+from veripb.optimized.constraints import maxId as getMaxConstraintId
+
 from veripb import verifier
 
 from veripb.timed_function import TimedFunction
@@ -504,18 +506,12 @@ def objectiveCondition(context, witnessDict):
 
     return context.ineqFactory.fromTerms(terms, degree)
 
-#@TimedFunction.time("computeEffected")
-def computeEffected(context, antecedents, witness):
-    effected = set()
 
-    witnessDict = witness.asDict()
-    for lit in witnessDict.keys():
-        for ineq in context.propEngine.occurence(lit):
-            effected.add(ineq)
+constraintMaxId = getMaxConstraintId()
 
-    result = [(ineq.id, ineq) for ineq in effected]
-    result.sort()
-    return result
+@TimedFunction.time("computeEffected")
+def computeEffected(context, substitution, maxId = constraintMaxId):
+    return context.propEngine.computeEffected(substitution, maxId)
 
 class Stats:
     def __init__(self):
@@ -573,19 +569,19 @@ class MapRedundancy(MultiGoalRule):
         ineq = ineq.negated()
         self.addAvailable(ineq)
 
-        effected = computeEffected(context, antecedents, self.witness)
+        witness = self.witness.get()
 
-        sub = self.witness.get()
-        for Id, ineq in effected:
+        effected = computeEffected(context, witness)
+        for ineq in effected:
             stats.numGoalCandidates += 1
             rhs = ineq.copy()
-            rhs.substitute(sub)
+            rhs.substitute(witness)
             if rhs != ineq:
                 stats.numSubgoals += 1
-                self.addSubgoal(rhs, Id)
+                self.addSubgoal(rhs, ineq.id)
 
         ineq = self.constraint.copy()
-        ineq.substitute(self.witness.get())
+        ineq.substitute(witness)
         self.addSubgoal(ineq)
 
         obj = objectiveCondition(context, self.witness.asDict())
@@ -636,21 +632,12 @@ class DominanceRule(MultiGoalRule):
         ineq = ineq.negated()
         self.addAvailable(ineq)
 
-        effected = computeEffected(context, antecedents, self.witness)
+        witness = self.witness.get()
 
-        sub = self.witness.get()
-        for Id, ineq in effected:
-            if Id >= self.order.firstDomInvisible:
-                break
+        effected = computeEffected(context, witness, self.order.firstDomInvisible)
 
-            stats.numGoalCandidates += 1
-
-            rhs = ineq.copy()
-            rhs.substitute(sub)
-            if rhs != ineq:
-                stats.numSubgoals += 1
-                self.addSubgoal(rhs, Id)
-
+        for ineq in effected:
+            self.addSubgoal(ineq, ineq.id)
 
         witnessDict = self.witness.asDict()
 

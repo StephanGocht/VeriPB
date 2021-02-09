@@ -37,6 +37,7 @@ int main(int argc, char const *argv[])
 #ifdef PY_BINDINGS
     void init_constraints(py::module &m){
         m.doc() = "Efficient implementation for linear combinations of constraints.";
+        m.def("maxId", []() { return std::numeric_limits<uint64_t>::max(); });
 
         py::class_<Substitution>(m, "Substitution")
             .def(py::init<std::vector<int>&,std::vector<int>&,std::vector<int>&>());
@@ -50,12 +51,7 @@ int main(int argc, char const *argv[])
             .def("propagatedLits", &PropEngine<CoefType>::propagatedLits)
             .def("increaseNumVarsTo", &PropEngine<CoefType>::increaseNumVarsTo)
             .def("printStats", &PropEngine<CoefType>::printStats)
-            .def("occurence", [](PropEngine<CoefType>& propEngine, int intLit){
-                Lit lit(intLit);
-                auto& occurence = propEngine.occurs[lit];
-                return py::make_iterator(occurence.begin(), occurence.end());
-            });
-
+            .def("computeEffected", &PropEngine<CoefType>::computeEffected);
 
         py::class_<Inequality<CoefType>>(m, "CppInequality")
             .def(py::init<std::vector<CoefType>&, std::vector<int>&, CoefType>())
@@ -68,7 +64,6 @@ int main(int argc, char const *argv[])
             .def("copy", &Inequality<CoefType>::copy)
             .def("implies", &Inequality<CoefType>::implies)
             .def("expand", &Inequality<CoefType>::expand)
-            .def("contract", &Inequality<CoefType>::contract)
             .def("negated", &Inequality<CoefType>::negated)
             .def("ratCheck", &Inequality<CoefType>::ratCheck)
             .def("__eq__", &Inequality<CoefType>::eq)
@@ -88,11 +83,7 @@ int main(int argc, char const *argv[])
             .def("propagatedLits", &PropEngine<BigInt>::propagatedLits)
             .def("increaseNumVarsTo", &PropEngine<BigInt>::increaseNumVarsTo)
             .def("printStats", &PropEngine<BigInt>::printStats)
-            .def("occurence", [](PropEngine<BigInt>& propEngine, int intLit){
-                Lit lit(intLit);
-                auto& occurence = propEngine.occurs[lit];
-                return py::make_iterator(occurence.begin(), occurence.end());
-            });
+            .def("computeEffected", &PropEngine<BigInt>::computeEffected);
 
 
         py::class_<Inequality<BigInt>>(m, "CppInequalityBigInt")
@@ -106,7 +97,6 @@ int main(int argc, char const *argv[])
             .def("copy", &Inequality<BigInt>::copy)
             .def("implies", &Inequality<BigInt>::implies)
             .def("expand", &Inequality<BigInt>::expand)
-            .def("contract", &Inequality<BigInt>::contract)
             .def("negated", &Inequality<BigInt>::negated)
             .def("ratCheck", &Inequality<BigInt>::ratCheck)
             .def("__eq__", &Inequality<BigInt>::eq)

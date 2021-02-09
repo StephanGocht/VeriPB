@@ -351,6 +351,9 @@ public:
 template<typename T>
 class Inequality;
 
+template <typename T>
+using InequalityPtr = std::unique_ptr<Inequality<T>>;
+
 template<typename T>
 class FixedSizeInequality;
 
@@ -930,6 +933,7 @@ public:
     LitIndexedVec<OccursList> occurs;
     std::vector<Inequality<T>*> unattached;
     std::vector<Inequality<T>*> propagatingAt0;
+    std::chrono::duration<double> timeEffected;
 
 
     long long visit = 0;
@@ -966,6 +970,11 @@ public:
         std::cout << "c statistic: visit: " << visit << std::endl;
         std::cout << "c statistic: visit_sat: " << visit_sat << std::endl;
         std::cout << "c statistic: visit_required: " << visit_required << std::endl;
+
+        std::chrono::seconds sec(1);
+        std::cout << "c statistic: time effected: "
+            << std::fixed << std::setprecision(3)
+            << timeEffected.count() << std::endl ;
     }
 
     void enqueue(Lit lit) {
@@ -1259,6 +1268,46 @@ public:
         return true;
     }
 
+    std::vector<InequalityPtr<T>> computeEffected(
+            Substitution& sub,
+            uint64_t includeIds = std::numeric_limits<uint64_t>::max())
+    {
+        Timer timer(timeEffected);
+        std::unordered_set<Inequality<T>*> unique;
+        for (auto it: sub.map) {
+            Lit from = it.first;
+            Lit to   = it.second;
+
+            // constraints are normalized, if a literal is set to
+            // one then this is the same as weakening, hence we do
+            // not need to add it to the set of effected
+            // constraints
+            if (to != Substitution::one()) {
+                unique.insert(occurs[from].begin(), occurs[to].end());
+            }
+        }
+
+        std::vector<InequalityPtr<T>> result;
+
+        for (Inequality<T>* ineq: unique) {
+            if (ineq->id <= includeIds) {
+                InequalityPtr<T> rhs(ineq->copy());
+                rhs->substitute(sub);
+                if (*rhs != *ineq) {
+                    result.emplace_back(std::move(rhs));
+                }
+            }
+        }
+
+        std::sort(result.begin(), result.end(),
+            [](InequalityPtr<T>& a, InequalityPtr<T>& b){
+                return a->id < b->id;
+            });
+
+        return result;
+    }
+
+
     void reset(PropState base) {
         while (trail.size() > base.qhead) {
             assignment.unassign(trail.back());
@@ -1454,8 +1503,11 @@ public:
     uint64_t id = 0;
 
     Inequality(Inequality& other)
-        : handler(other.handler) {
-            assert(other.loaded == false);
+        : handler(other.handler)
+    {
+        assert(other.loaded == false);
+
+        this->id = other.id;
     }
 
     Inequality(std::vector<Term<T>>& terms_, T degree_)
@@ -1600,13 +1652,21 @@ public:
     }
 
     bool eq(Inequality* other) {
+        return *this == *other;
+    }
+
+    bool operator==(Inequality<T>& other) {
         contract();
-        other->contract();
+        other.contract();
         std::vector<Term<T>> mine(ineq->terms.begin(), ineq->terms.end());
         sort(mine.begin(), mine.end(), orderByVar<Term<T>>);
-        std::vector<Term<T>> theirs(other->ineq->terms.begin(), other->ineq->terms.end());
+        std::vector<Term<T>> theirs(other.ineq->terms.begin(), other.ineq->terms.end());
         sort(theirs.begin(), theirs.end(), orderByVar<Term<T>>);
-        return (mine == theirs) && (ineq->degree == other->ineq->degree);
+        return (mine == theirs) && (ineq->degree == other.ineq->degree);
+    }
+
+    bool operator!=(Inequality<T>& other) {
+        return !(*this == other);
     }
 
     std::string toString(std::function<std::string(int)> varName) {

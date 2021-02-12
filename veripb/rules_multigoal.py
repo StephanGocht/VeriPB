@@ -174,7 +174,7 @@ class MultiGoalRule(EmptyRule):
         self.nextId = context.firstFreeId
 
     def addSubgoal(self, ineq, Id = None):
-        if Id is None:
+        if Id is None or Id == 0:
             # block of a new Id for subgoal
             Id = self.addAvailable(None)
 

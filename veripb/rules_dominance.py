@@ -15,12 +15,24 @@ from collections import deque
 from veripb.rules_multigoal import *
 from veripb.autoproving import *
 
+from collections import defaultdict
+
+constraintMaxId = getMaxConstraintId()
+
+#@TimedFunction.time("computeEffected")
+def computeEffected(context, substitution, maxId = constraintMaxId):
+    return context.propEngine.computeEffected(substitution, maxId)
+
 class TransitivityInfo:
     def __init__(self):
         self.fresh_right = []
         self.fresh_aux_1 = []
         self.fresh_aux_2 = []
         self.isProven = False
+
+class GoalCache:
+    def __init__(self):
+        self.goals = None
 
 
 class Order:
@@ -34,20 +46,72 @@ class Order:
 
         # variables the order is actually defined over, will be set
         # when order is loaded.
-        self.vars = []
+        self.vars = None
 
         # Id of the first auxiliary constraint that do not need to be
         # checked during dominance breaking.
-        self.firstDomInvisible = 1
+        self.firstDomInvisible = None
 
         self.transitivity = TransitivityInfo()
         self.irreflexivityProven = False
+
+        self.goalCache = defaultdict(GoalCache)
 
     def check(self):
         if not self.irreflexivityProven:
             raise InvalidProof("Proof did not show irreflexivity of order.")
         if not self.transitivity.isProven:
             raise InvalidProof("Proof did not show transitivity of order.")
+
+    def reset(self):
+        self.goalCache = defaultdict(GoalCache)
+        self.firstDomInvisible = None
+        self.vars = None
+
+    def getCachedGoals(self, context, witness):
+        cache = self.goalCache[witness]
+        if cache.goals is None:
+            cache.goals = computeEffected(context, witness.get(), self.firstDomInvisible)
+
+            witnessDict = witness.asDict()
+
+            zippedVars = zip(
+                self.leftVars,
+                self.rightVars,
+                self.vars)
+
+            substitution = Substitution()
+            for leftVar, rightVar, var in zippedVars:
+                try:
+                    substitution.map(leftVar, witnessDict[var])
+                except KeyError:
+                    substitution.map(leftVar, var)
+                substitution.map(rightVar, var)
+
+            for var in self.auxVars:
+                try:
+                    substitution.map(var, witnessDict[var])
+                except KeyError:
+                    pass
+
+            # # todo: we need to check that the auxVars are still fresh
+            sub = substitution.get()
+
+            # for ineq in self.order.auxDefinition:
+            #     ineq = self.constraint.copy()
+            #     ineq.substitute(sub)
+            #     self.addAvailable(ineq)
+
+            for ineq in self.definition:
+                ineq = ineq.copy()
+                ineq.substitute(sub)
+                cache.goals.append(ineq)
+
+            obj = objectiveCondition(context, witnessDict)
+            if obj is not None:
+                cache.goals.append(obj)
+
+        return cache.goals
 
 class OrderContext:
     @classmethod
@@ -64,12 +128,21 @@ class OrderContext:
         self.emptyOrder = Order()
         self.orders[self.emptyOrder.name] = \
             self.emptyOrder
+        self.activeOrder = None
         self.resetToEmptyOrder()
 
         self.activeDefinition = None
 
     def resetToEmptyOrder(self):
-        self.activeOrder = self.emptyOrder
+        self.activateOrder(self.emptyOrder, [], 1)
+
+    def activateOrder(self, order, lits, firstDomInvisible):
+        if self.activeOrder is not None:
+            self.activeOrder.reset()
+
+        order.vars = lits
+        order.firstDomInvisible = firstDomInvisible
+        self.activeOrder = order
 
     def newOrder(self, name):
         newOrder = Order(name)
@@ -119,16 +192,13 @@ class LoadOrder(EmptyRule):
             except KeyError:
                 raise ValueError("Unkown order '%s'." %(name))
 
-        order.vars = lits
-        order.firstDomInvisible = context.firstFreeId
-
-        if len(order.vars) != len(order.leftVars):
+        if len(lits) != len(order.leftVars):
             raise ValueError(
                 "Order does not specify right number of"
                 "variables. Expected: %i, Got: %i"
                 % (len(order.vars), len(order.leftVars)))
 
-        orderContext.activeOrder = order
+        orderContext.activateOrder(order, lits, context.firstFreeId)
 
         return cls()
 
@@ -507,12 +577,6 @@ def objectiveCondition(context, witnessDict):
     return context.ineqFactory.fromTerms(terms, degree)
 
 
-constraintMaxId = getMaxConstraintId()
-
-#@TimedFunction.time("computeEffected")
-def computeEffected(context, substitution, maxId = constraintMaxId):
-    return context.propEngine.computeEffected(substitution, maxId)
-
 class Stats:
     def __init__(self):
         self.numGoalCandidates = 0
@@ -632,49 +696,9 @@ class DominanceRule(MultiGoalRule):
         ineq = ineq.negated()
         self.addAvailable(ineq)
 
-        witness = self.witness.get()
-
-        effected = computeEffected(context, witness, self.order.firstDomInvisible)
+        effected = self.order.getCachedGoals(context, self.witness)
 
         for ineq in effected:
             self.addSubgoal(ineq, ineq.id)
-
-        witnessDict = self.witness.asDict()
-
-        zippedVars = zip(
-            self.order.leftVars,
-            self.order.rightVars,
-            self.order.vars)
-
-        substitution = Substitution()
-        for leftVar, rightVar, var in zippedVars:
-            try:
-                substitution.map(leftVar, witnessDict[var])
-            except KeyError:
-                substitution.map(leftVar, var)
-            substitution.map(rightVar, var)
-
-        for var in self.order.auxVars:
-            try:
-                substitution.map(var, witnessDict[var])
-            except KeyError:
-                pass
-
-        # # todo: we need to check that the auxVars are still fresh
-        sub = substitution.get()
-
-        # for ineq in self.order.auxDefinition:
-        #     ineq = self.constraint.copy()
-        #     ineq.substitute(sub)
-        #     self.addAvailable(ineq)
-
-        for ineq in self.order.definition:
-            ineq = ineq.copy()
-            ineq.substitute(sub)
-            self.addSubgoal(ineq)
-
-        obj = objectiveCondition(context, witnessDict)
-        if obj is not None:
-            self.addSubgoal(obj)
 
         return super().compute(antecedents, context)

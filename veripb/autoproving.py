@@ -22,6 +22,7 @@ class Substitution:
             self.map(variable, substitute)
 
     def addConstants(self, constants):
+        self.isSorted = False
         self.constants.extend(constants)
 
     def map(self, variable, substitute):
@@ -67,8 +68,10 @@ class Substitution:
         return res
 
     def sort(self):
-        self.substitutions.sort(key = lambda x: x[0])
-        self.isSorted = True
+        if not self.isSorted:
+            self.substitutions.sort(key = lambda x: x[0])
+            self.constants.sort()
+            self.isSorted = True
 
     @classmethod
     def parse(cls, words, ineqFactory, forbidden = []):
@@ -112,8 +115,16 @@ class Substitution:
             except StopIteration:
                 break
 
-        result.sort()
         return result
+
+    def __eq__(self, other):
+        self.sort()
+        return self.constants == other.constants \
+            and self.substitutions == other.substitutions
+
+    def __hash__(self):
+        self.sort()
+        return hash((tuple(self.constants), tuple(self.substitutions)))
 
 class Autoprover():
     #@TimedFunction.time("Autoprover::setup")
@@ -128,7 +139,7 @@ class Autoprover():
         self.dbSubstituted = None
         self.dbSet = None
 
-    #@TimedFunction.time("Autoprover::propagate")
+    # @TimedFunction.time("Autoprover::propagate")
     def propagate(self):
         self.assignment = Substitution()
         self.assignment.addConstants(self.propEngine.propagatedLits())
@@ -199,13 +210,16 @@ class Autoprover():
             #
             # if self.selfImplication(nxtGoalId, nxtGoal):
             #     continue
-            #
-            # if self.inDB(nxtGoalId, nxtGoal):
-            #     continue
 
             nxtGoal = nxtGoal.substitute(sub)
 
             if self.rupImplication(nxtGoalId, nxtGoal):
+                continue
+
+            # this is already checked when the effected constraints
+            # are computed. However, due to caching it could be that
+            # new constraints were added since then.
+            if self.inDB(nxtGoalId, nxtGoal):
                 continue
 
             if self.dbImplication(nxtGoalId, nxtGoal):

@@ -324,10 +324,7 @@ class IneqFactory():
             or self.isVarName(lit)
 
     def lit2int(self, lit):
-        if (lit[0] == "~"):
-            return -self.name2Num(lit[1:])
-        else:
-            return self.name2Num(lit)
+        return self.varNameMgr.getLit(lit)
 
     def int2lit(self, lit):
         res = ""
@@ -346,6 +343,13 @@ class IneqFactory():
 
     def isVarName(self, name):
         assert(name == name.strip())
+
+        if not self.freeNames:
+            if name[0] != "x":
+                return False
+            else:
+                return True
+
         if len(name) >= 2 \
                 and (ord(name[0]) in range(ord("A"), ord("Z") + 1) \
                     or ord(name[0]) in range(ord("a"), ord("z") + 1)) \
@@ -355,8 +359,6 @@ class IneqFactory():
             return False
 
     def name2Num(self, name):
-        if not self.isVarName(name):
-            raise ValueError("Expected variable name, got '%s'."%(name))
         return self.varNameMgr.getVar(name)
 
     def num2Name(self, num):

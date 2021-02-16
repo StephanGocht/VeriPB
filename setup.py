@@ -28,6 +28,7 @@ ext_modules = [
     ),
     Extension('veripb.constraints', sources=['veripb/constraints.py']),
     Extension('veripb.rules', sources=['veripb/rules.py']),
+    Extension('veripb.parser', sources=['veripb/parser.py']),
     # Extension('veripb.autoproving', sources=['veripb/autoproving.py']),
     # Extension('veripb.rules_dominance', sources=['veripb/rules_dominance.py']),
 ]

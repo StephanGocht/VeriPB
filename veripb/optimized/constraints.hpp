@@ -87,6 +87,8 @@ typedef uint32_t LitData;
 
 class Var {
 public:
+    static const LitData LIMIT = std::numeric_limits<LitData>::max() >> 1;
+
     LitData value;
 
     explicit Var(LitData value_)
@@ -148,7 +150,7 @@ public:
         return value;
     }
 
-    explicit operator int() const {
+    explicit operator int64_t() const {
         int result = var();
         assert(result != 0);
         if (isNegated()) {result = -result;}

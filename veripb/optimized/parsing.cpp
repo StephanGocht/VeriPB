@@ -312,14 +312,6 @@ public:
         : allowArbitraryNames(_allowArbitraryNames)
     {}
 
-    size_t pyGetVar(std::string name) {
-        return getVar(name);
-    }
-
-    std::string pyGetName(size_t num) {
-        return getName(Var(num));
-    }
-
     size_t maxVar() {
         return std::max(_maxVar, num2name.size());
     }
@@ -330,68 +322,65 @@ public:
         } else {
             return num2name[num - 1];
         }
-
     }
 
-    Var getVar(const WordIter& it, size_t start, size_t size) {
-        if (!allowArbitraryNames) {
-            size_t var = parseInt(it, "", start + 1, size - 1);
-            _maxVar = std::max(_maxVar, var);
-            return Var(var);
-        } else {
-            return getVar(std::string(it->data() + start, size));
+    Var getVar(const std::string_view& name) {
+        if (name.size() < 2) {
+            throw std::invalid_argument("Expected variable, but name is too short.");
         }
-    }
 
-    Var getVar(const std::string& name) {
         if (!allowArbitraryNames) {
-            size_t var = std::stoi(name.substr(1, name.size() - 1));
-            _maxVar = std::max(_maxVar, var);
-            return Var(var);
+            if (name[0] != 'x') {
+                throw std::invalid_argument("Expected variable, but did not start with 'x'.");
+            }
+            std::string var(name.substr(1));
+            unsigned long varVal = std::stoul(var);
+            if (varVal > Var::LIMIT) {
+                throw std::invalid_argument("Variable too large, can not be represented.");
+            }
+            _maxVar = std::max(_maxVar, varVal);
+            return Var(varVal);
         } else {
+            if (!std::isalpha(name[0])) {
+                throw std::invalid_argument("Expected variable, but did not start with letter.");
+            }
             auto result = name2num.insert(std::make_pair(name, num2name.size()));
             bool newName = result.second;
             if (newName) {
-                num2name.push_back(name);
+                num2name.emplace_back(name);
             }
-            return Var(result.first->second + 1);
+            size_t varVal = result.first->second + 1;
+            if (varVal > Var::LIMIT) {
+                throw std::invalid_argument("Too many variables, can not be represented.");
+            }
+            return Var(varVal);
         }
     }
 
-    bool isLit(const string_view& name) {
+    Lit getLit(const std::string_view& name) {
         if (name.size() < 1) {
-            return false;
+            throw std::invalid_argument("Expected literal.");
         }
 
-        if (name[0] == '~') {
-            return isVar(name, 1);
-        } else {
-            return isVar(name);
-        }
-    }
-
-    bool isVar(const string_view& name, size_t pos = 0) {
-        if (name.size() >= 2
-                && std::isalpha(name[pos])) {
-            return true;
-        } else {
-            return false;
-        }
+        bool isNegated = (name[0] == '~');
+        int offset = isNegated?1:0;
+        const std::string_view var = name.substr(offset);
+        return Lit(this->getVar(var), isNegated);
     }
 };
 
 Lit parseLit(const WordIter& it, VariableNameManager& mngr) {
-    if (it == WordIter::end || !mngr.isLit(*it)) {
+    if (it == WordIter::end) {
         throw ParseError(it, "Expected literal.");
     }
 
-    bool isNegated = ((*it)[0] == '~');
-    size_t start = 0;
-    if (isNegated) {
-        start += 1;
+    try {
+        return mngr.getLit(*it);
+    } catch (const std::invalid_argument& e) {
+        throw ParseError(it, e.what());
+    } catch (const std::out_of_range& e) {
+        throw ParseError(it, e.what());
     }
-
-    return Lit(mngr.getVar(it, start, it->size() - start), isNegated);
 }
 
 
@@ -652,8 +641,16 @@ void init_parsing(py::module &m){
     py::class_<VariableNameManager>(m, "VariableNameManager")
         .def(py::init<bool>())
         .def("maxVar", &VariableNameManager::maxVar)
-        .def("getVar", &VariableNameManager::pyGetVar)
-        .def("getName", &VariableNameManager::pyGetName);
+        .def("getVar", [](VariableNameManager &mngr, std::string name) {
+            return static_cast<uint64_t>(mngr.getVar(name));
+        })
+        .def("getLit", [](VariableNameManager &mngr, std::string name) {
+            return static_cast<int64_t>(mngr.getLit(name));
+        })
+        .def("getName", [](VariableNameManager &mngr, LitData value) {
+            return mngr.getName(Var(value));
+        });
+
 
     py::class_<Formula<CoefType>>(m, "Formula")
         .def(py::init<>())

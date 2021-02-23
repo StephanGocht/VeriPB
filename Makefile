@@ -34,7 +34,7 @@ PYBINDINCLUDE:=`python3 -m pybind11 --includes`
 
 all: install
 
-test:
+test: cpp
 	python3 -m pytest ${ROOT_DIR}
 
 install:

@@ -481,6 +481,7 @@ class SubVerifier(EmptyRule):
         svContext.newPropEngine = context.newPropEngine
         svContext.propEngine = svContext.newPropEngine()
         svContext.ineqFactory = context.ineqFactory
+        svContext.ruleCount = context.ruleCount
 
         self._newParseContext = ParseContext(svContext)
 

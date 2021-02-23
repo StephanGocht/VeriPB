@@ -184,11 +184,11 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
         settings = verifierSettings)
 
     try:
-        if verifierSettings.progressBar:
-            context.ruleCount = ruleParser.numRules(rulesFile)
-
         if not miscSettings.drat:
             ruleParser = RuleParser(context)
+            if verifierSettings.progressBar:
+                context.ruleCount = ruleParser.numRules(rulesFile)
+
             rules = ruleParser.parse(rules, rulesFile, dumpLine = verifierSettings.trace)
         else:
             ruleParser = DRATParser(context)

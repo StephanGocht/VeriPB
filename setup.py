@@ -30,6 +30,9 @@ ext_modules = [
     Extension('veripb.rules', sources=['veripb/rules.pyx']),
 ]
 
+for e in ext_modules:
+    e.cython_directives = {'language_level': "3"} #all are Python-3
+
 setup(
     name='veripb',
     version='0.3a0',

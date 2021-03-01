@@ -38,7 +38,7 @@ setup(
     author='Stephan Gocht',
     author_email='stephan@gobro.de',
     license='MIT',
-    packages=['veripb'],
+    packages=['veripb', 'veripb.optimized'],
     setup_requires=[
         # Setuptools 18.0 properly handles Cython extensions.
         'setuptools>=18.0',

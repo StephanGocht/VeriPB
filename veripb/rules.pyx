@@ -164,7 +164,6 @@ class Assumption(Rule):
         context.usesAssumptions = True
         return [self.constraint]
 
-
 @register_rule
 class ReverseUnitPropagation(Rule):
     Id = "u"
@@ -226,6 +225,69 @@ class ReverseUnitPropagation(Rule):
             raise ReverseUnitPropagationFailed(
                 "Failed to show '%s' by reverse unit propagation."%(
                     context.ineqFactory.toString(self.constraint)))
+
+def parseSubstitution(words, ineqFactory):
+    result = []
+
+    try:
+        nxt = next(words)
+    except StopIteration:
+        return result
+
+    while nxt != ";":
+        frm = ineqFactory.lit2int(nxt)
+        if frm < 0:
+            raise ValueError("Substitution should only"
+                "map variables, not negated literals.")
+
+        try:
+            nxt = next(words)
+            if nxt == "→" or nxt == "->":
+                nxt = next(words)
+        except StopIteration:
+            raise ValueError("Substitution is missing"
+                "a value for the last variable.")
+
+        if nxt == "0":
+            to = False
+        elif nxt == "1":
+            to = True
+        else:
+            raise ValueError("This version of VeriPB does not support "
+            "literal substitutions, please try to get the latest "
+            "version from https://gitlab.com/miao_research/VeriPB "
+            "or contact Stephan Gocht <stephan.gocht@cs.lth.se>.")
+
+        if to is False:
+            frm = -frm
+
+        result.append(frm)
+
+        try:
+            nxt = next(words)
+
+            if nxt == ",":
+                nxt = next(words)
+        except StopIteration:
+            break
+
+    return result
+
+@register_rule
+class Redundancy(Rule):
+    Id = "red"
+
+    @classmethod
+    def parse(cls, line, context):
+        with WordParser(line) as words:
+            parser = OPBParser(
+                ineqFactory = context.ineqFactory,
+                allowEq = False)
+            ineq = parser.parseConstraint(words)
+
+            w = parseSubstitution(words, context.ineqFactory)
+
+        return ReverseUnitPropagation(ineq[0], w, context.ineqFactory.numVars())
 
 class CompareToConstraint(Rule):
     @classmethod

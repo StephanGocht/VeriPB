@@ -76,11 +76,15 @@ class RuleParserBase():
                 print("line %03d: %s"% (lineNum, line.rstrip()))
 
             if not self.isEmpty(line):
+                line = line.rstrip()
+                ruleId = line.split(" ")[0]
+                idSize = len(ruleId)
+
                 try:
                     rule = self.rules[line[0:idSize]]
                 except KeyError as e:
                     if defaultRule is None:
-                        raise ParseError("Unsupported rule '%s'"%(line[0]), line = lineNum)
+                        raise ParseError("Unsupported rule '%s'"%(line[0:idSize]), line = lineNum)
                     else:
                         rule = defaultRule
                         idSize = 0

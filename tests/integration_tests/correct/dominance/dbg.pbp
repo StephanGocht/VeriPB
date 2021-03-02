@@ -40,13 +40,13 @@ qed
 load_order simple x1
 
 p 1 2 +
-map a3 → 1 ; 1 a3 1 x1 >= 1 ;
+red 1 a3 1 x1 >= 1 ; a3 → 1
     proofgoal 13
         c 14
     qed
 qed
 
-dom x1 → x2 , x2 → x1 ; 1 ~x1 1 x2 >= 1 ;
+dom 1 ~x1 1 x2 >= 1 ; x1 → x2 , x2 → x1
     proofgoal 17
         p 16 18 +
         c 19

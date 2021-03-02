@@ -594,8 +594,8 @@ stats = Stats()
 
 
 @register_rule
-class MapRedundancy(MultiGoalRule):
-    Ids = ["map"]
+class AddRedundant(MultiGoalRule):
+    Ids = ["red"]
 
     @classmethod
     def parse(cls, line, context):
@@ -603,15 +603,15 @@ class MapRedundancy(MultiGoalRule):
         order = orderContext.activeOrder
 
         with WordParser(line) as words:
-            substitution = Substitution.parse(
-                words = words,
-                ineqFactory = context.ineqFactory,
-                forbidden = order.vars)
-
             parser = OPBParser(
                 ineqFactory = context.ineqFactory,
                 allowEq = False)
             ineq = parser.parseConstraint(words)
+
+            substitution = Substitution.parse(
+                words = words,
+                ineqFactory = context.ineqFactory,
+                forbidden = order.vars)
 
             context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
 
@@ -666,14 +666,14 @@ class DominanceRule(MultiGoalRule):
         order = orderContext.activeOrder
 
         with WordParser(line) as words:
-            substitution = Substitution.parse(
-                words = words,
-                ineqFactory = context.ineqFactory)
-
             parser = OPBParser(
                 ineqFactory = context.ineqFactory,
                 allowEq = False)
             ineq = parser.parseConstraint(words)
+
+            substitution = Substitution.parse(
+                words = words,
+                ineqFactory = context.ineqFactory)
 
             context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
 

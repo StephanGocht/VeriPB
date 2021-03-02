@@ -103,7 +103,7 @@ end
 load_order simple x1
 
 * new dominance rule with rho = x1->0
-dom x1 0 ; 1 ~x1 >= 1 ;
+dom 1 ~x1 >= 1 ; x1 0
     * automatically creates \neg [~x1 >= 1]
     *   ID 11: x1 >= 1
     * checks if aux are still fresh variables
@@ -141,8 +141,8 @@ dom x1 0 ; 1 ~x1 >= 1 ;
     * end of rule adds ID 16: ~x1 >= 1 ;
 qed
 
-* map redundancy rule introducing fresh variable x2 using rho = [x2 -> ~x1]
-map x2 ~x1 ; 1 x1 1 x2 >= 1 ;
+* redundancy rule introducing fresh variable x2 using rho = [x2 -> ~x1]
+red 1 x1 1 x2 >= 1 ; x2 ~x1
     * checks that rho does not touch left variables of order simple
 
     * automatically creates \neg [1 x1 1 x2 >= 1]

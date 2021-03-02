@@ -167,7 +167,6 @@ class Assumption(Rule):
         context.usesAssumptions = True
         return [self.constraint]
 
-
 @register_rule
 class ReverseUnitPropagation(Rule):
     Ids = ["u"]

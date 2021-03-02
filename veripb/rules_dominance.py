@@ -611,8 +611,7 @@ class AddRedundant(MultiGoalRule):
             substitution = Substitution.parse(
                 words = words,
                 ineqFactory = context.ineqFactory,
-                forbidden = order.vars,
-                termination = cls.subProofBegin)
+                forbidden = order.vars)
 
             context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
 
@@ -680,8 +679,7 @@ class DominanceRule(MultiGoalRule):
 
             substitution = Substitution.parse(
                 words = words,
-                ineqFactory = context.ineqFactory,
-                termination = cls.subProofBegin)
+                ineqFactory = context.ineqFactory)
 
             context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
 

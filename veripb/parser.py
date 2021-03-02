@@ -109,11 +109,11 @@ class RuleParserBase():
                 columnOffset = len(origLine) - len(line)
                 line = line.rstrip()
 
-                # find first word
-                ruleId = line.split(" ")[0]
-                idSize = len(ruleId)
-
                 if not self.isEmpty(line):
+                    # find first word
+                    ruleId = line.split(" ")[0]
+                    idSize = len(ruleId)
+
                     try:
                         rule = self.parseContext.rules[line[0:idSize]]
                     except KeyError as e:

@@ -611,24 +611,29 @@ class AddRedundant(MultiGoalRule):
             substitution = Substitution.parse(
                 words = words,
                 ineqFactory = context.ineqFactory,
-                forbidden = order.vars)
+                forbidden = order.vars,
+                termination = cls.subProofBegin)
 
             context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
 
-        return cls(context, ineq[0], substitution)
+            autoProveAll = not cls.parseHasExplicitSubproof(words)
 
-    def __init__(self, context, constraint, witness):
+        return cls(context, ineq[0], substitution, autoProveAll)
+
+    def __init__(self, context, constraint, witness, autoProveAll):
         super().__init__(context)
 
         self.constraint = constraint
         self.witness = witness
+
+        self.autoProveAll = autoProveAll
 
         self.addIntroduced(constraint)
 
     def antecedentIDs(self):
         return "all"
 
-    @TimedFunction.time("MapRedundancy.compute")
+    @TimedFunction.time("Redundant.compute")
     def compute(self, antecedents, context):
         ineq = self.constraint.copy()
         ineq = ineq.negated()
@@ -653,6 +658,8 @@ class AddRedundant(MultiGoalRule):
         if obj is not None:
             self.addSubgoal(obj)
 
+        if self.autoProveAll:
+            self.autoProof(context, antecedents)
         return super().compute(antecedents, context)
 
 
@@ -673,18 +680,23 @@ class DominanceRule(MultiGoalRule):
 
             substitution = Substitution.parse(
                 words = words,
-                ineqFactory = context.ineqFactory)
+                ineqFactory = context.ineqFactory,
+                termination = cls.subProofBegin)
 
             context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
 
-        return cls(context, ineq[0], substitution, order)
+            autoProveAll = not cls.parseHasExplicitSubproof(words)
 
-    def __init__(self, context, constraint, witness, order):
+        return cls(context, ineq[0], substitution, order, autoProveAll)
+
+    def __init__(self, context, constraint, witness, order, autoProveAll):
         super().__init__(context)
 
         self.constraint = constraint
         self.witness = witness
         self.order = order
+
+        self.autoProveAll = autoProveAll
 
         self.addIntroduced(constraint)
 
@@ -701,5 +713,8 @@ class DominanceRule(MultiGoalRule):
 
         for ineq in effected:
             self.addSubgoal(ineq, ineq.id)
+
+        if self.autoProveAll:
+            self.autoProof(context, antecedents)
 
         return super().compute(antecedents, context)

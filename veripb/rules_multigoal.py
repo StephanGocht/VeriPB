@@ -6,6 +6,8 @@ from veripb.parser import OPBParser, WordParser, ParseContext
 
 from veripb import verifier
 
+from veripb.exceptions import ParseError
+
 from veripb.timed_function import TimedFunction
 
 from collections import deque
@@ -70,7 +72,10 @@ class EndOfProof(EmptyRule):
     @classmethod
     def parse(cls, line, context):
         subcontexts = SubContext.setup(context)
-        subcontext = subcontexts.pop(checkSubgoals = False)
+        try:
+            subcontext = subcontexts.pop(checkSubgoals = False)
+        except IndexError:
+            raise ParseError("Nothing to end here.")
         return cls(subcontext)
 
     def __init__(self, subcontext):
@@ -164,14 +169,26 @@ class SubProof(EmptyRule):
 
 class MultiGoalRule(EmptyRule):
     subRules = [EndOfProof, SubProof]
+    subProofBegin = "begin"
+
+    @classmethod
+    def parseHasExplicitSubproof(cls, words):
+        try:
+            nxt = next(words)
+            if nxt != cls.subProofBegin:
+                raise ValueError("Unexpected word, expected 'begin'")
+            return True
+        except StopIteration:
+            return False
 
     def __init__(self, context):
-        subContexts = SubContext.setup(context)
-        self.subContext = subContexts.push()
+        self.subContexts = SubContext.setup(context)
+        self.subContext = self.subContexts.push()
         self.displayGoals = context.verifierSettings.trace
         self.constraints = []
         self.ineqFactory = context.ineqFactory
         self.nextId = context.firstFreeId
+        self.autoProoved = False
 
     def addSubgoal(self, ineq, Id = None):
         if Id is None or Id == 0:
@@ -191,6 +208,23 @@ class MultiGoalRule(EmptyRule):
         self.nextId += 1
         return Id
 
+    def autoProof(self, context, db):
+        self.autoProoved = True
+
+        for c in self.constraints:
+            if c is not None:
+                context.propEngine.attach(c)
+
+        autoProof(context, db, self.subContext.subgoals)
+
+        for c in self.constraints:
+            if c is not None:
+                context.propEngine.detach(c)
+
+        self.constraints = [None] * len(self.constraints)
+        self.constraints.extend(self.subContext.toAdd)
+        self.subContexts.pop()
+
     def addIntroduced(self, ineq):
         """add constraint introduced after all subgoals are proven"""
         self.subContext.toAdd.append(ineq)
@@ -202,5 +236,8 @@ class MultiGoalRule(EmptyRule):
         return len(self.constraints)
 
     def allowedRules(self, context, currentRules):
-        self.subContext.previousRules = currentRules
-        return rules_to_dict(self.subRules)
+        if not self.autoProoved:
+            self.subContext.previousRules = currentRules
+            return rules_to_dict(self.subRules)
+        else:
+            return currentRules

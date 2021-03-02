@@ -74,7 +74,7 @@ class Substitution:
             self.isSorted = True
 
     @classmethod
-    def parse(cls, words, ineqFactory, forbidden = []):
+    def parse(cls, words, ineqFactory, forbidden = [], termination = None):
         result = cls()
 
         try:
@@ -82,7 +82,11 @@ class Substitution:
         except StopIteration:
             raise ValueError("Expected substitution found nothing.")
 
-        while nxt != ";":
+        while True:
+            if nxt == termination:
+                words.putback(nxt)
+                break
+
             frm = ineqFactory.lit2int(nxt)
             if frm < 0:
                 raise ValueError("Substitution should only"

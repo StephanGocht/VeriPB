@@ -432,7 +432,7 @@ class WordParser():
         self.wordIter = iter(line.split())
 
     def __iter__(self):
-        return self.wordIter
+        return self
 
     def __next__(self):
         return next(self.wordIter)

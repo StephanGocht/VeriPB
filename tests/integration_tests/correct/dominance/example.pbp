@@ -37,9 +37,9 @@ strict_order simple
         *       ID 1: >= 1 ;
         *
         * proof goals are created for:
-        *       ID 2 (only reserved):
+        *       ID #1:
         *           0 >= 1 ;
-        proofgoal 2
+        proofgoal #1
             c 1
         qed
         * end of context implicitly deletes all derived constraints (1)
@@ -55,16 +55,16 @@ strict_order simple
         proof
             * automatically creates constraints in the order:
             *   def
-            *       ID 4: -1 u1 1 v1 >= 1 ;
+            *       ID 3: -1 u1 1 v1 >= 1 ;
             *   def_aux
             *   def[left->right, right->fresh_right, aux->fresh_aux]
-            *       ID 5: -1 v1 1 w1 >= 1 ;
+            *       ID 4: -1 v1 1 w1 >= 1 ;
             *   def_aux[left->right, right->fresh_right, aux->fresh_aux]
             *   def_aux[right->fresh_right, aux->fresh_aux2]
 
             * proof goals are created for:
             *   def[right->fresh_right, aux->fresh_aux2]
-            *       ID 6 (only reserved): -1 u1 1 w1 >= 1 ;
+            *       ID #1: -1 u1 1 w1 >= 1 ;
 
             * It follows a sub proof for each proof goal, if an ID is
             * missing the verifier tries to verify it using RUP. The sub
@@ -74,13 +74,13 @@ strict_order simple
             * be fresh and will not be used for further constraints
 
 
-            * proof goal: show that proof goal [ID 4] is implied
-            proofgoal 6
-                * automatically creates \neg [ID 4]
+            * proof goal: show that proof goal [ID #1] is implied
+            proofgoal #1
+                * automatically creates \neg [ID #1]
                 *   ID 5: 1 u1 -1 v1 >= 0 ;
                 * We now need to show contradiction
-                p 4 5 + 7 +
-                c 8
+                p 3 4 + 5 +
+                c -1
                 * alternatively we could just write
                 *   u >= 1;
                 * in this case or omit the proof goal completely
@@ -88,7 +88,7 @@ strict_order simple
             * end of context implicitly deletes all added constraints (5,6)
             qed
 
-        * end of context implicitly deletes all added constraints (2,3)
+        * end of context implicitly deletes all added constraints (3,4)
         * the proof would fail if any of the proof goals is missing or failed at this point
         qed
     qed
@@ -120,25 +120,25 @@ dom 1 ~x1 >= 1 ; x1 0 ; begin
     *  - the order is respected by rho
     *       def [ left|->([vars][rho]), right|->vars,aux|->([aux][rho]) ]
     *       [ -1 u1 1 v1 >= 1 ;] [u1->0, v1->x1]
-    *       ID 12: 1 x1 >= 1;
+    *       #1: 1 x1 >= 1;
 
     * show C [rho] is implied
     proofgoal 1
-        c 13
+        c -1
     qed
 
     * show that order is respected
-    proofgoal 12
+    proofgoal #1
         * automatically creates \neg [ID 12]
         *   ID 13: 1 ~x1 >= 1;
-        p 11 14 +
-        c 15
+        p 11 13 +
+        c 14
 
-        * end of context implicitly deletes all added constraints (14,15)
+        * end of context implicitly deletes all added constraints (13,14)
     qed
 
     * end of context implicitly deletes all added constraints (11)
-    * end of rule adds ID 16: ~x1 >= 1 ;
+    * end of rule adds ID 15: ~x1 >= 1 ;
 qed
 
 * redundancy rule introducing fresh variable x2 using rho = [x2 -> ~x1]
@@ -146,7 +146,7 @@ red 1 x1 1 x2 >= 1 ; x2 ~x1 ; begin
     * checks that rho does not touch left variables of order simple
 
     * automatically creates \neg [1 x1 1 x2 >= 1]
-    *   ID 17 -1 x1 -1 x2 >= 0 ;
+    *   ID 16 -1 x1 -1 x2 >= 0 ;
 
     * The following proof goals are added:
     *
@@ -155,20 +155,20 @@ red 1 x1 1 x2 >= 1 ; x2 ~x1 ; begin
     *    are not effected by rho
     *
     *  - for the constraint to be introduced [1 x1 1 x2 >= 1][rho]
-    *        ID 18: >= 0 ;
+    *        ID #1: >= 0 ;
 
-    proofgoal 18
-        * automatically adds \neg [ID 18]
-        * ID 19: >= 1 ;
-        c 19
+    proofgoal #1
+        * automatically adds \neg [ID #1]
+        * ID 17: >= 1 ;
+        c 17
 
-        * end of context implicitly deletes all added constraints (19)
+        * end of context implicitly deletes all added constraints (17)
     qed
-    * end of context implicitly deletes all added constraints (17)
-    * end of rule adds ID 20: 1 x1 1 x2 >= 1 ;
+    * end of context implicitly deletes all added constraints (16)
+    * end of rule adds ID 18: 1 x1 1 x2 >= 1 ;
 qed
 
-p 16 20 +
+p 15 18 +
 *  ID 21: x2 >= 1 ;
 
 * load the default order (0 >= 1), mark all constraints as fixed

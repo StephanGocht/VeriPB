@@ -128,10 +128,9 @@ class Substitution:
 
 class Autoprover():
     #@TimedFunction.time("Autoprover::setup")
-    def __init__(self, context, db, subgoals, upTo = None):
+    def __init__(self, context, db, subgoals):
         self.context = context
         self.subgoals = subgoals
-        self.upTo = upTo
         self.verbose = context.verifierSettings.trace
         self.context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
         self.propEngine = context.propEngine
@@ -155,7 +154,7 @@ class Autoprover():
         if nxtGoalId in self.db:
             if self.db[nxtGoalId].implies(nxtGoal):
                 if self.verbose:
-                    print("    automatically proved %03i by self implication" % (nxtGoalId))
+                    print("    automatically proved %s by self implication" % (str(nxtGoalId)))
                 return True
         return False
 
@@ -163,7 +162,7 @@ class Autoprover():
         success = self.propEngine.contains(nxtGoal)
         if success:
             if self.verbose:
-                print("    automatically proved %03i by finding constraint in database" % (nxtGoalId))
+                print("    automatically proved %s by finding constraint in database" % (str(nxtGoalId)))
             return True
         return False
 
@@ -180,7 +179,7 @@ class Autoprover():
 
         if success:
             if self.verbose:
-                print("    automatically proved %03i by implication from %i" % (nxtGoalId, ineqId))
+                print("    automatically proved %s by implication from %i" % (str(nxtGoalId), ineqId))
             return True
         return False
 
@@ -189,7 +188,7 @@ class Autoprover():
         success = nxtGoal.ratCheck([], self.propEngine)
         if success:
             if self.verbose:
-                print("    automatically proved %03i by RUP check" % (nxtGoalId))
+                print("    automatically proved %s by RUP check" % (str(nxtGoalId)))
             return True
         return False
 
@@ -199,11 +198,7 @@ class Autoprover():
 
         sub = self.assignment.get()
         while self.subgoals:
-            nxtGoalId, nxtGoal = self.subgoals[0]
-            if self.upTo is not None and nxtGoalId >= self.upTo:
-                break
-            else:
-                self.subgoals.popleft()
+            nxtGoalId, nxtGoal = self.subgoals.popitem()
 
             ## for performance reasons the following two checks are
             ## done directly when the effected constraints are computed
@@ -225,12 +220,12 @@ class Autoprover():
             if self.dbImplication(nxtGoalId, nxtGoal):
                 continue
 
-            raise InvalidProof("Could not proof proof goal %03i automatically." % (nxtGoalId))
+            raise InvalidProof("Could not proof proof goal %s automatically." % (str(nxtGoalId)))
 
 
-def autoProof(context, db, subgoals, upTo = None):
+def autoProof(context, db, subgoals):
     if not subgoals:
         return
 
-    prover = Autoprover(context, db, subgoals, upTo)
+    prover = Autoprover(context, db, subgoals)
     prover()

@@ -20,7 +20,7 @@ class SubContextInfo():
         self.toAdd = []
         self.previousRules = None
         self.callbacks = []
-        self.subgoals = deque()
+        self.subgoals = dict()
 
     def addToDelete(self, ineqs):
         self.toDelete.extend(ineqs)
@@ -41,6 +41,9 @@ class SubContext():
         f = lambda ineqs, context: self.addToDelete(ineqs)
         context.addIneqListener.append(f)
 
+    def __bool__(self):
+        return bool(self.infos)
+
     def addToDelete(self, ineqs):
         if len(self.infos) > 0:
             self.infos[-1].addToDelete(ineqs)
@@ -56,10 +59,9 @@ class SubContext():
             callback(self.context, oldContext)
 
         if checkSubgoals and len(oldContext.subgoals) > 0:
-            ineqId, ineq = oldContext.subgoals[0]
-
-            ineq = self.context.ineqFactory.toString(ineq)
-            raise InvalidProof("Open subgoal not proven: %i:, %s"%(ineqId, ineq))
+            for Id, ineq in oldContext.subgoals.items():
+                ineq = self.context.ineqFactory.toString(ineq)
+                raise InvalidProof("Open subgoal not proven: %s:, %s"%(str(Id), ineq))
 
         return oldContext
 
@@ -71,12 +73,11 @@ class EndOfProof(EmptyRule):
 
     @classmethod
     def parse(cls, line, context):
-        subcontexts = SubContext.setup(context)
-        try:
-            subcontext = subcontexts.pop(checkSubgoals = False)
-        except IndexError:
-            raise ParseError("Nothing to end here.")
-        return cls(subcontext)
+        subContexts = SubContext.setup(context)
+        if not subContexts:
+            raise ParseError("No subcontext to end here.")
+
+        return cls(subContexts.getCurrent())
 
     def __init__(self, subcontext):
         self.subcontext = subcontext
@@ -84,8 +85,11 @@ class EndOfProof(EmptyRule):
     def deleteConstraints(self):
         return self.subcontext.toDelete
 
-    def compute(self, antecedents, context = None):
+    def compute(self, antecedents, context):
         autoProof(context, antecedents, self.subcontext.subgoals)
+        subContexts = SubContext.setup(context)
+        poped = subContexts.pop()
+        assert(self.subcontext == poped)
         return self.subcontext.toAdd
 
     def antecedentIDs(self):
@@ -109,50 +113,39 @@ class SubProof(EmptyRule):
     @classmethod
     def parse(cls, line, context):
         subcontexts = SubContext.setup(context)
-        parentCtx = subcontexts.getCurrent()
-        subContext = subcontexts.push()
+        subContext = subcontexts.getCurrent()
 
         with WordParser(line) as words:
-            myGoal = words.nextInt()
+            myGoal = next(words)
+            if myGoal[0] != "#":
+                myGoal = int(myGoal)
 
-            if not parentCtx.subgoals:
+            if not subContext.subgoals:
                 raise ValueError("No proofgoals left to proof.")
 
-            if myGoal < 0:
-                myGoal += context.firstFreeId
-
-            found = False
-            for nxtGoalId, nxtGoal in parentCtx.subgoals:
-                if nxtGoalId == myGoal:
-                    found = True
-                    break
-
-            if not found:
+            if myGoal not in subContext.subgoals:
                 raise ValueError("Invalid proofgoal.")
 
-        return cls(subContext, parentCtx.subgoals, myGoal)
+        return cls(subContext.subgoals, myGoal)
 
-
-
-    def __init__(self, subContext, subgoals, myGoal):
-        self.subContext = subContext
-        self.subgoals = subgoals
+    def __init__(self, subgoals, myGoal):
         self.myGoal = myGoal
-
-        f = lambda context, subContext: self.check(context)
-        subContext.callbacks.append(f)
-
-
+        self.subgoals = subgoals
 
     def compute(self, antecedents, context):
-        autoProof(context, antecedents, self.subgoals, self.myGoal)
+        subContexts = SubContext.setup(context)
+        self.subContext = subContexts.push()
 
-        nxtGoalId, constraint = self.subgoals.popleft()
-        assert(nxtGoalId == self.myGoal)
+        f = lambda context, subContext: self.check(context)
+        self.subContext.callbacks.append(f)
+
+        constraint = self.subgoals[self.myGoal]
+        del self.subgoals[self.myGoal]
+
         return [constraint.copy().negated()]
 
     def antecedentIDs(self):
-        return "all"
+        return []
 
     def numConstraints(self):
         return 1
@@ -187,26 +180,26 @@ class MultiGoalRule(EmptyRule):
         self.displayGoals = context.verifierSettings.trace
         self.constraints = []
         self.ineqFactory = context.ineqFactory
-        self.nextId = context.firstFreeId
+        self.nextId = 1
         self.autoProoved = False
 
     def addSubgoal(self, ineq, Id = None):
         if Id is None or Id == 0:
-            # block of a new Id for subgoal
-            Id = self.addAvailable(None)
+            # the goal does not relate to an existing constraint
+            Id = "#%i" % (self.nextId)
+            self.nextId += 1
 
-        self.subContext.subgoals.append((Id, ineq))
+        assert(Id not in self.subContext.subgoals)
+        self.subContext.subgoals[Id] = ineq
         if self.displayGoals:
             ineqStr = self.ineqFactory.toString(ineq)
-            print("  proofgoal %03i: %s"%(Id, ineqStr))
+            if isinstance(Id, int):
+                Id = "%03i" % (Id)
+            print("  proofgoal %s: %s"%(Id, ineqStr))
 
     def addAvailable(self, ineq):
         """add constraint available in sub proof"""
-        Id = self.nextId
         self.constraints.append(ineq)
-
-        self.nextId += 1
-        return Id
 
     def autoProof(self, context, db):
         self.autoProoved = True
@@ -221,8 +214,7 @@ class MultiGoalRule(EmptyRule):
             if c is not None:
                 context.propEngine.detach(c)
 
-        self.constraints = [None] * len(self.constraints)
-        self.constraints.extend(self.subContext.toAdd)
+        self.constraints = self.subContext.toAdd
         self.subContexts.pop()
 
     def addIntroduced(self, ineq):

@@ -29,8 +29,8 @@ strict_order simple
             fresh_right w1
         qed
         proof
-            proofgoal -1
-                p -3 -4 + -1 +
+            proofgoal #1
+                p -2 -3 + -1 +
                 c -1
             qed
         qed
@@ -41,15 +41,15 @@ load_order simple x1
 
 p 1 2 +
 red 1 a3 1 x1 >= 1 ; a3 → 1 ; begin
-    proofgoal 13
-        c 14
+    proofgoal #1
+        c 13
     qed
 qed
 
 dom 1 ~x1 1 x2 >= 1 ; x1 → x2 , x2 → x1 ; begin
-    proofgoal 17
-        p 16 18 +
-        c 19
+    proofgoal #1
+        p 15 16 +
+        c -1
     qed
 qed
 

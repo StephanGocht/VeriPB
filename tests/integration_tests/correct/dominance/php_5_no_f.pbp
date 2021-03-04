@@ -1,0 +1,1364 @@
+pseudo-Boolean proof version 1.2
+* load formula
+f
+
+* We will now encode the following order
+*	 (most significant variable first; we will encode lex-minimality)
+*	 (negative literal means inverse order -- I THINK)
+* 5 6 7 8 9 10 11 12 17 18 19 20 13 14 15 16 1 2 3 4 
+strict_order exp45
+	vars
+		left u1 u2 u3 u4 u5 u6 u7 u8 u9 u10 u11 u12 u13 u14 u15 u16 u17 u18 u19 u20 
+		right v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17 v18 v19 v20 
+		aux
+	end
+
+	def
+		-1 u20 1 v20 -2 u19 2 v19 -4 u18 4 v18 -8 u17 8 v17 -16 u16 16 v16 -32 u15 32 v15 -64 u14 64 v14 -128 u13 128 v13 -256 u12 256 v12 -512 u11 512 v11 -1024 u10 1024 v10 -2048 u9 2048 v9 -4096 u8 4096 v8 -8192 u7 8192 v7 -16384 u6 16384 v6 -32768 u5 32768 v5 -65536 u4 65536 v4 -131072 u3 131072 v3 -262144 u2 262144 v2 -524288 u1 524288 v1 >= 1;
+	end
+
+	irreflexive
+		proofgoal #1
+			c 1 
+		qed
+	qed
+
+	transitivity
+		vars
+			fresh_right w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 w18 w19 w20 
+		end
+		proof
+			proofgoal #1
+				p 3 4 + 5 +
+				c 6
+			qed
+		qed
+	end
+end
+
+* I think there should now be 45 constraints
+load_order exp45 x5 x6 x7 x8 x9 x10 x11 x12 x17 x18 x19 x20 x13 x14 x15 x16 x1 x2 x3 x4 
+
+
+
+********************************************************
+* Now we start logging the following permutation:
+*	( 1 16 ) ( -1 -16 ) ( 2 14 ) ( -2 -14 ) ( 3 15 ) ( -3 -15 ) ( 4 13 ) ( -4 -13 ) ( 5 12 ) ( -5 -12 ) ( 6 10 ) ( -6 -10 ) ( 7 11 ) ( -7 -11 ) ( 8 9 ) ( -8 -9 ) ( 17 20 ) ( -17 -20 ) 
+* Note: the order in which the logging constraints are printed is not the same as order of the output.
+* In SAT, that is probably not a problem 
+
+* I think there should now be 45 constraints
+* new symmetry breaking clause: 
+dom 1 ~x5 1 x12  >= 1 ;  x1 -> x16 x2 -> x14 x3 -> x15 x4 -> x13 x5 -> x12 x6 -> x10 x7 -> x11 x8 -> x9 x9 -> x8 x10 -> x6 x11 -> x7 x12 -> x5 x13 -> x4 x14 -> x2 x15 -> x3 x16 -> x1 x17 -> x20 x20 -> x17 ; begin
+qed
+
+* We introduce a new Tseitin variable x21
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 47 constraints
+red 1 x12 1 x21  >= 1 ; x21 -> 1
+
+* I think there should now be 48 constraints
+red 1 ~x5 1 x21  >= 1 ; x21 -> 1
+
+* I think there should now be 49 constraints
+red 1 ~x21 1 ~x12 1 x5  >= 1 ; x21 -> 0
+
+* I think there should now be 50 constraints
+* new symmetry breaking clause: 
+dom 1 ~x21 1 ~x6 1 x10  >= 1 ;  x1 -> x16 x2 -> x14 x3 -> x15 x4 -> x13 x5 -> x12 x6 -> x10 x7 -> x11 x8 -> x9 x9 -> x8 x10 -> x6 x11 -> x7 x12 -> x5 x13 -> x4 x14 -> x2 x15 -> x3 x16 -> x1 x17 -> x20 x20 -> x17 ; begin
+	proofgoal #1
+		p 52  50 524288 * +  ; 
+	u >= 1 ; 
+	c 54
+	qed
+qed
+
+* We introduce a new Tseitin variable x22
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 55 constraints
+red 1 x10 1 ~x21 1 x22  >= 1 ; x22 -> 1
+
+* I think there should now be 56 constraints
+red 1 ~x6 1 ~x21 1 x22  >= 1 ; x22 -> 1
+
+* I think there should now be 57 constraints
+red 1 ~x22 1 x21  >= 1 ; x22 -> 0
+
+* I think there should now be 58 constraints
+red 1 ~x22 1 ~x10 1 x6  >= 1 ; x22 -> 0
+
+* I think there should now be 59 constraints
+* new symmetry breaking clause: 
+dom 1 ~x22 1 ~x7 1 x11  >= 1 ;  x1 -> x16 x2 -> x14 x3 -> x15 x4 -> x13 x5 -> x12 x6 -> x10 x7 -> x11 x8 -> x9 x9 -> x8 x10 -> x6 x11 -> x7 x12 -> x5 x13 -> x4 x14 -> x2 x15 -> x3 x16 -> x1 x17 -> x20 x20 -> x17 ; begin
+	proofgoal #1
+		p 61  50 524288 * +  59 262144 * +  ; 
+	u >= 1 ; 
+	c 63
+	qed
+qed
+
+* We introduce a new Tseitin variable x23
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 64 constraints
+red 1 x11 1 ~x22 1 x23  >= 1 ; x23 -> 1
+
+* I think there should now be 65 constraints
+red 1 ~x7 1 ~x22 1 x23  >= 1 ; x23 -> 1
+
+* I think there should now be 66 constraints
+red 1 ~x23 1 x22  >= 1 ; x23 -> 0
+
+* I think there should now be 67 constraints
+red 1 ~x23 1 ~x11 1 x7  >= 1 ; x23 -> 0
+
+* I think there should now be 68 constraints
+* new symmetry breaking clause: 
+dom 1 ~x23 1 ~x8 1 x9  >= 1 ;  x1 -> x16 x2 -> x14 x3 -> x15 x4 -> x13 x5 -> x12 x6 -> x10 x7 -> x11 x8 -> x9 x9 -> x8 x10 -> x6 x11 -> x7 x12 -> x5 x13 -> x4 x14 -> x2 x15 -> x3 x16 -> x1 x17 -> x20 x20 -> x17 ; begin
+	proofgoal #1
+		p 70  50 524288 * +  59 262144 * +  68 131072 * +  ; 
+	u >= 1 ; 
+	c 72
+	qed
+qed
+
+* We introduce a new Tseitin variable x24
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 73 constraints
+red 1 x9 1 ~x23 1 x24  >= 1 ; x24 -> 1
+
+* I think there should now be 74 constraints
+red 1 ~x8 1 ~x23 1 x24  >= 1 ; x24 -> 1
+
+* I think there should now be 75 constraints
+red 1 ~x24 1 x23  >= 1 ; x24 -> 0
+
+* I think there should now be 76 constraints
+red 1 ~x24 1 ~x9 1 x8  >= 1 ; x24 -> 0
+
+* I think there should now be 77 constraints
+* new symmetry breaking clause: 
+dom 1 ~x24 1 ~x17 1 x20  >= 1 ;  x1 -> x16 x2 -> x14 x3 -> x15 x4 -> x13 x5 -> x12 x6 -> x10 x7 -> x11 x8 -> x9 x9 -> x8 x10 -> x6 x11 -> x7 x12 -> x5 x13 -> x4 x14 -> x2 x15 -> x3 x16 -> x1 x17 -> x20 x20 -> x17 ; begin
+	proofgoal #1
+		u 1 x9 -1 x8 >= 0 ;
+		u 1 x10 -1 x6 >= 0 ;
+		u 1 x11 -1 x7 >= 0 ;
+		u 1 x12 -1 x5 >= 0 ;
+		p 79  50 524288 * +  59 262144 * +  68 131072 * +  77 65536 * + 80 32768 * + 81 16384 * + 82 8192 * + 83 4096 * +  ; 
+	u >= 1 ; 
+	c 85
+	qed
+qed
+
+* We introduce a new Tseitin variable x25
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 86 constraints
+red 1 x20 1 ~x24 1 x25  >= 1 ; x25 -> 1
+
+* I think there should now be 87 constraints
+red 1 ~x17 1 ~x24 1 x25  >= 1 ; x25 -> 1
+
+* I think there should now be 88 constraints
+red 1 ~x25 1 x24  >= 1 ; x25 -> 0
+
+* I think there should now be 89 constraints
+red 1 ~x25 1 ~x20 1 x17  >= 1 ; x25 -> 0
+
+* I think there should now be 90 constraints
+* new symmetry breaking clause: 
+dom 1 ~x25 1 ~x13 1 x4  >= 1 ;  x1 -> x16 x2 -> x14 x3 -> x15 x4 -> x13 x5 -> x12 x6 -> x10 x7 -> x11 x8 -> x9 x9 -> x8 x10 -> x6 x11 -> x7 x12 -> x5 x13 -> x4 x14 -> x2 x15 -> x3 x16 -> x1 x17 -> x20 x20 -> x17 ; begin
+	proofgoal #1
+		u 1 x9 -1 x8 >= 0 ;
+		u 1 x10 -1 x6 >= 0 ;
+		u 1 x11 -1 x7 >= 0 ;
+		u 1 x12 -1 x5 >= 0 ;
+		u 1 x20 -1 x17 >= 0 ;
+		p 92  50 524288 * +  59 262144 * +  68 131072 * +  77 65536 * +  90 2048 * + 93 32768 * + 94 16384 * + 95 8192 * + 96 4096 * + 97 256 * +  ; 
+	u >= 1 ; 
+	c 99
+	qed
+qed
+
+* We introduce a new Tseitin variable x26
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 100 constraints
+red 1 x4 1 ~x25 1 x26  >= 1 ; x26 -> 1
+
+* I think there should now be 101 constraints
+red 1 ~x13 1 ~x25 1 x26  >= 1 ; x26 -> 1
+
+* I think there should now be 102 constraints
+red 1 ~x26 1 x25  >= 1 ; x26 -> 0
+
+* I think there should now be 103 constraints
+red 1 ~x26 1 ~x4 1 x13  >= 1 ; x26 -> 0
+
+* I think there should now be 104 constraints
+* new symmetry breaking clause: 
+dom 1 ~x26 1 ~x14 1 x2  >= 1 ;  x1 -> x16 x2 -> x14 x3 -> x15 x4 -> x13 x5 -> x12 x6 -> x10 x7 -> x11 x8 -> x9 x9 -> x8 x10 -> x6 x11 -> x7 x12 -> x5 x13 -> x4 x14 -> x2 x15 -> x3 x16 -> x1 x17 -> x20 x20 -> x17 ; begin
+	proofgoal #1
+		u 1 x9 -1 x8 >= 0 ;
+		u 1 x10 -1 x6 >= 0 ;
+		u 1 x11 -1 x7 >= 0 ;
+		u 1 x12 -1 x5 >= 0 ;
+		u 1 x20 -1 x17 >= 0 ;
+		p 106  50 524288 * +  59 262144 * +  68 131072 * +  77 65536 * +  90 2048 * +  104 128 * + 107 32768 * + 108 16384 * + 109 8192 * + 110 4096 * + 111 256 * +  ; 
+	u >= 1 ; 
+	c 113
+	qed
+qed
+
+* We introduce a new Tseitin variable x27
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 114 constraints
+red 1 x2 1 ~x26 1 x27  >= 1 ; x27 -> 1
+
+* I think there should now be 115 constraints
+red 1 ~x14 1 ~x26 1 x27  >= 1 ; x27 -> 1
+
+* I think there should now be 116 constraints
+red 1 ~x27 1 x26  >= 1 ; x27 -> 0
+
+* I think there should now be 117 constraints
+red 1 ~x27 1 ~x2 1 x14  >= 1 ; x27 -> 0
+
+* I think there should now be 118 constraints
+* new symmetry breaking clause: 
+dom 1 ~x27 1 ~x15 1 x3  >= 1 ;  x1 -> x16 x2 -> x14 x3 -> x15 x4 -> x13 x5 -> x12 x6 -> x10 x7 -> x11 x8 -> x9 x9 -> x8 x10 -> x6 x11 -> x7 x12 -> x5 x13 -> x4 x14 -> x2 x15 -> x3 x16 -> x1 x17 -> x20 x20 -> x17 ; begin
+	proofgoal #1
+		u 1 x9 -1 x8 >= 0 ;
+		u 1 x10 -1 x6 >= 0 ;
+		u 1 x11 -1 x7 >= 0 ;
+		u 1 x12 -1 x5 >= 0 ;
+		u 1 x20 -1 x17 >= 0 ;
+		p 120  50 524288 * +  59 262144 * +  68 131072 * +  77 65536 * +  90 2048 * +  104 128 * +  118 64 * + 121 32768 * + 122 16384 * + 123 8192 * + 124 4096 * + 125 256 * +  ; 
+	u >= 1 ; 
+	c 127
+	qed
+qed
+
+* We introduce a new Tseitin variable x28
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 128 constraints
+red 1 x3 1 ~x27 1 x28  >= 1 ; x28 -> 1
+
+* I think there should now be 129 constraints
+red 1 ~x15 1 ~x27 1 x28  >= 1 ; x28 -> 1
+
+* I think there should now be 130 constraints
+red 1 ~x28 1 x27  >= 1 ; x28 -> 0
+
+* I think there should now be 131 constraints
+red 1 ~x28 1 ~x3 1 x15  >= 1 ; x28 -> 0
+
+* I think there should now be 132 constraints
+* new symmetry breaking clause: 
+dom 1 ~x28 1 ~x16 1 x1  >= 1 ;  x1 -> x16 x2 -> x14 x3 -> x15 x4 -> x13 x5 -> x12 x6 -> x10 x7 -> x11 x8 -> x9 x9 -> x8 x10 -> x6 x11 -> x7 x12 -> x5 x13 -> x4 x14 -> x2 x15 -> x3 x16 -> x1 x17 -> x20 x20 -> x17 ; begin
+	proofgoal #1
+		u 1 x9 -1 x8 >= 0 ;
+		u 1 x10 -1 x6 >= 0 ;
+		u 1 x11 -1 x7 >= 0 ;
+		u 1 x12 -1 x5 >= 0 ;
+		u 1 x20 -1 x17 >= 0 ;
+		p 134  50 524288 * +  59 262144 * +  68 131072 * +  77 65536 * +  90 2048 * +  104 128 * +  118 64 * +  132 32 * + 135 32768 * + 136 16384 * + 137 8192 * + 138 4096 * + 139 256 * +  ; 
+	u >= 1 ; 
+	c 141
+	qed
+qed
+
+
+
+********************************************************
+* Now we start logging the following permutation:
+*	( 1 6 ) ( -1 -6 ) ( 2 5 ) ( -2 -5 ) ( 3 7 ) ( -3 -7 ) ( 4 8 ) ( -4 -8 ) ( 9 18 ) ( -9 -18 ) ( 10 17 ) ( -10 -17 ) ( 11 19 ) ( -11 -19 ) ( 12 20 ) ( -12 -20 ) ( 13 14 ) ( -13 -14 ) 
+* Note: the order in which the logging constraints are printed is not the same as order of the output.
+* In SAT, that is probably not a problem 
+
+* I think there should now be 142 constraints
+* new symmetry breaking clause: 
+dom 1 ~x5 1 x2  >= 1 ;  x1 -> x6 x2 -> x5 x3 -> x7 x4 -> x8 x5 -> x2 x6 -> x1 x7 -> x3 x8 -> x4 x9 -> x18 x10 -> x17 x11 -> x19 x12 -> x20 x13 -> x14 x14 -> x13 x17 -> x10 x18 -> x9 x19 -> x11 x20 -> x12 ; begin
+qed
+
+* We introduce a new Tseitin variable x29
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 144 constraints
+red 1 x2 1 x29  >= 1 ; x29 -> 1
+
+* I think there should now be 145 constraints
+red 1 ~x5 1 x29  >= 1 ; x29 -> 1
+
+* I think there should now be 146 constraints
+red 1 ~x29 1 ~x2 1 x5  >= 1 ; x29 -> 0
+
+* I think there should now be 147 constraints
+* new symmetry breaking clause: 
+dom 1 ~x29 1 ~x6 1 x1  >= 1 ;  x1 -> x6 x2 -> x5 x3 -> x7 x4 -> x8 x5 -> x2 x6 -> x1 x7 -> x3 x8 -> x4 x9 -> x18 x10 -> x17 x11 -> x19 x12 -> x20 x13 -> x14 x14 -> x13 x17 -> x10 x18 -> x9 x19 -> x11 x20 -> x12 ; begin
+	proofgoal #1
+		p 149  147 524288 * +  ; 
+	u >= 1 ; 
+	c 151
+	qed
+qed
+
+* We introduce a new Tseitin variable x30
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 152 constraints
+red 1 x1 1 ~x29 1 x30  >= 1 ; x30 -> 1
+
+* I think there should now be 153 constraints
+red 1 ~x6 1 ~x29 1 x30  >= 1 ; x30 -> 1
+
+* I think there should now be 154 constraints
+red 1 ~x30 1 x29  >= 1 ; x30 -> 0
+
+* I think there should now be 155 constraints
+red 1 ~x30 1 ~x1 1 x6  >= 1 ; x30 -> 0
+
+* I think there should now be 156 constraints
+* new symmetry breaking clause: 
+dom 1 ~x30 1 ~x7 1 x3  >= 1 ;  x1 -> x6 x2 -> x5 x3 -> x7 x4 -> x8 x5 -> x2 x6 -> x1 x7 -> x3 x8 -> x4 x9 -> x18 x10 -> x17 x11 -> x19 x12 -> x20 x13 -> x14 x14 -> x13 x17 -> x10 x18 -> x9 x19 -> x11 x20 -> x12 ; begin
+	proofgoal #1
+		p 158  147 524288 * +  156 262144 * +  ; 
+	u >= 1 ; 
+	c 160
+	qed
+qed
+
+* We introduce a new Tseitin variable x31
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 161 constraints
+red 1 x3 1 ~x30 1 x31  >= 1 ; x31 -> 1
+
+* I think there should now be 162 constraints
+red 1 ~x7 1 ~x30 1 x31  >= 1 ; x31 -> 1
+
+* I think there should now be 163 constraints
+red 1 ~x31 1 x30  >= 1 ; x31 -> 0
+
+* I think there should now be 164 constraints
+red 1 ~x31 1 ~x3 1 x7  >= 1 ; x31 -> 0
+
+* I think there should now be 165 constraints
+* new symmetry breaking clause: 
+dom 1 ~x31 1 ~x8 1 x4  >= 1 ;  x1 -> x6 x2 -> x5 x3 -> x7 x4 -> x8 x5 -> x2 x6 -> x1 x7 -> x3 x8 -> x4 x9 -> x18 x10 -> x17 x11 -> x19 x12 -> x20 x13 -> x14 x14 -> x13 x17 -> x10 x18 -> x9 x19 -> x11 x20 -> x12 ; begin
+	proofgoal #1
+		p 167  147 524288 * +  156 262144 * +  165 131072 * +  ; 
+	u >= 1 ; 
+	c 169
+	qed
+qed
+
+* We introduce a new Tseitin variable x32
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 170 constraints
+red 1 x4 1 ~x31 1 x32  >= 1 ; x32 -> 1
+
+* I think there should now be 171 constraints
+red 1 ~x8 1 ~x31 1 x32  >= 1 ; x32 -> 1
+
+* I think there should now be 172 constraints
+red 1 ~x32 1 x31  >= 1 ; x32 -> 0
+
+* I think there should now be 173 constraints
+red 1 ~x32 1 ~x4 1 x8  >= 1 ; x32 -> 0
+
+* I think there should now be 174 constraints
+* new symmetry breaking clause: 
+dom 1 ~x32 1 ~x9 1 x18  >= 1 ;  x1 -> x6 x2 -> x5 x3 -> x7 x4 -> x8 x5 -> x2 x6 -> x1 x7 -> x3 x8 -> x4 x9 -> x18 x10 -> x17 x11 -> x19 x12 -> x20 x13 -> x14 x14 -> x13 x17 -> x10 x18 -> x9 x19 -> x11 x20 -> x12 ; begin
+	proofgoal #1
+		p 176  147 524288 * +  156 262144 * +  165 131072 * +  174 65536 * +  ; 
+	u >= 1 ; 
+	c 178
+	qed
+qed
+
+* We introduce a new Tseitin variable x33
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 179 constraints
+red 1 x18 1 ~x32 1 x33  >= 1 ; x33 -> 1
+
+* I think there should now be 180 constraints
+red 1 ~x9 1 ~x32 1 x33  >= 1 ; x33 -> 1
+
+* I think there should now be 181 constraints
+red 1 ~x33 1 x32  >= 1 ; x33 -> 0
+
+* I think there should now be 182 constraints
+red 1 ~x33 1 ~x18 1 x9  >= 1 ; x33 -> 0
+
+* I think there should now be 183 constraints
+* new symmetry breaking clause: 
+dom 1 ~x33 1 ~x10 1 x17  >= 1 ;  x1 -> x6 x2 -> x5 x3 -> x7 x4 -> x8 x5 -> x2 x6 -> x1 x7 -> x3 x8 -> x4 x9 -> x18 x10 -> x17 x11 -> x19 x12 -> x20 x13 -> x14 x14 -> x13 x17 -> x10 x18 -> x9 x19 -> x11 x20 -> x12 ; begin
+	proofgoal #1
+		p 185  147 524288 * +  156 262144 * +  165 131072 * +  174 65536 * +  183 32768 * +  ; 
+	u >= 1 ; 
+	c 187
+	qed
+qed
+
+* We introduce a new Tseitin variable x34
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 188 constraints
+red 1 x17 1 ~x33 1 x34  >= 1 ; x34 -> 1
+
+* I think there should now be 189 constraints
+red 1 ~x10 1 ~x33 1 x34  >= 1 ; x34 -> 1
+
+* I think there should now be 190 constraints
+red 1 ~x34 1 x33  >= 1 ; x34 -> 0
+
+* I think there should now be 191 constraints
+red 1 ~x34 1 ~x17 1 x10  >= 1 ; x34 -> 0
+
+* I think there should now be 192 constraints
+* new symmetry breaking clause: 
+dom 1 ~x34 1 ~x11 1 x19  >= 1 ;  x1 -> x6 x2 -> x5 x3 -> x7 x4 -> x8 x5 -> x2 x6 -> x1 x7 -> x3 x8 -> x4 x9 -> x18 x10 -> x17 x11 -> x19 x12 -> x20 x13 -> x14 x14 -> x13 x17 -> x10 x18 -> x9 x19 -> x11 x20 -> x12 ; begin
+	proofgoal #1
+		p 194  147 524288 * +  156 262144 * +  165 131072 * +  174 65536 * +  183 32768 * +  192 16384 * +  ; 
+	u >= 1 ; 
+	c 196
+	qed
+qed
+
+* We introduce a new Tseitin variable x35
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 197 constraints
+red 1 x19 1 ~x34 1 x35  >= 1 ; x35 -> 1
+
+* I think there should now be 198 constraints
+red 1 ~x11 1 ~x34 1 x35  >= 1 ; x35 -> 1
+
+* I think there should now be 199 constraints
+red 1 ~x35 1 x34  >= 1 ; x35 -> 0
+
+* I think there should now be 200 constraints
+red 1 ~x35 1 ~x19 1 x11  >= 1 ; x35 -> 0
+
+* I think there should now be 201 constraints
+* new symmetry breaking clause: 
+dom 1 ~x35 1 ~x12 1 x20  >= 1 ;  x1 -> x6 x2 -> x5 x3 -> x7 x4 -> x8 x5 -> x2 x6 -> x1 x7 -> x3 x8 -> x4 x9 -> x18 x10 -> x17 x11 -> x19 x12 -> x20 x13 -> x14 x14 -> x13 x17 -> x10 x18 -> x9 x19 -> x11 x20 -> x12 ; begin
+	proofgoal #1
+		p 203  147 524288 * +  156 262144 * +  165 131072 * +  174 65536 * +  183 32768 * +  192 16384 * +  201 8192 * +  ; 
+	u >= 1 ; 
+	c 205
+	qed
+qed
+
+* We introduce a new Tseitin variable x36
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 206 constraints
+red 1 x20 1 ~x35 1 x36  >= 1 ; x36 -> 1
+
+* I think there should now be 207 constraints
+red 1 ~x12 1 ~x35 1 x36  >= 1 ; x36 -> 1
+
+* I think there should now be 208 constraints
+red 1 ~x36 1 x35  >= 1 ; x36 -> 0
+
+* I think there should now be 209 constraints
+red 1 ~x36 1 ~x20 1 x12  >= 1 ; x36 -> 0
+
+* I think there should now be 210 constraints
+* new symmetry breaking clause: 
+dom 1 ~x36 1 ~x13 1 x14  >= 1 ;  x1 -> x6 x2 -> x5 x3 -> x7 x4 -> x8 x5 -> x2 x6 -> x1 x7 -> x3 x8 -> x4 x9 -> x18 x10 -> x17 x11 -> x19 x12 -> x20 x13 -> x14 x14 -> x13 x17 -> x10 x18 -> x9 x19 -> x11 x20 -> x12 ; begin
+	proofgoal #1
+		u 1 x17 -1 x10 >= 0 ;
+		u 1 x18 -1 x9 >= 0 ;
+		u 1 x19 -1 x11 >= 0 ;
+		u 1 x20 -1 x12 >= 0 ;
+		p 212  147 524288 * +  156 262144 * +  165 131072 * +  174 65536 * +  183 32768 * +  192 16384 * +  201 8192 * +  210 4096 * + 213 2048 * + 214 1024 * + 215 512 * + 216 256 * +  ; 
+	u >= 1 ; 
+	c 218
+	qed
+qed
+
+
+
+********************************************************
+* Now we start logging the following permutation:
+*	( 2 3 ) ( -2 -3 ) ( 5 9 ) ( -5 -9 ) ( 6 11 ) ( -6 -11 ) ( 7 10 ) ( -7 -10 ) ( 8 12 ) ( -8 -12 ) ( 14 15 ) ( -14 -15 ) ( 18 19 ) ( -18 -19 ) 
+* Note: the order in which the logging constraints are printed is not the same as order of the output.
+* In SAT, that is probably not a problem 
+
+* I think there should now be 219 constraints
+* new symmetry breaking clause: 
+dom 1 ~x5 1 x9  >= 1 ;  x2 -> x3 x3 -> x2 x5 -> x9 x6 -> x11 x7 -> x10 x8 -> x12 x9 -> x5 x10 -> x7 x11 -> x6 x12 -> x8 x14 -> x15 x15 -> x14 x18 -> x19 x19 -> x18 ; begin
+qed
+
+* We introduce a new Tseitin variable x37
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 221 constraints
+red 1 x9 1 x37  >= 1 ; x37 -> 1
+
+* I think there should now be 222 constraints
+red 1 ~x5 1 x37  >= 1 ; x37 -> 1
+
+* I think there should now be 223 constraints
+red 1 ~x37 1 ~x9 1 x5  >= 1 ; x37 -> 0
+
+* I think there should now be 224 constraints
+* new symmetry breaking clause: 
+dom 1 ~x37 1 ~x6 1 x11  >= 1 ;  x2 -> x3 x3 -> x2 x5 -> x9 x6 -> x11 x7 -> x10 x8 -> x12 x9 -> x5 x10 -> x7 x11 -> x6 x12 -> x8 x14 -> x15 x15 -> x14 x18 -> x19 x19 -> x18 ; begin
+	proofgoal #1
+		p 226  224 524288 * +  ; 
+	u >= 1 ; 
+	c 228
+	qed
+qed
+
+* We introduce a new Tseitin variable x38
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 229 constraints
+red 1 x11 1 ~x37 1 x38  >= 1 ; x38 -> 1
+
+* I think there should now be 230 constraints
+red 1 ~x6 1 ~x37 1 x38  >= 1 ; x38 -> 1
+
+* I think there should now be 231 constraints
+red 1 ~x38 1 x37  >= 1 ; x38 -> 0
+
+* I think there should now be 232 constraints
+red 1 ~x38 1 ~x11 1 x6  >= 1 ; x38 -> 0
+
+* I think there should now be 233 constraints
+* new symmetry breaking clause: 
+dom 1 ~x38 1 ~x7 1 x10  >= 1 ;  x2 -> x3 x3 -> x2 x5 -> x9 x6 -> x11 x7 -> x10 x8 -> x12 x9 -> x5 x10 -> x7 x11 -> x6 x12 -> x8 x14 -> x15 x15 -> x14 x18 -> x19 x19 -> x18 ; begin
+	proofgoal #1
+		p 235  224 524288 * +  233 262144 * +  ; 
+	u >= 1 ; 
+	c 237
+	qed
+qed
+
+* We introduce a new Tseitin variable x39
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 238 constraints
+red 1 x10 1 ~x38 1 x39  >= 1 ; x39 -> 1
+
+* I think there should now be 239 constraints
+red 1 ~x7 1 ~x38 1 x39  >= 1 ; x39 -> 1
+
+* I think there should now be 240 constraints
+red 1 ~x39 1 x38  >= 1 ; x39 -> 0
+
+* I think there should now be 241 constraints
+red 1 ~x39 1 ~x10 1 x7  >= 1 ; x39 -> 0
+
+* I think there should now be 242 constraints
+* new symmetry breaking clause: 
+dom 1 ~x39 1 ~x8 1 x12  >= 1 ;  x2 -> x3 x3 -> x2 x5 -> x9 x6 -> x11 x7 -> x10 x8 -> x12 x9 -> x5 x10 -> x7 x11 -> x6 x12 -> x8 x14 -> x15 x15 -> x14 x18 -> x19 x19 -> x18 ; begin
+	proofgoal #1
+		p 244  224 524288 * +  233 262144 * +  242 131072 * +  ; 
+	u >= 1 ; 
+	c 246
+	qed
+qed
+
+* We introduce a new Tseitin variable x40
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 247 constraints
+red 1 x12 1 ~x39 1 x40  >= 1 ; x40 -> 1
+
+* I think there should now be 248 constraints
+red 1 ~x8 1 ~x39 1 x40  >= 1 ; x40 -> 1
+
+* I think there should now be 249 constraints
+red 1 ~x40 1 x39  >= 1 ; x40 -> 0
+
+* I think there should now be 250 constraints
+red 1 ~x40 1 ~x12 1 x8  >= 1 ; x40 -> 0
+
+* I think there should now be 251 constraints
+* new symmetry breaking clause: 
+dom 1 ~x40 1 ~x18 1 x19  >= 1 ;  x2 -> x3 x3 -> x2 x5 -> x9 x6 -> x11 x7 -> x10 x8 -> x12 x9 -> x5 x10 -> x7 x11 -> x6 x12 -> x8 x14 -> x15 x15 -> x14 x18 -> x19 x19 -> x18 ; begin
+	proofgoal #1
+		u 1 x9 -1 x5 >= 0 ;
+		u 1 x10 -1 x7 >= 0 ;
+		u 1 x11 -1 x6 >= 0 ;
+		u 1 x12 -1 x8 >= 0 ;
+		p 253  224 524288 * +  233 262144 * +  242 131072 * +  251 65536 * + 254 32768 * + 255 16384 * + 256 8192 * + 257 4096 * +  ; 
+	u >= 1 ; 
+	c 259
+	qed
+qed
+
+* We introduce a new Tseitin variable x41
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 260 constraints
+red 1 x19 1 ~x40 1 x41  >= 1 ; x41 -> 1
+
+* I think there should now be 261 constraints
+red 1 ~x18 1 ~x40 1 x41  >= 1 ; x41 -> 1
+
+* I think there should now be 262 constraints
+red 1 ~x41 1 x40  >= 1 ; x41 -> 0
+
+* I think there should now be 263 constraints
+red 1 ~x41 1 ~x19 1 x18  >= 1 ; x41 -> 0
+
+* I think there should now be 264 constraints
+* new symmetry breaking clause: 
+dom 1 ~x41 1 ~x14 1 x15  >= 1 ;  x2 -> x3 x3 -> x2 x5 -> x9 x6 -> x11 x7 -> x10 x8 -> x12 x9 -> x5 x10 -> x7 x11 -> x6 x12 -> x8 x14 -> x15 x15 -> x14 x18 -> x19 x19 -> x18 ; begin
+	proofgoal #1
+		u 1 x9 -1 x5 >= 0 ;
+		u 1 x10 -1 x7 >= 0 ;
+		u 1 x11 -1 x6 >= 0 ;
+		u 1 x12 -1 x8 >= 0 ;
+		u 1 x19 -1 x18 >= 0 ;
+		p 266  224 524288 * +  233 262144 * +  242 131072 * +  251 65536 * +  264 1024 * + 267 32768 * + 268 16384 * + 269 8192 * + 270 4096 * + 271 512 * +  ; 
+	u >= 1 ; 
+	c 273
+	qed
+qed
+
+* We introduce a new Tseitin variable x42
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 274 constraints
+red 1 x15 1 ~x41 1 x42  >= 1 ; x42 -> 1
+
+* I think there should now be 275 constraints
+red 1 ~x14 1 ~x41 1 x42  >= 1 ; x42 -> 1
+
+* I think there should now be 276 constraints
+red 1 ~x42 1 x41  >= 1 ; x42 -> 0
+
+* I think there should now be 277 constraints
+red 1 ~x42 1 ~x15 1 x14  >= 1 ; x42 -> 0
+
+* I think there should now be 278 constraints
+* new symmetry breaking clause: 
+dom 1 ~x42 1 ~x2 1 x3  >= 1 ;  x2 -> x3 x3 -> x2 x5 -> x9 x6 -> x11 x7 -> x10 x8 -> x12 x9 -> x5 x10 -> x7 x11 -> x6 x12 -> x8 x14 -> x15 x15 -> x14 x18 -> x19 x19 -> x18 ; begin
+	proofgoal #1
+		u 1 x9 -1 x5 >= 0 ;
+		u 1 x10 -1 x7 >= 0 ;
+		u 1 x11 -1 x6 >= 0 ;
+		u 1 x12 -1 x8 >= 0 ;
+		u 1 x19 -1 x18 >= 0 ;
+		u 1 x15 -1 x14 >= 0 ;
+		p 280  224 524288 * +  233 262144 * +  242 131072 * +  251 65536 * +  264 1024 * +  278 64 * + 281 32768 * + 282 16384 * + 283 8192 * + 284 4096 * + 285 512 * + 286 32 * +  ; 
+	u >= 1 ; 
+	c 288
+	qed
+qed
+
+
+
+********************************************************
+* Now we start logging the following permutation:
+*	( 5 9 ) ( -5 -9 ) ( 6 10 ) ( -6 -10 ) ( 7 11 ) ( -7 -11 ) ( 8 12 ) ( -8 -12 ) 
+* Note: the order in which the logging constraints are printed is not the same as order of the output.
+* In SAT, that is probably not a problem 
+
+* I think there should now be 289 constraints
+* new symmetry breaking clause: 
+dom 1 ~x5 1 x9  >= 1 ;  x5 -> x9 x9 -> x5 x6 -> x10 x10 -> x6 x7 -> x11 x11 -> x7 x8 -> x12 x12 -> x8 ; begin
+qed
+
+* We introduce a new Tseitin variable x43
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 291 constraints
+red 1 x9 1 x43  >= 1 ; x43 -> 1
+
+* I think there should now be 292 constraints
+red 1 ~x5 1 x43  >= 1 ; x43 -> 1
+
+* I think there should now be 293 constraints
+red 1 ~x43 1 ~x9 1 x5  >= 1 ; x43 -> 0
+
+* I think there should now be 294 constraints
+* new symmetry breaking clause: 
+dom 1 ~x43 1 ~x6 1 x10  >= 1 ;  x5 -> x9 x9 -> x5 x6 -> x10 x10 -> x6 x7 -> x11 x11 -> x7 x8 -> x12 x12 -> x8 ; begin
+	proofgoal #1
+		p 296  294 524288 * +  ; 
+	u >= 1 ; 
+	c 298
+	qed
+qed
+
+* We introduce a new Tseitin variable x44
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 299 constraints
+red 1 x10 1 ~x43 1 x44  >= 1 ; x44 -> 1
+
+* I think there should now be 300 constraints
+red 1 ~x6 1 ~x43 1 x44  >= 1 ; x44 -> 1
+
+* I think there should now be 301 constraints
+red 1 ~x44 1 x43  >= 1 ; x44 -> 0
+
+* I think there should now be 302 constraints
+red 1 ~x44 1 ~x10 1 x6  >= 1 ; x44 -> 0
+
+* I think there should now be 303 constraints
+* new symmetry breaking clause: 
+dom 1 ~x44 1 ~x7 1 x11  >= 1 ;  x5 -> x9 x9 -> x5 x6 -> x10 x10 -> x6 x7 -> x11 x11 -> x7 x8 -> x12 x12 -> x8 ; begin
+	proofgoal #1
+		p 305  294 524288 * +  303 262144 * +  ; 
+	u >= 1 ; 
+	c 307
+	qed
+qed
+
+* We introduce a new Tseitin variable x45
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 308 constraints
+red 1 x11 1 ~x44 1 x45  >= 1 ; x45 -> 1
+
+* I think there should now be 309 constraints
+red 1 ~x7 1 ~x44 1 x45  >= 1 ; x45 -> 1
+
+* I think there should now be 310 constraints
+red 1 ~x45 1 x44  >= 1 ; x45 -> 0
+
+* I think there should now be 311 constraints
+red 1 ~x45 1 ~x11 1 x7  >= 1 ; x45 -> 0
+
+* I think there should now be 312 constraints
+* new symmetry breaking clause: 
+dom 1 ~x45 1 ~x8 1 x12  >= 1 ;  x5 -> x9 x9 -> x5 x6 -> x10 x10 -> x6 x7 -> x11 x11 -> x7 x8 -> x12 x12 -> x8 ; begin
+	proofgoal #1
+		p 314  294 524288 * +  303 262144 * +  312 131072 * +  ; 
+	u >= 1 ; 
+	c 316
+	qed
+qed
+
+
+
+********************************************************
+* Now we start logging the following permutation:
+*	( 9 17 ) ( -9 -17 ) ( 10 18 ) ( -10 -18 ) ( 11 19 ) ( -11 -19 ) ( 12 20 ) ( -12 -20 ) 
+* Note: the order in which the logging constraints are printed is not the same as order of the output.
+* In SAT, that is probably not a problem 
+
+* I think there should now be 317 constraints
+* new symmetry breaking clause: 
+dom 1 ~x9 1 x17  >= 1 ;  x9 -> x17 x17 -> x9 x10 -> x18 x18 -> x10 x11 -> x19 x19 -> x11 x12 -> x20 x20 -> x12 ; begin
+qed
+
+* We introduce a new Tseitin variable x46
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 319 constraints
+red 1 x17 1 x46  >= 1 ; x46 -> 1
+
+* I think there should now be 320 constraints
+red 1 ~x9 1 x46  >= 1 ; x46 -> 1
+
+* I think there should now be 321 constraints
+red 1 ~x46 1 ~x17 1 x9  >= 1 ; x46 -> 0
+
+* I think there should now be 322 constraints
+* new symmetry breaking clause: 
+dom 1 ~x46 1 ~x10 1 x18  >= 1 ;  x9 -> x17 x17 -> x9 x10 -> x18 x18 -> x10 x11 -> x19 x19 -> x11 x12 -> x20 x20 -> x12 ; begin
+	proofgoal #1
+		p 324  322 32768 * +  ; 
+	u >= 1 ; 
+	c 326
+	qed
+qed
+
+* We introduce a new Tseitin variable x47
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 327 constraints
+red 1 x18 1 ~x46 1 x47  >= 1 ; x47 -> 1
+
+* I think there should now be 328 constraints
+red 1 ~x10 1 ~x46 1 x47  >= 1 ; x47 -> 1
+
+* I think there should now be 329 constraints
+red 1 ~x47 1 x46  >= 1 ; x47 -> 0
+
+* I think there should now be 330 constraints
+red 1 ~x47 1 ~x18 1 x10  >= 1 ; x47 -> 0
+
+* I think there should now be 331 constraints
+* new symmetry breaking clause: 
+dom 1 ~x47 1 ~x11 1 x19  >= 1 ;  x9 -> x17 x17 -> x9 x10 -> x18 x18 -> x10 x11 -> x19 x19 -> x11 x12 -> x20 x20 -> x12 ; begin
+	proofgoal #1
+		p 333  322 32768 * +  331 16384 * +  ; 
+	u >= 1 ; 
+	c 335
+	qed
+qed
+
+* We introduce a new Tseitin variable x48
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 336 constraints
+red 1 x19 1 ~x47 1 x48  >= 1 ; x48 -> 1
+
+* I think there should now be 337 constraints
+red 1 ~x11 1 ~x47 1 x48  >= 1 ; x48 -> 1
+
+* I think there should now be 338 constraints
+red 1 ~x48 1 x47  >= 1 ; x48 -> 0
+
+* I think there should now be 339 constraints
+red 1 ~x48 1 ~x19 1 x11  >= 1 ; x48 -> 0
+
+* I think there should now be 340 constraints
+* new symmetry breaking clause: 
+dom 1 ~x48 1 ~x12 1 x20  >= 1 ;  x9 -> x17 x17 -> x9 x10 -> x18 x18 -> x10 x11 -> x19 x19 -> x11 x12 -> x20 x20 -> x12 ; begin
+	proofgoal #1
+		p 342  322 32768 * +  331 16384 * +  340 8192 * +  ; 
+	u >= 1 ; 
+	c 344
+	qed
+qed
+
+
+
+********************************************************
+* Now we start logging the following permutation:
+*	( 17 13 ) ( -17 -13 ) ( 18 14 ) ( -18 -14 ) ( 19 15 ) ( -19 -15 ) ( 20 16 ) ( -20 -16 ) 
+* Note: the order in which the logging constraints are printed is not the same as order of the output.
+* In SAT, that is probably not a problem 
+
+* I think there should now be 345 constraints
+* new symmetry breaking clause: 
+dom 1 ~x17 1 x13  >= 1 ;  x17 -> x13 x13 -> x17 x18 -> x14 x14 -> x18 x19 -> x15 x15 -> x19 x20 -> x16 x16 -> x20 ; begin
+qed
+
+* We introduce a new Tseitin variable x49
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 347 constraints
+red 1 x13 1 x49  >= 1 ; x49 -> 1
+
+* I think there should now be 348 constraints
+red 1 ~x17 1 x49  >= 1 ; x49 -> 1
+
+* I think there should now be 349 constraints
+red 1 ~x49 1 ~x13 1 x17  >= 1 ; x49 -> 0
+
+* I think there should now be 350 constraints
+* new symmetry breaking clause: 
+dom 1 ~x49 1 ~x18 1 x14  >= 1 ;  x17 -> x13 x13 -> x17 x18 -> x14 x14 -> x18 x19 -> x15 x15 -> x19 x20 -> x16 x16 -> x20 ; begin
+	proofgoal #1
+		p 352  350 2048 * +  ; 
+	u >= 1 ; 
+	c 354
+	qed
+qed
+
+* We introduce a new Tseitin variable x50
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 355 constraints
+red 1 x14 1 ~x49 1 x50  >= 1 ; x50 -> 1
+
+* I think there should now be 356 constraints
+red 1 ~x18 1 ~x49 1 x50  >= 1 ; x50 -> 1
+
+* I think there should now be 357 constraints
+red 1 ~x50 1 x49  >= 1 ; x50 -> 0
+
+* I think there should now be 358 constraints
+red 1 ~x50 1 ~x14 1 x18  >= 1 ; x50 -> 0
+
+* I think there should now be 359 constraints
+* new symmetry breaking clause: 
+dom 1 ~x50 1 ~x19 1 x15  >= 1 ;  x17 -> x13 x13 -> x17 x18 -> x14 x14 -> x18 x19 -> x15 x15 -> x19 x20 -> x16 x16 -> x20 ; begin
+	proofgoal #1
+		p 361  350 2048 * +  359 1024 * +  ; 
+	u >= 1 ; 
+	c 363
+	qed
+qed
+
+* We introduce a new Tseitin variable x51
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 364 constraints
+red 1 x15 1 ~x50 1 x51  >= 1 ; x51 -> 1
+
+* I think there should now be 365 constraints
+red 1 ~x19 1 ~x50 1 x51  >= 1 ; x51 -> 1
+
+* I think there should now be 366 constraints
+red 1 ~x51 1 x50  >= 1 ; x51 -> 0
+
+* I think there should now be 367 constraints
+red 1 ~x51 1 ~x15 1 x19  >= 1 ; x51 -> 0
+
+* I think there should now be 368 constraints
+* new symmetry breaking clause: 
+dom 1 ~x51 1 ~x20 1 x16  >= 1 ;  x17 -> x13 x13 -> x17 x18 -> x14 x14 -> x18 x19 -> x15 x15 -> x19 x20 -> x16 x16 -> x20 ; begin
+	proofgoal #1
+		p 370  350 2048 * +  359 1024 * +  368 512 * +  ; 
+	u >= 1 ; 
+	c 372
+	qed
+qed
+
+
+
+********************************************************
+* Now we start logging the following permutation:
+*	( 13 1 ) ( -13 -1 ) ( 14 2 ) ( -14 -2 ) ( 15 3 ) ( -15 -3 ) ( 16 4 ) ( -16 -4 ) 
+* Note: the order in which the logging constraints are printed is not the same as order of the output.
+* In SAT, that is probably not a problem 
+
+* I think there should now be 373 constraints
+* new symmetry breaking clause: 
+dom 1 ~x13 1 x1  >= 1 ;  x13 -> x1 x1 -> x13 x14 -> x2 x2 -> x14 x15 -> x3 x3 -> x15 x16 -> x4 x4 -> x16 ; begin
+qed
+
+* We introduce a new Tseitin variable x52
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 375 constraints
+red 1 x1 1 x52  >= 1 ; x52 -> 1
+
+* I think there should now be 376 constraints
+red 1 ~x13 1 x52  >= 1 ; x52 -> 1
+
+* I think there should now be 377 constraints
+red 1 ~x52 1 ~x1 1 x13  >= 1 ; x52 -> 0
+
+* I think there should now be 378 constraints
+* new symmetry breaking clause: 
+dom 1 ~x52 1 ~x14 1 x2  >= 1 ;  x13 -> x1 x1 -> x13 x14 -> x2 x2 -> x14 x15 -> x3 x3 -> x15 x16 -> x4 x4 -> x16 ; begin
+	proofgoal #1
+		p 380  378 128 * +  ; 
+	u >= 1 ; 
+	c 382
+	qed
+qed
+
+* We introduce a new Tseitin variable x53
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 383 constraints
+red 1 x2 1 ~x52 1 x53  >= 1 ; x53 -> 1
+
+* I think there should now be 384 constraints
+red 1 ~x14 1 ~x52 1 x53  >= 1 ; x53 -> 1
+
+* I think there should now be 385 constraints
+red 1 ~x53 1 x52  >= 1 ; x53 -> 0
+
+* I think there should now be 386 constraints
+red 1 ~x53 1 ~x2 1 x14  >= 1 ; x53 -> 0
+
+* I think there should now be 387 constraints
+* new symmetry breaking clause: 
+dom 1 ~x53 1 ~x15 1 x3  >= 1 ;  x13 -> x1 x1 -> x13 x14 -> x2 x2 -> x14 x15 -> x3 x3 -> x15 x16 -> x4 x4 -> x16 ; begin
+	proofgoal #1
+		p 389  378 128 * +  387 64 * +  ; 
+	u >= 1 ; 
+	c 391
+	qed
+qed
+
+* We introduce a new Tseitin variable x54
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 392 constraints
+red 1 x3 1 ~x53 1 x54  >= 1 ; x54 -> 1
+
+* I think there should now be 393 constraints
+red 1 ~x15 1 ~x53 1 x54  >= 1 ; x54 -> 1
+
+* I think there should now be 394 constraints
+red 1 ~x54 1 x53  >= 1 ; x54 -> 0
+
+* I think there should now be 395 constraints
+red 1 ~x54 1 ~x3 1 x15  >= 1 ; x54 -> 0
+
+* I think there should now be 396 constraints
+* new symmetry breaking clause: 
+dom 1 ~x54 1 ~x16 1 x4  >= 1 ;  x13 -> x1 x1 -> x13 x14 -> x2 x2 -> x14 x15 -> x3 x3 -> x15 x16 -> x4 x4 -> x16 ; begin
+	proofgoal #1
+		p 398  378 128 * +  387 64 * +  396 32 * +  ; 
+	u >= 1 ; 
+	c 400
+	qed
+qed
+
+
+
+********************************************************
+* Now we start logging the following permutation:
+*	( 5 6 ) ( -5 -6 ) ( 9 10 ) ( -9 -10 ) ( 17 18 ) ( -17 -18 ) ( 13 14 ) ( -13 -14 ) ( 1 2 ) ( -1 -2 ) 
+* Note: the order in which the logging constraints are printed is not the same as order of the output.
+* In SAT, that is probably not a problem 
+
+* I think there should now be 401 constraints
+* new symmetry breaking clause: 
+dom 1 ~x5 1 x6  >= 1 ;  x5 -> x6 x6 -> x5 x9 -> x10 x10 -> x9 x17 -> x18 x18 -> x17 x13 -> x14 x14 -> x13 x1 -> x2 x2 -> x1 ; begin
+qed
+
+* We introduce a new Tseitin variable x55
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 403 constraints
+red 1 x6 1 x55  >= 1 ; x55 -> 1
+
+* I think there should now be 404 constraints
+red 1 ~x5 1 x55  >= 1 ; x55 -> 1
+
+* I think there should now be 405 constraints
+red 1 ~x55 1 ~x6 1 x5  >= 1 ; x55 -> 0
+
+* I think there should now be 406 constraints
+* new symmetry breaking clause: 
+dom 1 ~x55 1 ~x9 1 x10  >= 1 ;  x5 -> x6 x6 -> x5 x9 -> x10 x10 -> x9 x17 -> x18 x18 -> x17 x13 -> x14 x14 -> x13 x1 -> x2 x2 -> x1 ; begin
+	proofgoal #1
+		u 1 x6 -1 x5 >= 0 ;
+		p 408  406 524288 * + 409 262144 * +  ; 
+	u >= 1 ; 
+	c 411
+	qed
+qed
+
+* We introduce a new Tseitin variable x56
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 412 constraints
+red 1 x10 1 ~x55 1 x56  >= 1 ; x56 -> 1
+
+* I think there should now be 413 constraints
+red 1 ~x9 1 ~x55 1 x56  >= 1 ; x56 -> 1
+
+* I think there should now be 414 constraints
+red 1 ~x56 1 x55  >= 1 ; x56 -> 0
+
+* I think there should now be 415 constraints
+red 1 ~x56 1 ~x10 1 x9  >= 1 ; x56 -> 0
+
+* I think there should now be 416 constraints
+* new symmetry breaking clause: 
+dom 1 ~x56 1 ~x17 1 x18  >= 1 ;  x5 -> x6 x6 -> x5 x9 -> x10 x10 -> x9 x17 -> x18 x18 -> x17 x13 -> x14 x14 -> x13 x1 -> x2 x2 -> x1 ; begin
+	proofgoal #1
+		u 1 x6 -1 x5 >= 0 ;
+		u 1 x10 -1 x9 >= 0 ;
+		p 418  406 524288 * +  416 32768 * + 419 262144 * + 420 16384 * +  ; 
+	u >= 1 ; 
+	c 422
+	qed
+qed
+
+* We introduce a new Tseitin variable x57
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 423 constraints
+red 1 x18 1 ~x56 1 x57  >= 1 ; x57 -> 1
+
+* I think there should now be 424 constraints
+red 1 ~x17 1 ~x56 1 x57  >= 1 ; x57 -> 1
+
+* I think there should now be 425 constraints
+red 1 ~x57 1 x56  >= 1 ; x57 -> 0
+
+* I think there should now be 426 constraints
+red 1 ~x57 1 ~x18 1 x17  >= 1 ; x57 -> 0
+
+* I think there should now be 427 constraints
+* new symmetry breaking clause: 
+dom 1 ~x57 1 ~x13 1 x14  >= 1 ;  x5 -> x6 x6 -> x5 x9 -> x10 x10 -> x9 x17 -> x18 x18 -> x17 x13 -> x14 x14 -> x13 x1 -> x2 x2 -> x1 ; begin
+	proofgoal #1
+		u 1 x6 -1 x5 >= 0 ;
+		u 1 x10 -1 x9 >= 0 ;
+		u 1 x18 -1 x17 >= 0 ;
+		p 429  406 524288 * +  416 32768 * +  427 2048 * + 430 262144 * + 431 16384 * + 432 1024 * +  ; 
+	u >= 1 ; 
+	c 434
+	qed
+qed
+
+* We introduce a new Tseitin variable x58
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 435 constraints
+red 1 x14 1 ~x57 1 x58  >= 1 ; x58 -> 1
+
+* I think there should now be 436 constraints
+red 1 ~x13 1 ~x57 1 x58  >= 1 ; x58 -> 1
+
+* I think there should now be 437 constraints
+red 1 ~x58 1 x57  >= 1 ; x58 -> 0
+
+* I think there should now be 438 constraints
+red 1 ~x58 1 ~x14 1 x13  >= 1 ; x58 -> 0
+
+* I think there should now be 439 constraints
+* new symmetry breaking clause: 
+dom 1 ~x58 1 ~x1 1 x2  >= 1 ;  x5 -> x6 x6 -> x5 x9 -> x10 x10 -> x9 x17 -> x18 x18 -> x17 x13 -> x14 x14 -> x13 x1 -> x2 x2 -> x1 ; begin
+	proofgoal #1
+		u 1 x6 -1 x5 >= 0 ;
+		u 1 x10 -1 x9 >= 0 ;
+		u 1 x18 -1 x17 >= 0 ;
+		u 1 x14 -1 x13 >= 0 ;
+		p 441  406 524288 * +  416 32768 * +  427 2048 * +  439 128 * + 442 262144 * + 443 16384 * + 444 1024 * + 445 64 * +  ; 
+	u >= 1 ; 
+	c 447
+	qed
+qed
+
+
+
+********************************************************
+* Now we start logging the following permutation:
+*	( 6 7 ) ( -6 -7 ) ( 10 11 ) ( -10 -11 ) ( 18 19 ) ( -18 -19 ) ( 14 15 ) ( -14 -15 ) ( 2 3 ) ( -2 -3 ) 
+* Note: the order in which the logging constraints are printed is not the same as order of the output.
+* In SAT, that is probably not a problem 
+
+* I think there should now be 448 constraints
+* new symmetry breaking clause: 
+dom 1 ~x6 1 x7  >= 1 ;  x6 -> x7 x7 -> x6 x10 -> x11 x11 -> x10 x18 -> x19 x19 -> x18 x14 -> x15 x15 -> x14 x2 -> x3 x3 -> x2 ; begin
+qed
+
+* We introduce a new Tseitin variable x59
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 450 constraints
+red 1 x7 1 x59  >= 1 ; x59 -> 1
+
+* I think there should now be 451 constraints
+red 1 ~x6 1 x59  >= 1 ; x59 -> 1
+
+* I think there should now be 452 constraints
+red 1 ~x59 1 ~x7 1 x6  >= 1 ; x59 -> 0
+
+* I think there should now be 453 constraints
+* new symmetry breaking clause: 
+dom 1 ~x59 1 ~x10 1 x11  >= 1 ;  x6 -> x7 x7 -> x6 x10 -> x11 x11 -> x10 x18 -> x19 x19 -> x18 x14 -> x15 x15 -> x14 x2 -> x3 x3 -> x2 ; begin
+	proofgoal #1
+		u 1 x7 -1 x6 >= 0 ;
+		p 455  453 262144 * + 456 131072 * +  ; 
+	u >= 1 ; 
+	c 458
+	qed
+qed
+
+* We introduce a new Tseitin variable x60
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 459 constraints
+red 1 x11 1 ~x59 1 x60  >= 1 ; x60 -> 1
+
+* I think there should now be 460 constraints
+red 1 ~x10 1 ~x59 1 x60  >= 1 ; x60 -> 1
+
+* I think there should now be 461 constraints
+red 1 ~x60 1 x59  >= 1 ; x60 -> 0
+
+* I think there should now be 462 constraints
+red 1 ~x60 1 ~x11 1 x10  >= 1 ; x60 -> 0
+
+* I think there should now be 463 constraints
+* new symmetry breaking clause: 
+dom 1 ~x60 1 ~x18 1 x19  >= 1 ;  x6 -> x7 x7 -> x6 x10 -> x11 x11 -> x10 x18 -> x19 x19 -> x18 x14 -> x15 x15 -> x14 x2 -> x3 x3 -> x2 ; begin
+	proofgoal #1
+		u 1 x7 -1 x6 >= 0 ;
+		u 1 x11 -1 x10 >= 0 ;
+		p 465  453 262144 * +  463 16384 * + 466 131072 * + 467 8192 * +  ; 
+	u >= 1 ; 
+	c 469
+	qed
+qed
+
+* We introduce a new Tseitin variable x61
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 470 constraints
+red 1 x19 1 ~x60 1 x61  >= 1 ; x61 -> 1
+
+* I think there should now be 471 constraints
+red 1 ~x18 1 ~x60 1 x61  >= 1 ; x61 -> 1
+
+* I think there should now be 472 constraints
+red 1 ~x61 1 x60  >= 1 ; x61 -> 0
+
+* I think there should now be 473 constraints
+red 1 ~x61 1 ~x19 1 x18  >= 1 ; x61 -> 0
+
+* I think there should now be 474 constraints
+* new symmetry breaking clause: 
+dom 1 ~x61 1 ~x14 1 x15  >= 1 ;  x6 -> x7 x7 -> x6 x10 -> x11 x11 -> x10 x18 -> x19 x19 -> x18 x14 -> x15 x15 -> x14 x2 -> x3 x3 -> x2 ; begin
+	proofgoal #1
+		u 1 x7 -1 x6 >= 0 ;
+		u 1 x11 -1 x10 >= 0 ;
+		u 1 x19 -1 x18 >= 0 ;
+		p 476  453 262144 * +  463 16384 * +  474 1024 * + 477 131072 * + 478 8192 * + 479 512 * +  ; 
+	u >= 1 ; 
+	c 481
+	qed
+qed
+
+* We introduce a new Tseitin variable x62
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 482 constraints
+red 1 x15 1 ~x61 1 x62  >= 1 ; x62 -> 1
+
+* I think there should now be 483 constraints
+red 1 ~x14 1 ~x61 1 x62  >= 1 ; x62 -> 1
+
+* I think there should now be 484 constraints
+red 1 ~x62 1 x61  >= 1 ; x62 -> 0
+
+* I think there should now be 485 constraints
+red 1 ~x62 1 ~x15 1 x14  >= 1 ; x62 -> 0
+
+* I think there should now be 486 constraints
+* new symmetry breaking clause: 
+dom 1 ~x62 1 ~x2 1 x3  >= 1 ;  x6 -> x7 x7 -> x6 x10 -> x11 x11 -> x10 x18 -> x19 x19 -> x18 x14 -> x15 x15 -> x14 x2 -> x3 x3 -> x2 ; begin
+	proofgoal #1
+		u 1 x7 -1 x6 >= 0 ;
+		u 1 x11 -1 x10 >= 0 ;
+		u 1 x19 -1 x18 >= 0 ;
+		u 1 x15 -1 x14 >= 0 ;
+		p 488  453 262144 * +  463 16384 * +  474 1024 * +  486 64 * + 489 131072 * + 490 8192 * + 491 512 * + 492 32 * +  ; 
+	u >= 1 ; 
+	c 494
+	qed
+qed
+
+
+
+********************************************************
+* Now we start logging the following permutation:
+*	( 7 8 ) ( -7 -8 ) ( 11 12 ) ( -11 -12 ) ( 19 20 ) ( -19 -20 ) ( 15 16 ) ( -15 -16 ) ( 3 4 ) ( -3 -4 ) 
+* Note: the order in which the logging constraints are printed is not the same as order of the output.
+* In SAT, that is probably not a problem 
+
+* I think there should now be 495 constraints
+* new symmetry breaking clause: 
+dom 1 ~x7 1 x8  >= 1 ;  x7 -> x8 x8 -> x7 x11 -> x12 x12 -> x11 x19 -> x20 x20 -> x19 x15 -> x16 x16 -> x15 x3 -> x4 x4 -> x3 ; begin
+qed
+
+* We introduce a new Tseitin variable x63
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 497 constraints
+red 1 x8 1 x63  >= 1 ; x63 -> 1
+
+* I think there should now be 498 constraints
+red 1 ~x7 1 x63  >= 1 ; x63 -> 1
+
+* I think there should now be 499 constraints
+red 1 ~x63 1 ~x8 1 x7  >= 1 ; x63 -> 0
+
+* I think there should now be 500 constraints
+* new symmetry breaking clause: 
+dom 1 ~x63 1 ~x11 1 x12  >= 1 ;  x7 -> x8 x8 -> x7 x11 -> x12 x12 -> x11 x19 -> x20 x20 -> x19 x15 -> x16 x16 -> x15 x3 -> x4 x4 -> x3 ; begin
+	proofgoal #1
+		u 1 x8 -1 x7 >= 0 ;
+		p 502  500 131072 * + 503 65536 * +  ; 
+	u >= 1 ; 
+	c 505
+	qed
+qed
+
+* We introduce a new Tseitin variable x64
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 506 constraints
+red 1 x12 1 ~x63 1 x64  >= 1 ; x64 -> 1
+
+* I think there should now be 507 constraints
+red 1 ~x11 1 ~x63 1 x64  >= 1 ; x64 -> 1
+
+* I think there should now be 508 constraints
+red 1 ~x64 1 x63  >= 1 ; x64 -> 0
+
+* I think there should now be 509 constraints
+red 1 ~x64 1 ~x12 1 x11  >= 1 ; x64 -> 0
+
+* I think there should now be 510 constraints
+* new symmetry breaking clause: 
+dom 1 ~x64 1 ~x19 1 x20  >= 1 ;  x7 -> x8 x8 -> x7 x11 -> x12 x12 -> x11 x19 -> x20 x20 -> x19 x15 -> x16 x16 -> x15 x3 -> x4 x4 -> x3 ; begin
+	proofgoal #1
+		u 1 x8 -1 x7 >= 0 ;
+		u 1 x12 -1 x11 >= 0 ;
+		p 512  500 131072 * +  510 8192 * + 513 65536 * + 514 4096 * +  ; 
+	u >= 1 ; 
+	c 516
+	qed
+qed
+
+* We introduce a new Tseitin variable x65
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 517 constraints
+red 1 x20 1 ~x64 1 x65  >= 1 ; x65 -> 1
+
+* I think there should now be 518 constraints
+red 1 ~x19 1 ~x64 1 x65  >= 1 ; x65 -> 1
+
+* I think there should now be 519 constraints
+red 1 ~x65 1 x64  >= 1 ; x65 -> 0
+
+* I think there should now be 520 constraints
+red 1 ~x65 1 ~x20 1 x19  >= 1 ; x65 -> 0
+
+* I think there should now be 521 constraints
+* new symmetry breaking clause: 
+dom 1 ~x65 1 ~x15 1 x16  >= 1 ;  x7 -> x8 x8 -> x7 x11 -> x12 x12 -> x11 x19 -> x20 x20 -> x19 x15 -> x16 x16 -> x15 x3 -> x4 x4 -> x3 ; begin
+	proofgoal #1
+		u 1 x8 -1 x7 >= 0 ;
+		u 1 x12 -1 x11 >= 0 ;
+		u 1 x20 -1 x19 >= 0 ;
+		p 523  500 131072 * +  510 8192 * +  521 512 * + 524 65536 * + 525 4096 * + 526 256 * +  ; 
+	u >= 1 ; 
+	c 528
+	qed
+qed
+
+* We introduce a new Tseitin variable x66
+* The following map redundancy rules contain its definition.
+
+* I think there should now be 529 constraints
+red 1 x16 1 ~x65 1 x66  >= 1 ; x66 -> 1
+
+* I think there should now be 530 constraints
+red 1 ~x15 1 ~x65 1 x66  >= 1 ; x66 -> 1
+
+* I think there should now be 531 constraints
+red 1 ~x66 1 x65  >= 1 ; x66 -> 0
+
+* I think there should now be 532 constraints
+red 1 ~x66 1 ~x16 1 x15  >= 1 ; x66 -> 0
+
+* I think there should now be 533 constraints
+* new symmetry breaking clause: 
+dom 1 ~x66 1 ~x3 1 x4  >= 1 ;  x7 -> x8 x8 -> x7 x11 -> x12 x12 -> x11 x19 -> x20 x20 -> x19 x15 -> x16 x16 -> x15 x3 -> x4 x4 -> x3 ; begin
+	proofgoal #1
+		u 1 x8 -1 x7 >= 0 ;
+		u 1 x12 -1 x11 >= 0 ;
+		u 1 x20 -1 x19 >= 0 ;
+		u 1 x16 -1 x15 >= 0 ;
+		p 535  500 131072 * +  510 8192 * +  521 512 * +  533 32 * + 536 65536 * + 537 4096 * + 538 256 * + 539 16 * +  ; 
+	u >= 1 ; 
+	c 541
+	qed
+qed
+

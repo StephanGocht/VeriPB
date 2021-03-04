@@ -206,7 +206,7 @@ class Autoprover():
             # if self.selfImplication(nxtGoalId, nxtGoal):
             #     continue
 
-            nxtGoal = nxtGoal.substitute(sub)
+            nxtGoal = nxtGoal.copy().substitute(sub)
 
             if self.rupImplication(nxtGoalId, nxtGoal):
                 continue

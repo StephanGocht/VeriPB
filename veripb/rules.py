@@ -174,35 +174,15 @@ class ReverseUnitPropagation(Rule):
     @classmethod
     def parse(cls, line, context):
         with WordParser(line) as words:
-            peek = next(words)
-            w = list()
-
-            if peek == "w":
-                if getattr(context, "foundLoadFormula", False) == False:
-                    raise ValueError("You are not allowed to use redundancy checks"\
-                        "before the formula is loaded.")
-
-                if getattr(context, "objective", None) is not None:
-                    raise ValueError("You are not allowed to use redundancy checks"\
-                        "in optimization problems.")
-
-                for nxt in words:
-                    if nxt in ["0", ";"]:
-                        break
-                    w.append(context.ineqFactory.lit2int(nxt))
-            else:
-                words = itertools.chain([peek], words)
-
             parser = OPBParser(
                     ineqFactory = context.ineqFactory,
                     allowEq = False)
             ineq = parser.parseConstraint(words)
 
-        return cls(ineq[0], w)
+        return cls(ineq[0])
 
-    def __init__(self, constraint, w):
+    def __init__(self, constraint):
         self.constraint = constraint
-        self.w = w
 
     def numConstraints(self):
         return 1
@@ -219,7 +199,7 @@ class ReverseUnitPropagation(Rule):
     @TimedFunction.time("ReverseUnitPropagation.compute")
     def compute(self, antecedents, context):
         context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
-        success = self.constraint.ratCheck(self.w, context.propEngine)
+        success = self.constraint.rupCheck(context.propEngine)
 
         if success:
             return [self.constraint]

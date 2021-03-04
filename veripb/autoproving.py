@@ -185,7 +185,7 @@ class Autoprover():
 
     #@TimedFunction.time("Autoprover::rupImplication")
     def rupImplication(self, nxtGoalId, nxtGoal):
-        success = nxtGoal.ratCheck([], self.propEngine)
+        success = nxtGoal.rupCheck(self.propEngine)
         if success:
             if self.verbose:
                 print("    automatically proved %s by RUP check" % (str(nxtGoalId)))

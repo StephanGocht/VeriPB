@@ -1244,89 +1244,30 @@ public:
         return assignment;
     }
 
-    bool ratCheck(const FixedSizeInequality<T>& redundant, const std::vector<Lit>& w) {
+    bool rupCheck(const FixedSizeInequality<T>& redundant) {
         AutoReset reset(*this);
         initPropagation();
-        Assignment a(this->nVars);
-        if (w.size() > 0) {
-            for (Lit lit: w) {
-                a.assign(lit);
-            }
-            if (!redundant.isSatisfied(a)) {
-                // std::cout << "given assignment does not satisfy constraint" << std::endl;
-                return false;
-            }
+
+        FixedSizeInequalityHandler<T> negated(redundant);
+        negated->negate();
+
+        while (!current.conflict &&
+                singleTmpPropagation(*negated))
+        {
+            propagate();
         }
 
-        { // with autoReset do
-            AutoReset autoReset(*this);
-            FixedSizeInequalityHandler<T> negated(redundant);
-            negated->negate();
+        // We might have got some propagations that allow us to
+        // strengthen (remove all falsified literals) the negated
+        // constraint. This will make the comming checks more
+        // likely to succeed.
+        negated->restrictByFalseLits(this->assignment);
 
-            while (!current.conflict &&
-                    singleTmpPropagation(*negated))
-            {
-                propagate();
-            }
-
-            // We might have got some propagations that allow us to
-            // strengthen (remove all falsified literals) the negated
-            // constraint. This will make the comming checks more
-            // likely to succeed.
-            negated->restrictByFalseLits(this->assignment);
-
-            if (current.conflict) {
-                // std::cout << "rup check succeded" << std::endl;
-                return true;
-            } else if (w.size() == 0) {
-                // std::cout << "rup check failed" << std::endl;
-                return false;
-            }
-
-            for (Lit lit: w) {
-                // todo (performance): this will double check
-                // constraints that contain more than one literal from
-                // w, however each constraint should only be checked
-                // once.
-                for (const Inequality<T>* ineqFull: occurs[~lit]) {
-                    const FixedSizeInequality<T>* ineq = ineqFull->ineq;
-                    FixedSizeInequalityHandler<T> implied(*ineq);
-                    // std::cout << "  [internal] checking implication of " << *implied << std::endl;
-                    implied->restrictBy(a);
-
-                    // strengthen original constraint by current propagations
-                    FixedSizeInequalityHandler<T> orig(*ineq);
-                    orig->restrictByFalseLits(this->assignment);
-
-                    // std::cout << "checking constraint" << std::endl;
-                    if (orig->implies(*implied) || negated->implies(*implied)) {
-                        // std::cout << "  ...syntactic implication check succeded" << std::endl;
-                        continue;
-                    } else {
-                        AutoReset autoReset(*this);
-                        implied->negate();
-
-                        while (!current.conflict
-                            && (singleTmpPropagation(*implied)
-                                || singleTmpPropagation(*negated)))
-                        {
-                            propagate();
-                        }
-
-                        if (!current.conflict) {
-                            // std::cout << "  ...rup check failed" << std::endl;
-                            return false;
-                        } else {
-                            // std::cout << "  ...rup check succeded" << std::endl;
-                            continue;
-                        }
-                    }
-                }
-            }
-        }
-
-        // std::cout << "checking all implications succeded" << std::endl;
-        return true;
+        // for (Lit lit : this->trail) {
+        //     std::cout << lit << " ";
+        // }
+        // std::cout << std::endl;
+        return current.conflict;
     }
 
     std::vector<InequalityPtr<T>> computeEffected(
@@ -1779,13 +1720,9 @@ public:
         return ineq->implies(*other->ineq);
     }
 
-    bool ratCheck(const std::vector<int>& w, PropEngine<T>& propEngine) {
+    bool rupCheck(PropEngine<T>& propEngine) {
         this->contract();
-        std::vector<Lit> v;
-        for (int i : w) {
-            v.emplace_back(i);
-        }
-        return propEngine.ratCheck(*this->ineq, v);
+        return propEngine.rupCheck(*this->ineq);
     }
 
     Inequality* substitute(Substitution& sub) {

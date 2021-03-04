@@ -635,19 +635,17 @@ class AddRedundant(MultiGoalRule):
     @TimedFunction.time("Redundant.compute")
     def compute(self, antecedents, context):
         ineq = self.constraint.copy()
-        ineq = ineq.negated()
-        self.addAvailable(ineq)
+        negated = ineq.negated()
+        self.addAvailable(negated)
 
         witness = self.witness.get()
 
         effected = computeEffected(context, witness)
         for ineq in effected:
             stats.numGoalCandidates += 1
-            rhs = ineq.copy()
-            rhs.substitute(witness)
-            if rhs != ineq:
+            if not negated.implies(ineq):
                 stats.numSubgoals += 1
-                self.addSubgoal(rhs, ineq.id)
+                self.addSubgoal(ineq, ineq.id)
 
         ineq = self.constraint.copy()
         ineq.substitute(witness)

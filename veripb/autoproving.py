@@ -80,7 +80,7 @@ class Substitution:
         try:
             nxt = next(words)
         except StopIteration:
-            raise ValueError("Expected substitution found nothing.")
+            return result
 
         while nxt != ";":
             frm = ineqFactory.lit2int(nxt)

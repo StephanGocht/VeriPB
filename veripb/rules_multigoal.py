@@ -207,15 +207,17 @@ class MultiGoalRule(EmptyRule):
     def autoProof(self, context, db):
         self.autoProoved = True
 
-        for c in self.constraints:
-            if c is not None:
-                context.propEngine.attach(c, 0)
+        if self.subContext.subgoals:
+            for c in self.constraints:
+                if c is not None:
+                    context.propEngine.attach(c, 0)
 
-        autoProof(context, db, self.subContext.subgoals)
-
-        for c in self.constraints:
-            if c is not None:
-                context.propEngine.detach(c, 0)
+            try:
+                autoProof(context, db, self.subContext.subgoals)
+            finally:
+                for c in self.constraints:
+                    if c is not None:
+                        context.propEngine.detach(c, 0)
 
         self.constraints = self.subContext.toAdd
         self.subContexts.pop()

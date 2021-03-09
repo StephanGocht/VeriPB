@@ -981,7 +981,7 @@ public:
     std::vector<Inequality<T>*> unattached;
     std::vector<Inequality<T>*> propagatingAt0;
     std::chrono::duration<double> timeEffected;
-    std::chrono::duration<double> timeContains;
+    std::chrono::duration<double> timeFind;
 
 
     long long visit = 0;
@@ -997,7 +997,7 @@ public:
         , watchlist(2 * (_nVars + 1))
         , occurs(2 * (_nVars + 1))
         , timeEffected(0)
-        , timeContains(0)
+        , timeFind(0)
     {
         for (auto& ws: watchlist) {
             ws.reserve(50);
@@ -1026,9 +1026,9 @@ public:
             << std::fixed << std::setprecision(2)
             << timeEffected.count() << std::endl ;
 
-        std::cout << "c statistic: time contains: "
+        std::cout << "c statistic: time find: "
             << std::fixed << std::setprecision(2)
-            << timeContains.count() << std::endl ;
+            << timeFind.count() << std::endl ;
 
         std::cout << "c statistic: hashColisions: " << hashColision << std::endl;
         std::cout << "c statistic: lookup_requests: " << lookup_requests << std::endl;
@@ -1150,18 +1150,22 @@ public:
         }
     }
 
-    void attach(Inequality<T>* ineq) {
+    Inequality<T>* attach(Inequality<T>* toAttach, uint64_t id) {
+        Inequality<T>* ineq = *constraintLookup.insert(toAttach).first;
+        ineq->ids.insert(id);
+        ineq->minId = std::min(ineq->minId, id);
+
         if (!ineq->isAttached) {
             ineq->isAttached = true;
             ineq->freeze(this->nVars);
             ineq->registerOccurence(*this);
-            constraintLookup.insert(ineq);
             lookup_requests += 1;
             dbMem += ineq->mem();
             cumDbMem += ineq->mem();
             maxDbMem = std::max(dbMem, maxDbMem);
             unattached.push_back(ineq);
         }
+        return ineq;
     }
 
     void initPropagation() {
@@ -1181,9 +1185,30 @@ public:
         unattached.clear();
     }
 
-    void detach(Inequality<T>* ineq) {
+    std::vector<uint64_t> getDeletions(Inequality<T>* ineq) {
+        std::vector<uint64_t> result;
+
+        Inequality<T>* attachedIneq = find(ineq);
+        if (attachedIneq) {
+            attachedIneq->detachCount += 1;
+            if (attachedIneq->ids.size() <= attachedIneq->detachCount) {
+                std::copy(attachedIneq->ids.begin(), attachedIneq->ids.end(), std::back_inserter(result));
+                attachedIneq->ids.clear();
+                attachedIneq->detachCount = 0;
+            }
+        }
+
+        return result;
+    }
+
+    void detach(Inequality<T>* ineq, uint64_t id) {
         if (ineq != nullptr) {
-            if (ineq->isAttached) {
+            ineq->ids.erase(id);
+            if (ineq->minId == id && ineq->ids.size() > 0) {
+                ineq->minId = *std::min_element(ineq->ids.begin(), ineq->ids.end());
+            }
+
+            if (ineq->isAttached && ineq->ids.size() == 0) {
                 ineq->isAttached = false;
                 ineq->unRegisterOccurence(*this);
                 constraintLookup.erase(ineq);
@@ -1292,29 +1317,30 @@ public:
         std::vector<InequalityPtr<T>> result;
 
         for (Inequality<T>* ineq: unique) {
-            if (ineq->id <= includeIds) {
+            if (ineq->minId <= includeIds) {
                 InequalityPtr<T> rhs(ineq->copy());
                 rhs->substitute(sub);
-                if (!ineq->implies(rhs.get()) && !contains(rhs.get())
+                if (!ineq->implies(rhs.get()) && !find(rhs.get())
                     ) {
                     result.emplace_back(std::move(rhs));
                 }
             }
         }
 
-        std::sort(result.begin(), result.end(),
-            [](InequalityPtr<T>& a, InequalityPtr<T>& b){
-                return a->id < b->id;
-            });
-
         return result;
     }
 
-    bool contains(Inequality<T>* ineq) {
-        Timer timer(timeContains);
+    Inequality<T>* find(Inequality<T>* ineq) {
+        Timer timer(timeFind);
         ineq->contract();
         lookup_requests += 1;
-        return constraintLookup.find(ineq) != constraintLookup.end();
+
+        auto result = constraintLookup.find(ineq);
+        if (result == constraintLookup.end()) {
+            return nullptr;
+        } else {
+            return *result;
+        }
     }
 
 
@@ -1511,14 +1537,15 @@ private:
     friend std::hash<Inequality<T>>;
 public:
     bool isAttached = false;
-    uint64_t id = 0;
+    uint64_t minId = std::numeric_limits<uint64_t>::max();
+    std::unordered_set<uint64_t> ids;
+    uint detachCount = 0;
 
     Inequality(Inequality& other)
         : handler(other.handler)
     {
         assert(other.loaded == false);
-
-        this->id = other.id;
+        this->minId = other.minId;
     }
 
     Inequality(std::vector<Term<T>>& terms_, T degree_)

@@ -6,6 +6,7 @@ def register_rule(rule):
 def get_registered_rules():
     import veripb.rules
     import veripb.rules_dominance
+    import veripb.rules_debug
 
     return registered_rules
 

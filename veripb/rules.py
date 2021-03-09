@@ -99,7 +99,7 @@ class ReverseUnitPropagationFailed(InvalidProof):
     pass
 
 @register_rule
-class DeleteConstraints(Rule):
+class DeleteConstraints(EmptyRule):
     Ids = ["d"] #(d)elete
 
     @classmethod
@@ -118,17 +118,38 @@ class DeleteConstraints(Rule):
     def __init__(self, toDelete):
         self.toDelete = toDelete
 
-    def compute(self, antecedents, context = None):
-        return []
+    def deleteConstraints(self):
+        return self.toDelete
 
-    def numConstraints(self):
-        return 0
 
-    def antecedentIDs(self):
-        return []
+@register_rule
+class DeleteConstraints2(EmptyRule):
+    Ids = ["del"]
 
-    def isGoal(self):
-        return False
+    @classmethod
+    def parse(cls, line, context):
+        with WordParser(line) as words:
+            del_type = next(words)
+            if del_type == "id":
+                which = list(map(int, words))
+
+                if (which[-1] == 0):
+                    which = which[:-1]
+
+                if 0 in which:
+                    raise ValueError("Can not delete constraint with index 0.")
+            elif del_type == "find":
+                parser = OPBParser(
+                    ineqFactory = context.ineqFactory,
+                    allowEq = False)
+                ineq = parser.parseConstraint(words)
+                which = context.propEngine.getDeletions(ineq[0])
+                print(">> ", which)
+
+        return cls(which)
+
+    def __init__(self, toDelete):
+        self.toDelete = toDelete
 
     def deleteConstraints(self):
         return self.toDelete

@@ -14,6 +14,9 @@ from collections import deque
 
 from veripb.autoproving import autoProof
 
+from veripb.optimized.constraints import maxId as getMaxConstraintId
+constraintMaxId = getMaxConstraintId()
+
 class SubContextInfo():
     def __init__(self):
         self.toDelete = []
@@ -184,7 +187,7 @@ class MultiGoalRule(EmptyRule):
         self.autoProoved = False
 
     def addSubgoal(self, ineq, Id = None):
-        if Id is None or Id == 0:
+        if Id is None or Id == constraintMaxId:
             # the goal does not relate to an existing constraint
             Id = "#%i" % (self.nextId)
             self.nextId += 1
@@ -206,13 +209,13 @@ class MultiGoalRule(EmptyRule):
 
         for c in self.constraints:
             if c is not None:
-                context.propEngine.attach(c)
+                context.propEngine.attach(c, 0)
 
         autoProof(context, db, self.subContext.subgoals)
 
         for c in self.constraints:
             if c is not None:
-                context.propEngine.detach(c)
+                context.propEngine.detach(c, 0)
 
         self.constraints = self.subContext.toAdd
         self.subContexts.pop()

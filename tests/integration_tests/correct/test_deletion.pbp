@@ -1,0 +1,38 @@
+pseudo-Boolean proof version 1.2
+f 2
+p 1 2 +
+e 3 2 x1 2 x2 2 ~x3 >= 3 ;
+del id 3
+is_deleted 2 x1 2 x2 2 ~x3 >= 3 ;
+p 1 2 +
+e -1 2 x1 2 x2 2 ~x3 >= 3 ;
+del find 2 x1 2 x2 2 ~x3 >= 3 ;
+is_deleted 2 x1 2 x2 2 ~x3 >= 3 ;
+p 1 2 +
+p 1 2 +
+del find 2 x1 2 x2 2 ~x3 >= 3 ;
+e -1 2 x1 2 x2 2 ~x3 >= 3 ;
+e -2 2 x1 2 x2 2 ~x3 >= 3 ;
+del id 5 6
+is_deleted 2 x1 2 x2 2 ~x3 >= 3 ;
+p 1 2 +
+p 1 2 +
+del find 2 x1 2 x2 2 ~x3 >= 3 ;
+e -1 2 x1 2 x2 2 ~x3 >= 3 ;
+e -2 2 x1 2 x2 2 ~x3 >= 3 ;
+del find 2 x1 2 x2 2 ~x3 >= 3 ;
+is_deleted 2 x1 2 x2 2 ~x3 >= 3 ;
+p 1 2 +
+p 1 2 +
+del find 2 x1 2 x2 2 ~x3 >= 3 ;
+p 1 2 +
+del find 2 x1 2 x2 2 ~x3 >= 3 ;
+p 1 2 +
+e -1 2 x1 2 x2 2 ~x3 >= 3 ;
+e -2 2 x1 2 x2 2 ~x3 >= 3 ;
+e -3 2 x1 2 x2 2 ~x3 >= 3 ;
+e -4 2 x1 2 x2 2 ~x3 >= 3 ;
+del find 2 x1 2 x2 2 ~x3 >= 3 ;
+del find 2 x1 2 x2 2 ~x3 >= 3 ;
+is_deleted 2 x1 2 x2 2 ~x3 >= 3 ;
+del id 1 2

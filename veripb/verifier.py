@@ -200,12 +200,12 @@ class Verifier():
         self.context = context
 
     @TimedFunction.time("propEngine.attach")
-    def attach(self, constraint):
-        self.context.propEngine.attach(constraint)
+    def attach(self, constraint, constraintId):
+        return self.context.propEngine.attach(constraint, constraintId)
 
     @TimedFunction.time("propEngine.detach")
-    def detach(self, constraint):
-        self.context.propEngine.detach(constraint)
+    def detach(self, constraint, constraintId):
+        self.context.propEngine.detach(constraint, constraintId)
 
     def handleRule(self, ruleNum, rule):
         if self.settings.progressBar:
@@ -216,13 +216,12 @@ class Verifier():
         antecedents = self.antecedents(rule.antecedentIDs(), ruleNum)
         constraints = rule.compute(antecedents, self.context)
 
-        for i, constraint in enumerate(constraints):
+        for constraint in constraints:
             if constraint is None:
                 continue
 
-            constraintId = len(self.db) + i
-            constraint.id = constraintId
-            self.attach(constraint)
+            constraintId = len(self.db)
+            constraint = self.attach(constraint, constraintId)
             if self.settings.trace and ruleNum > 0:
                 didPrint = True
                 print("  ConstraintId %(line)03d: %(ineq)s"%{
@@ -240,7 +239,7 @@ class Verifier():
                         "antecedents": " ".join(map(str,ids))
                     }, file=f)
 
-        self.db.extend(constraints)
+            self.db.append(constraint)
 
         deletedConstraints = [i for i in rule.deleteConstraints() if self.db[i] is not None]
         if self.settings.trace and len(deletedConstraints) > 0:
@@ -249,30 +248,31 @@ class Verifier():
                 "ineq": ", ".join(map(str,deletedConstraints))
             })
 
+        deleted = set()
         for i in deletedConstraints:
             ineq = self.db[i]
             if ineq is None:
                 continue
 
-            self.detach(ineq)
+            self.db[i] = None
+            self.detach(ineq, i)
+            deleted.add(ineq)
 
-            # clean up references, to not get spicious warnings
-            constraint = None
-            antecedents = None
 
-            ineq = None
-            refcount = sys.getrefcount(self.db[i])
-            if (refcount > 3):
-                # todo: refcount should be at-most 2, except for
+        # clean up references, to not get spicious warnings
+        constraint = None
+        antecedents = None
+        for ineq in deleted:
+            refcount = sys.getrefcount(ineq)
+            if (refcount > 4):
+                # todo: refcount should be at-most 3, except for
                 # constraints that apear in the formula.
-                logging.warn("Internal Warning: refcount of "
+                logging.warning("Internal Warning: refcount of "
                     "deleted constraint too large (is %i), memory will "
                     "not be freed."%(refcount))
                 # import gc
                 # for refer in gc.get_referrers(self.db[i]):
                 #     print(refer)
-
-            self.db[i] = None
 
         # if not didPrint == True and self.settings.trace and ruleNum > 0:
         #    print("  ConstraintId  - : check passed")

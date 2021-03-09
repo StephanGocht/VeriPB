@@ -159,7 +159,7 @@ class Autoprover():
         return False
 
     def inDB(self, nxtGoalId, nxtGoal):
-        success = self.propEngine.contains(nxtGoal)
+        success = self.propEngine.find(nxtGoal)
         if success:
             if self.verbose:
                 print("    automatically proved %s by finding constraint in database" % (str(nxtGoalId)))

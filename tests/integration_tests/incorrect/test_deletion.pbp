@@ -1,0 +1,6 @@
+pseudo-Boolean proof version 1.2
+f 2
+p 1 2 +
+p 1 2 +
+del id 3
+e 3 2 x1 2 x2 2 ~x3 >= 3 ;

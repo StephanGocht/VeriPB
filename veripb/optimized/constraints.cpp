@@ -19,7 +19,7 @@ int main(int argc, char const *argv[])
     foo.implies(&baa);
     foo.negated();
     Inequality<CoefType> test(baa);
-    p.attach(&foo);
+    p.attach(&foo, 1);
     }
     Inequality<CoefType> foo({1,1,1},{1,1,1},1);
 
@@ -46,17 +46,18 @@ int hashColision = 0;
             .def(py::init<size_t>())
             .def("attach", &PropEngine<CoefType>::attach)
             .def("detach", &PropEngine<CoefType>::detach)
+            .def("getDeletions", &PropEngine<CoefType>::getDeletions)
             .def("reset", &PropEngine<CoefType>::reset)
             .def("checkSat", &PropEngine<CoefType>::checkSat)
             .def("propagatedLits", &PropEngine<CoefType>::propagatedLits)
             .def("increaseNumVarsTo", &PropEngine<CoefType>::increaseNumVarsTo)
             .def("printStats", &PropEngine<CoefType>::printStats)
             .def("computeEffected", &PropEngine<CoefType>::computeEffected)
-            .def("contains", &PropEngine<CoefType>::contains);
+            .def("find", &PropEngine<CoefType>::find);
 
         py::class_<Inequality<CoefType>>(m, "CppInequality")
             .def(py::init<std::vector<CoefType>&, std::vector<int>&, CoefType>())
-            .def_readwrite("id", &Inequality<CoefType>::id)
+            .def_readonly("minId", &Inequality<CoefType>::minId)
             .def("saturate", &Inequality<CoefType>::saturate)
             .def("divide", &Inequality<CoefType>::divide)
             .def("multiply", &Inequality<CoefType>::multiply)
@@ -79,18 +80,19 @@ int hashColision = 0;
             .def(py::init<size_t>())
             .def("attach", &PropEngine<BigInt>::attach)
             .def("detach", &PropEngine<BigInt>::detach)
+            .def("getDeletions", &PropEngine<BigInt>::getDeletions)
             .def("reset", &PropEngine<BigInt>::reset)
             .def("checkSat", &PropEngine<BigInt>::checkSat)
             .def("propagatedLits", &PropEngine<BigInt>::propagatedLits)
             .def("increaseNumVarsTo", &PropEngine<BigInt>::increaseNumVarsTo)
             .def("printStats", &PropEngine<BigInt>::printStats)
             .def("computeEffected", &PropEngine<BigInt>::computeEffected)
-            .def("contains", &PropEngine<BigInt>::contains);
+            .def("find", &PropEngine<BigInt>::find);
 
 
         py::class_<Inequality<BigInt>>(m, "CppInequalityBigInt")
             .def(py::init<std::vector<BigInt>&, std::vector<int>&, BigInt>())
-            .def_readwrite("id", &Inequality<BigInt>::id)
+            .def_readonly("minId", &Inequality<BigInt>::minId)
             .def("saturate", &Inequality<BigInt>::saturate)
             .def("divide", &Inequality<BigInt>::divide)
             .def("multiply", &Inequality<BigInt>::multiply)

@@ -5,6 +5,7 @@ from veripb.rules_register import register_rule, dom_friendly_rules, rules_to_di
 from veripb.parser import OPBParser, WordParser, ParseContext
 
 from veripb.optimized.constraints import maxId as getMaxConstraintId
+constraintMaxId = getMaxConstraintId()
 
 from veripb import verifier
 
@@ -17,7 +18,7 @@ from veripb.autoproving import *
 
 from collections import defaultdict
 
-constraintMaxId = getMaxConstraintId()
+
 
 #@TimedFunction.time("computeEffected")
 def computeEffected(context, substitution, maxId = constraintMaxId):
@@ -645,7 +646,8 @@ class AddRedundant(MultiGoalRule):
             stats.numGoalCandidates += 1
             if not negated.implies(ineq):
                 stats.numSubgoals += 1
-                self.addSubgoal(ineq, ineq.id)
+                assert(ineq.minId != 0)
+                self.addSubgoal(ineq, ineq.minId)
 
         ineq = self.constraint.copy()
         ineq.substitute(witness)
@@ -708,7 +710,8 @@ class DominanceRule(MultiGoalRule):
         effected = self.order.getCachedGoals(context, self.witness)
 
         for ineq in effected:
-            self.addSubgoal(ineq, ineq.id)
+            assert(ineq.minId != 0)
+            self.addSubgoal(ineq, ineq.minId)
 
         if self.autoProveAll:
             self.autoProof(context, antecedents)

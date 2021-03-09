@@ -264,9 +264,9 @@ class Verifier():
         antecedents = None
         for ineq in deleted:
             refcount = sys.getrefcount(ineq)
-            if (refcount > 4):
+            if (refcount > 5):
                 # todo: refcount should be at-most 3, except for
-                # constraints that apear in the formula.
+                # constraints that apear in the formula or in dominance proofs.
                 logging.warning("Internal Warning: refcount of "
                     "deleted constraint too large (is %i), memory will "
                     "not be freed."%(refcount))

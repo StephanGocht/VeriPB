@@ -144,7 +144,6 @@ class DeleteConstraints2(EmptyRule):
                     allowEq = False)
                 ineq = parser.parseConstraint(words)
                 which = context.propEngine.getDeletions(ineq[0])
-                print(">> ", which)
 
         return cls(which)
 

@@ -264,12 +264,15 @@ class Verifier():
         antecedents = None
         for ineq in deleted:
             refcount = sys.getrefcount(ineq)
-            if (refcount > 5):
+            attachCount = self.context.propEngine.attachCount(ineq)
+            if (attachCount == 0 and refcount > 4):
                 # todo: refcount should be at-most 3, except for
                 # constraints that apear in the formula or in dominance proofs.
-                logging.warning("Internal Warning: refcount of "
+                #logging.warning
+                print("Internal Warning: refcount of "
                     "deleted constraint too large (is %i), memory will "
                     "not be freed."%(refcount))
+                print(self.context.ineqFactory.toString(ineq))
                 # import gc
                 # for refer in gc.get_referrers(self.db[i]):
                 #     print(refer)

@@ -1185,6 +1185,12 @@ public:
         unattached.clear();
     }
 
+    int attachCount(Inequality<T>* ineq) {
+        Inequality<T>* tmp;
+        assert( (tmp = find(ineq), tmp == nullptr || tmp == ineq) );
+        return ineq->ids.size() - ineq->detachCount;
+    }
+
     std::vector<uint64_t> getDeletions(Inequality<T>* ineq) {
         std::vector<uint64_t> result;
 

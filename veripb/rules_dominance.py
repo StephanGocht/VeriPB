@@ -303,7 +303,6 @@ class OrderDefinitions(EmptyRule):
 
 class Irreflexivity(MultiGoalRule):
     Ids = ["irreflexive"]
-    subRules = dom_friendly_rules() + [EndOfProof, SubProof]
 
     @classmethod
     def parse(cls, line, context):
@@ -314,6 +313,7 @@ class Irreflexivity(MultiGoalRule):
 
     def __init__(self, context, order):
         super().__init__(context)
+        self.subRules = dom_friendly_rules() + [EndOfProof, SubProof]
 
         order.irreflexivityProven = True
 
@@ -376,7 +376,6 @@ class TransitivityVars(EmptyRule):
 
 class TransitivityProof(MultiGoalRule):
     Ids = ["proof"]
-    subRules = dom_friendly_rules() + [EndOfProof, SubProof]
 
     @classmethod
     def parse(cls, line, context):
@@ -391,6 +390,8 @@ class TransitivityProof(MultiGoalRule):
 
     def __init__(self, context, order):
         super().__init__(context)
+
+        self.subRules = dom_friendly_rules() + [EndOfProof, SubProof]
 
         for ineq in order.definition:
             ineq = ineq.copy()
@@ -638,8 +639,8 @@ class AddRedundant(MultiGoalRule):
         ineq = self.constraint.copy()
 
         if self.autoProveAll:
-            rup = ineq.rupCheck(context.propEngine)
-            if rup:
+            if context.propEngine.find(ineq) is not None \
+                    or ineq.rupCheck(context.propEngine):
                 self.autoProof(context, antecedents)
                 return super().compute(antecedents, context)
 

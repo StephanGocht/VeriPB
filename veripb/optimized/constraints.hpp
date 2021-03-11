@@ -599,7 +599,10 @@ public:
             computeWatchSize();
         }
 
-        T slack = -this->degree;
+        // use statick variable to avoid reinizialisation for BigInts,
+        // prevents prallel or recursive execution!
+        static T slack;
+        slack = -this->degree;
 
         size_t j = this->watchSize;
         size_t k = this->watchSize;
@@ -982,6 +985,7 @@ public:
     std::vector<Inequality<T>*> propagatingAt0;
     std::chrono::duration<double> timeEffected;
     std::chrono::duration<double> timeFind;
+    std::chrono::duration<double> timeInitProp;
 
 
     long long visit = 0;
@@ -998,6 +1002,7 @@ public:
         , occurs(2 * (_nVars + 1))
         , timeEffected(0)
         , timeFind(0)
+        , timeInitProp(0)
     {
         for (auto& ws: watchlist) {
             ws.reserve(50);
@@ -1029,6 +1034,10 @@ public:
         std::cout << "c statistic: time find: "
             << std::fixed << std::setprecision(2)
             << timeFind.count() << std::endl ;
+
+        std::cout << "c statistic: time initpropagation: "
+            << std::fixed << std::setprecision(2)
+            << timeInitProp.count() << std::endl ;
 
         std::cout << "c statistic: hashColisions: " << hashColision << std::endl;
         std::cout << "c statistic: lookup_requests: " << lookup_requests << std::endl;
@@ -1169,11 +1178,13 @@ public:
     }
 
     void initPropagation() {
+        Timer timer(timeInitProp);
         assert(this->current.qhead == 0);
         attachUnattached();
         for (Inequality<T>* ineq: this->propagatingAt0) {
             ineq->updateWatch(*this);
         }
+        // propagate();
     }
 
     void attachUnattached() {
@@ -1287,12 +1298,6 @@ public:
         {
             propagate();
         }
-
-        // We might have got some propagations that allow us to
-        // strengthen (remove all falsified literals) the negated
-        // constraint. This will make the comming checks more
-        // likely to succeed.
-        negated->restrictByFalseLits(this->assignment);
 
         // for (Lit lit : this->trail) {
         //     std::cout << lit << " ";

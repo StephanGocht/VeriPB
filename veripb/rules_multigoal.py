@@ -109,7 +109,6 @@ class EndOfProof(EmptyRule):
 
 class SubProof(EmptyRule):
     Ids = ["proofgoal"]
-    subRules = dom_friendly_rules() + [EndOfProof]
 
     # todo enforce only one def
 
@@ -132,6 +131,7 @@ class SubProof(EmptyRule):
         return cls(subContext.subgoals, myGoal)
 
     def __init__(self, subgoals, myGoal):
+        self.subRules = dom_friendly_rules() + [EndOfProof]
         self.myGoal = myGoal
         self.subgoals = subgoals
 

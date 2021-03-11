@@ -10,8 +10,9 @@ def get_registered_rules():
 
     return registered_rules
 
-def dom_friendly_rules():
+def get_dom_friendly_rules():
     import veripb.rules
+    import veripb.rules_dominance
 
     return [
         veripb.rules.DeleteConstraints,
@@ -24,7 +25,17 @@ def dom_friendly_rules():
         veripb.rules.ReversePolishNotation,
         veripb.rules.SetLevel,
         veripb.rules.WipeLevel,
+        veripb.rules_dominance.AddRedundant
     ]
+
+dom_rules = None
+
+def dom_friendly_rules():
+    global dom_rules
+    if dom_rules is None:
+        dom_rules = get_dom_friendly_rules()
+    return dom_rules
+
 
 def rules_to_dict(rules, default = None):
     res = dict()

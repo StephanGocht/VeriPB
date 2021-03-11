@@ -56,7 +56,7 @@ int hashColision = 0;
             .def("computeEffected", &PropEngine<CoefType>::computeEffected)
             .def("find", &PropEngine<CoefType>::find);
 
-        py::class_<Inequality<CoefType>>(m, "CppInequality")
+        auto cppIneq = py::class_<Inequality<CoefType>>(m, "CppInequality")
             .def(py::init<std::vector<CoefType>&, std::vector<int>&, CoefType>())
             .def_readonly("minId", &Inequality<CoefType>::minId)
             .def("saturate", &Inequality<CoefType>::saturate)
@@ -76,6 +76,7 @@ int hashColision = 0;
             .def("isContradiction", &Inequality<CoefType>::isContradiction)
             .def("substitute", &Inequality<CoefType>::substitute)
             .def("weaken", &Inequality<CoefType>::weaken);
+        cppIneq.attr("__hash__") = py::none();
 
         py::class_<PropEngine<BigInt>>(m, "PropEngineBigInt")
             .def(py::init<size_t>())
@@ -92,7 +93,7 @@ int hashColision = 0;
             .def("find", &PropEngine<BigInt>::find);
 
 
-        py::class_<Inequality<BigInt>>(m, "CppInequalityBigInt")
+        auto cppIneqBigInt = py::class_<Inequality<BigInt>>(m, "CppInequalityBigInt")
             .def(py::init<std::vector<BigInt>&, std::vector<int>&, BigInt>())
             .def_readonly("minId", &Inequality<BigInt>::minId)
             .def("saturate", &Inequality<BigInt>::saturate)
@@ -112,6 +113,7 @@ int hashColision = 0;
             .def("isContradiction", &Inequality<BigInt>::isContradiction)
             .def("substitute", &Inequality<BigInt>::substitute)
             .def("weaken", &Inequality<BigInt>::weaken);
+        cppIneqBigInt.attr("__hash__") = py::none();
 
     }
 #endif

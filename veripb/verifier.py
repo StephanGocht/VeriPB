@@ -248,7 +248,7 @@ class Verifier():
                 "ineq": ", ".join(map(str,deletedConstraints))
             })
 
-        deleted = set()
+        deleted = dict()
         for i in deletedConstraints:
             ineq = self.db[i]
             if ineq is None:
@@ -256,13 +256,13 @@ class Verifier():
 
             self.db[i] = None
             self.detach(ineq, i)
-            deleted.add(ineq)
+            deleted[id(ineq)] = ineq
 
 
         # clean up references, to not get spicious warnings
         constraint = None
         antecedents = None
-        for ineq in deleted:
+        for ineq in deleted.values():
             refcount = sys.getrefcount(ineq)
             attachCount = self.context.propEngine.attachCount(ineq)
             if (attachCount == 0 and refcount > 4):

@@ -155,21 +155,14 @@ red 1 x1 1 x2 >= 1 ; x2 ~x1 ; begin
     *    are not effected by rho
     *
     *  - for the constraint to be introduced [1 x1 1 x2 >= 1][rho]
-    *        ID #1: >= 0 ;
+    *        ID #1: >= 0 ;  --- is trivialy satisfied and nothing needs to be proven
 
-    proofgoal #1
-        * automatically adds \neg [ID #1]
-        * ID 17: >= 1 ;
-        c 17
-
-        * end of context implicitly deletes all added constraints (17)
-    qed
     * end of context implicitly deletes all added constraints (16)
-    * end of rule adds ID 18: 1 x1 1 x2 >= 1 ;
+    * end of rule adds ID 17: 1 x1 1 x2 >= 1 ;
 qed
 
-p 15 18 +
-*  ID 21: x2 >= 1 ;
+p 15 17 +
+*  ID 18: x2 >= 1 ;
 
 * load the default order (0 >= 1), mark all constraints as fixed
 load_order

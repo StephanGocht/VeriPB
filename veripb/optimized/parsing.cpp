@@ -573,6 +573,7 @@ public:
         T degree;
         if (rhs[rhs.size() - 1] == ';') {
             degree = parseCoeff<T>(it, 0, rhs.size() - 1);
+            ++it;
         } else {
             degree = parseCoeff<T>(it);
             ++it;

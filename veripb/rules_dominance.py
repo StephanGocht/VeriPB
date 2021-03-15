@@ -658,11 +658,14 @@ class AddRedundant(MultiGoalRule):
 
         ineq = self.constraint.copy()
         ineq.substitute(witness)
-        self.addSubgoal(ineq)
+        if not (ineq.copy().negated().isContradiction()):
+            self.addSubgoal(ineq)
+
 
         obj = objectiveCondition(context, self.witness.asDict())
         if obj is not None:
-            self.addSubgoal(obj)
+            if not (obj.copy().negated().isContradiction()):
+                self.addSubgoal(obj)
 
         if self.autoProveAll:
             self.autoProof(context, antecedents)

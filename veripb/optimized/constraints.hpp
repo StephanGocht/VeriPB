@@ -1160,7 +1160,13 @@ public:
     }
 
     Inequality<T>* attach(Inequality<T>* toAttach, uint64_t id) {
-        Inequality<T>* ineq = *constraintLookup.insert(toAttach).first;
+        Inequality<T>* ineq;
+        {
+            Timer timer(timeFind);
+            ineq = *constraintLookup.insert(toAttach).first;
+            lookup_requests += 1;
+        }
+
         ineq->ids.insert(id);
         ineq->minId = std::min(ineq->minId, id);
 
@@ -1168,7 +1174,6 @@ public:
             ineq->isAttached = true;
             ineq->freeze(this->nVars);
             ineq->registerOccurence(*this);
-            lookup_requests += 1;
             dbMem += ineq->mem();
             cumDbMem += ineq->mem();
             maxDbMem = std::max(dbMem, maxDbMem);

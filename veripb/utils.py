@@ -204,6 +204,7 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
         raise e
     finally:
         if miscSettings.printStats:
+            print()
             TimedFunction.print_stats()
             context.propEngine.printStats()
 

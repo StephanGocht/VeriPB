@@ -17,7 +17,7 @@ from veripb.timed_function import TimedFunction
 from veripb.parser import RuleParser
 from veripb.exceptions import ParseError
 from veripb.optimized.constraints import PropEngine as CppPropEngine,PropEngineBigInt
-from veripb.optimized.parsing import parseOpb,parseOpbBigInt
+from veripb.optimized.parsing import parseOpb,parseOpbBigInt,parseCnf,parseCnfBigInt
 from veripb.constraints import PropEngine,CppIneqFactory,BigIntIneqFactory
 from time import perf_counter
 
@@ -153,15 +153,19 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
     else:
         context.ineqFactory = CppIneqFactory(miscSettings.enableFreeNames)
 
-    try:
-        if miscSettings.drat or miscSettings.cnf:
-            formula = CNFParser(context.ineqFactory).parse(formulaFile)
+    if miscSettings.drat or miscSettings.cnf:
+        if miscSettings.arbitraryPrecision:
+            parser = parseCnfBigInt
         else:
-            if miscSettings.arbitraryPrecision:
-                parser = parseOpbBigInt
-            else:
-                parser = parseOpb
-            formula = loadFormula(formulaFile.name, parser, context.ineqFactory.varNameMgr)
+            parser = parseCnf
+    else:
+        if miscSettings.arbitraryPrecision:
+            parser = parseOpbBigInt
+        else:
+            parser = parseOpb
+
+    try:
+        formula = loadFormula(formulaFile.name, parser, context.ineqFactory.varNameMgr)
     except ParseError as e:
         e.fileName = formulaFile.name
         raise e

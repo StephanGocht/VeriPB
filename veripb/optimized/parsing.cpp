@@ -369,13 +369,17 @@ public:
     }
 };
 
-Lit parseLit(const WordIter& it, VariableNameManager& mngr) {
+Lit parseLit(const WordIter& it, VariableNameManager& mngr, const std::string_view* value = nullptr) {
     if (it == WordIter::end) {
         throw ParseError(it, "Expected literal.");
     }
 
     try {
-        return mngr.getLit(*it);
+        if (value) {
+            return mngr.getLit(*value);
+        } else {
+            return mngr.getLit(*it);
+        }
     } catch (const std::invalid_argument& e) {
         throw ParseError(it, e.what());
     } catch (const std::out_of_range& e) {
@@ -576,6 +580,10 @@ public:
             ++it;
         }
 
+        if (it != WordIter::end) {
+            throw ParseError(it, "Expected end line after constraint.");
+        }
+
         T normalizedDegree = degree + degreeOffset;
         if (degree > normalizedDegree) {
             throw ParseError(it, "Overflow due to normalization.");
@@ -598,9 +606,122 @@ public:
 };
 
 template<typename T>
+class CNFParser {
+    VariableNameManager& variableNameManager;
+    std::vector<Term<T>> terms;
+    VarDouplicateDetection duplicateDetection;
+
+    std::unique_ptr<Formula<T>> formula;
+
+public:
+    CNFParser(VariableNameManager& mngr):
+        variableNameManager(mngr)
+    {}
+
+
+    std::unique_ptr<Formula<T>> parse(std::ifstream& f, const std::string& fileName) {
+        formula = std::make_unique<Formula<T>>();
+        WordIter it(fileName);
+
+        bool foundHeader = false;
+        while (WordIter::getline(f, it)) {
+            if (it != WordIter::end && ((*it)[0] != 'c')) {
+                if (!foundHeader) {
+                    parseHeader(it);
+                    foundHeader = true;
+                } else {
+                    auto res = parseConstraint(it);
+                    formula->add(std::move(res));
+                }
+            }
+        }
+
+        if (!foundHeader) {
+            throw ParseError(it, "Expected CNF header.");
+        }
+
+        return std::move(formula);
+    }
+
+    void parseHeader(WordIter& it) {
+        it.expect("p");
+        ++it;
+        it.expect("cnf");
+        ++it;
+        formula->claimedNumVar = parseInt(it, "Expected number of variables.");
+        ++it;
+        formula->claimedNumC = parseInt(it, "Expected number of constraints.");
+        ++it;
+        if (it != WordIter::end) {
+            throw ParseError(it, "Expected end of header line.");
+        }
+    }
+
+    std::unique_ptr<Inequality<T>> parseConstraint(WordIter& it) {
+        terms.clear();
+        duplicateDetection.clear();
+
+        char buffer[12];
+        char* bufferEnd = buffer + 12;
+        char* bufferStart;
+
+        while (it != WordIter::end && *it != "0") {
+            // parse int to give nice error messages if input is not
+            // an integer, out put is not used because we construct
+            // string to be consistent with arbitrary variable names
+            parseInt(it, "Expected literal.");
+            if (it->size() > 11) {
+                throw ParseError(it, "Literal too large.");
+            }
+            bufferStart = bufferEnd - it->size();
+            std::copy(it->begin(), it->end(), bufferStart);
+            if (bufferStart[0] == '-') {
+                bufferStart -= 1;
+                bufferStart[0] = '~';
+                bufferStart[1] = 'x';
+            } else {
+                bufferStart -= 1;
+                bufferStart[0] = 'x';
+            }
+
+            std::string_view litString(bufferStart, bufferEnd - bufferStart);
+            Lit lit = parseLit(it, variableNameManager, &litString);
+            if (formula) {
+                formula->maxVar = std::max(formula->maxVar, static_cast<size_t>(lit.var()));
+            }
+            if (duplicateDetection.add(lit.var())) {
+                throw ParseError(it, "Douplicated variables are not supported in constraints.");
+            }
+
+            terms.emplace_back(1, lit);
+            ++it;
+        }
+        if (*it != "0") {
+            throw ParseError(it, "Expected '0' at end of clause.");
+        }
+        ++it;
+
+        if (it != WordIter::end) {
+            throw ParseError(it, "Expected end line after constraint.");
+        }
+
+        return std::make_unique<Inequality<T>>(terms, 1);
+    }
+};
+
+
+template<typename T>
 std::unique_ptr<Formula<T>> parseOpb(std::string fileName, VariableNameManager& varMgr) {
     std::ifstream f(fileName);
     OPBParser<T> parser(varMgr);
+    std::unique_ptr<Formula<T>> result = parser.parse(f, fileName);
+    return result;
+}
+
+template<typename T>
+std::unique_ptr<Formula<T>> parseCnf(std::string fileName, VariableNameManager& varMgr) {
+    std::ifstream f(fileName);
+    CNFParser<T> parser(varMgr);
     std::unique_ptr<Formula<T>> result = parser.parse(f, fileName);
     return result;
 }
@@ -628,6 +749,9 @@ void init_parsing(py::module &m){
     m.doc() = "Efficient implementation for parsing opb and pbp files.";
     m.def("parseOpb", &parseOpb<CoefType>, "Parse opb file with fixed precision.");
     m.def("parseOpbBigInt", &parseOpb<BigInt>, "Parse opb file with arbitrary precision.");
+    m.def("parseCnf", &parseCnf<CoefType>, "Parse cnf file with fixed precision.");
+    m.def("parseCnfBigInt", &parseCnf<BigInt>, "Parse cnf file with arbitrary precision.");
+
 
     py::register_exception_translator([](std::exception_ptr p) {
         try {

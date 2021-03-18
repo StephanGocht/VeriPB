@@ -123,19 +123,19 @@ dom 1 ~x1 >= 1 ; x1 0 ; begin
     *       #1: 1 x1 >= 1;
 
     * show C [rho] is implied
-    proofgoal 1
-        c -1
-    qed
+*    proofgoal 1
+*        c -1
+*    qed
 
     * show that order is respected
-    proofgoal #1
-        * automatically creates \neg [ID 12]
-        *   ID 13: 1 ~x1 >= 1;
-        p 11 13 +
-        c 14
-
-        * end of context implicitly deletes all added constraints (13,14)
-    qed
+*    proofgoal #1
+*        * automatically creates \neg [ID 12]
+*        *   ID 13: 1 ~x1 >= 1;
+*        p 11 13 +
+*        c 14
+*
+*        * end of context implicitly deletes all added constraints (13,14)
+*    qed
 
     * end of context implicitly deletes all added constraints (11)
     * end of rule adds ID 15: ~x1 >= 1 ;
@@ -161,7 +161,7 @@ red 1 x1 1 x2 >= 1 ; x2 ~x1 ; begin
     * end of rule adds ID 17: 1 x1 1 x2 >= 1 ;
 qed
 
-p 15 17 +
+p 12 14 +
 *  ID 18: x2 >= 1 ;
 
 * load the default order (0 >= 1), mark all constraints as fixed

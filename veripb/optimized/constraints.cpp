@@ -54,6 +54,7 @@ int hashColision = 0;
             .def("increaseNumVarsTo", &PropEngine<CoefType>::increaseNumVarsTo)
             .def("printStats", &PropEngine<CoefType>::printStats)
             .def("computeEffected", &PropEngine<CoefType>::computeEffected)
+            .def("estimateNumEffected", &PropEngine<CoefType>::estimateNumEffected)
             .def("find", &PropEngine<CoefType>::find);
 
         auto cppIneq = py::class_<Inequality<CoefType>>(m, "CppInequality")
@@ -90,6 +91,7 @@ int hashColision = 0;
             .def("increaseNumVarsTo", &PropEngine<BigInt>::increaseNumVarsTo)
             .def("printStats", &PropEngine<BigInt>::printStats)
             .def("computeEffected", &PropEngine<BigInt>::computeEffected)
+            .def("estimateNumEffected", &PropEngine<BigInt>::estimateNumEffected)
             .def("find", &PropEngine<BigInt>::find);
 
 

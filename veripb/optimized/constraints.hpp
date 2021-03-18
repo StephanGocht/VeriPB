@@ -1311,6 +1311,19 @@ public:
         return current.conflict;
     }
 
+    long long estimateNumEffected(Substitution& sub) {
+        long long estimate = 0;
+        for (auto it: sub.map) {
+            Lit from = it.first;
+            Lit to   = it.second;
+
+            if (to != Substitution::one()) {
+                estimate += occurs[from].size();
+            }
+        }
+        return estimate;
+    }
+
     std::vector<InequalityPtr<T>> computeEffected(
             Substitution& sub,
             uint64_t includeIds = std::numeric_limits<uint64_t>::max())

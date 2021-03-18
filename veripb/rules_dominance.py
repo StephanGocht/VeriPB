@@ -637,17 +637,24 @@ class AddRedundant(MultiGoalRule):
     @TimedFunction.time("Redundant.compute")
     def compute(self, antecedents, context):
         ineq = self.constraint.copy()
+        witness = self.witness.get()
 
         if self.autoProveAll:
-            if context.propEngine.find(ineq) is not None \
-                    or ineq.rupCheck(context.propEngine):
-                self.autoProof(context, antecedents)
-                return super().compute(antecedents, context)
+            estimateNumEffected = context.propEngine.estimateNumEffected(witness)
+            # rup check would be expensive if we only derive a new
+            # reification, so only do rup check first if there are
+            # many effected constraints, otherwise it will be cheap to
+            # compute the effected constraitns anyway.
+            if estimateNumEffected > 10:
+                if context.propEngine.find(ineq) is not None \
+                        or ineq.rupCheck(context.propEngine):
+                    self.autoProof(context, antecedents)
+                    return super().compute(antecedents, context)
 
         negated = ineq.negated()
         self.addAvailable(negated)
 
-        witness = self.witness.get()
+
         effected = computeEffected(context, witness)
         for ineq in effected:
             stats.numGoalCandidates += 1
@@ -714,14 +721,15 @@ class DominanceRule(MultiGoalRule):
     @TimedFunction.time("DominanceRule.compute")
     def compute(self, antecedents, context):
         ineq = self.constraint.copy()
-        ineq = ineq.negated()
-        self.addAvailable(ineq)
+        negated = ineq.negated()
+        self.addAvailable(negated)
 
         effected = self.order.getCachedGoals(context, self.witness)
 
         for ineq in effected:
             assert(ineq.minId != 0)
-            self.addSubgoal(ineq, ineq.minId)
+            if not negated.implies(ineq):
+                self.addSubgoal(ineq, ineq.minId)
 
         if self.autoProveAll:
             self.autoProof(context, antecedents)

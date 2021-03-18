@@ -194,9 +194,11 @@ class Autoprover():
 
     @TimedFunction.time("Autoprover")
     def __call__(self):
-        self.propagate()
+        if self.subgoals:
+            self.propagate()
 
-        sub = self.assignment.get()
+            sub = self.assignment.get()
+
         while self.subgoals:
             nxtGoalId, nxtGoal = self.subgoals.popitem()
 

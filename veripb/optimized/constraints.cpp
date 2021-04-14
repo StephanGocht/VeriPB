@@ -8,6 +8,57 @@
 
 #include "constraints.hpp"
 
+void ClausePropagator::propagate() {
+    while (current.qhead < trail.size() and !current.conflict) {
+        Lit falsifiedLit = ~trail[current.qhead];
+        // std::cout << "propagating: " << trail[current.qhead] << std::endl;
+
+        WatchList& ws = watchlist[falsifiedLit];
+
+        const WatchedType* end = ws.data() + ws.size();
+        WatchedType* sat = ws.data();
+        // WatchedType* it  = ws.data();
+        // for (; it != end; it++) {
+        //     if (assignment.value[it->other] == State::True) {
+        //         std::swap(*it, *sat);
+        //         ++sat;
+        //     }
+        // }
+
+
+        WatchedType* next = &(*sat);
+        WatchedType* kept = next;
+
+        const uint lookAhead = 3;
+        for (; next != end && !current.conflict; next++) {
+            auto fetch = next + lookAhead;
+            if (fetch < end) {
+                __builtin_prefetch(fetch->ineq);
+            }
+            assert(next->other != Lit::Undef() || assignment.value[next->other] == State::Unassigned);
+
+            bool keepWatch = true;
+            if (assignment.value[next->other] != State::True) {
+                keepWatch = next->ineq->updateWatch(*this, falsifiedLit, false);
+            }
+            if (keepWatch) {
+                *kept = *next;
+                kept += 1;
+            }
+        }
+
+        // in case of conflict copy remaining watches
+        for (; next != end; next++) {
+            *kept = *next;
+            kept += 1;
+        }
+
+        ws.erase(ws.begin() + (kept - ws.data()), ws.end());
+
+        current.qhead += 1;
+    }
+}
+
 int main(int argc, char const *argv[])
 {
     /* code */

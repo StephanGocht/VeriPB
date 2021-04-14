@@ -393,6 +393,11 @@ using ClauseHandler = ConstraintHandler<Clause>;
 template<typename T>
 class PropEngine;
 
+struct PropState {
+    size_t qhead = 0;
+    bool conflict = false;
+};
+
 template<typename T>
 struct WatchInfo {
     T* ineq;
@@ -487,19 +492,23 @@ public:
 
     Assignment& assignment;
     std::vector<Lit>& trail;
+    PropState current;
     LitIndexedVec<WatchList> watchlist;
 
     void enqueue(Lit lit) {
-        // todo
+        // todo master propagator?
     }
 
     void conflict() {
-
+        current.conflict = true;
+        // todo master propagator?
     }
 
     void watch(Lit lit, WatchedType& w) {
         watchlist[lit].push_back(w);
     }
+
+    void propagate();
 };
 
 class Clause {
@@ -547,7 +556,11 @@ private:
         }
     }
 public:
-    void updateWatch(ClausePropagator& prop, Lit falsifiedLit, bool initial = false) {
+    void initWatch(ClausePropagator& prop) {
+        updateWatch(prop, Lit::Undef(), true);
+    }
+
+    bool updateWatch(ClausePropagator& prop, Lit falsifiedLit, bool initial = false) {
         int numFound = 0;
         // watcher will contain the position of the literals to be watched
         size_t watcher[2];
@@ -590,17 +603,20 @@ public:
             prop.conflict();
         }
 
+        bool keep = false;
         if (this->terms.size() >= 2) {
             // This variables controlles if we want to update all
             // watches (2) or just the falsified watch (1). The
             // problem with updating all watches is that it might
             // cause memory blowup unless we remove the swaped out
             // watcher.
-            const size_t numUpdatedWatches = 1;
+            const size_t numUpdatedWatches = initial?2:1;
             for (size_t i = 0; i < numUpdatedWatches; i++) {
                 auto& lits = this->terms;
                 std::swap(lits[i], lits[watcher[i]]);
-                if (watcher[i] >= 2 || initial || lits[i] == falsifiedLit) { // was not a watched literal / needs to be readded
+                if (lits[i] == falsifiedLit) {
+                    keep = true;
+                } else if (watcher[i] >= 2 || initial) { // was not a watched literal / needs to be readded
                     WatchInfo<Clause> watchInfo;
                     watchInfo.ineq = this;
                     watchInfo.other = lits[watcher[(i + 1) % 2]];
@@ -613,6 +629,7 @@ public:
                 this->propagationSearchStart = watcher[1];
             }
         }
+        return keep;
     }
 };
 
@@ -934,11 +951,6 @@ inline std::ostream& operator<<(std::ostream& os, const FixedSizeInequality<T>& 
     os << " >= " << v.degree;
     return os;
 }
-
-struct PropState {
-    size_t qhead = 0;
-    bool conflict = false;
-};
 
 template<typename TConstraint>
 class ConstraintHandler {

@@ -380,18 +380,22 @@ using InequalityPtr = std::unique_ptr<Inequality<T>>;
 template<typename T>
 class FixedSizeInequality;
 
+class Clause;
+
 template<typename T>
 class ConstraintHandler;
 
 template<typename T>
 using FixedSizeInequalityHandler = ConstraintHandler<FixedSizeInequality<T>>;
 
+using ClauseHandler = ConstraintHandler<Clause>;
+
 template<typename T>
 class PropEngine;
 
 template<typename T>
 struct WatchInfo {
-    FixedSizeInequality<T>* ineq;
+    T* ineq;
     Lit other;
 
     WatchInfo()
@@ -406,12 +410,14 @@ private:
     uint32_t _size;
     Element data[];
 
-    // warning requires custom allocation
+    // warning requires custom allocation, if you know what you are
+    // doing add a friend
     InlineVec(size_t size)
         : _size(size) {};
 
     template<typename T>
     friend class FixedSizeInequality;
+    friend class Clause;
 public:
 
     ~InlineVec(){
@@ -473,6 +479,143 @@ public:
         return numElements * sizeof(TElement);
     };
 };
+
+class ClausePropagator {
+public:
+    using WatchedType = WatchInfo<Clause>;
+    using WatchList = std::vector<WatchedType>;
+
+    Assignment& assignment;
+    std::vector<Lit>& trail;
+    LitIndexedVec<WatchList> watchlist;
+
+    void enqueue(Lit lit) {
+        // todo
+    }
+
+    void conflict() {
+
+    }
+
+    void watch(Lit lit, WatchedType& w) {
+        watchlist[lit].push_back(w);
+    }
+};
+
+class Clause {
+private:
+    using TElement = Lit;
+    using TVec = InlineVec<TElement>;
+
+    friend ClauseHandler;
+
+public:
+    size_t propagationSearchStart = 2;
+    InlineVec<Lit> terms;
+
+private:
+    Clause(size_t size)
+        :terms(size) {
+    }
+
+    Clause(const Clause& other)
+        : terms(other.terms.size())
+    {
+        using namespace std;
+        copy(other.terms.begin(), other.terms.end(), this->terms.begin());
+    }
+
+    Clause(std::vector<Lit>& _terms)
+        : terms(_terms.size())
+    {
+        std::copy(_terms.begin(),_terms.end(), this->terms.begin());
+    }
+
+    void checkPosition(size_t pos, int &numFound, size_t (&watcher)[2], Assignment& assignment) {
+        Lit& lit = this->terms[pos];
+        switch(assignment[lit]) {
+            case State::True:
+                // watcher[numFound] = pos;
+                // numFound = 2;
+                // break;
+            case State::Unassigned:
+                watcher[numFound] = pos;
+                numFound += 1;
+                break;
+            case State::False:
+                break;
+        }
+    }
+public:
+    void updateWatch(ClausePropagator& prop, Lit falsifiedLit, bool initial = false) {
+        int numFound = 0;
+        // watcher will contain the position of the literals to be watched
+        size_t watcher[2];
+        watcher[0] = 0;
+        watcher[1] = 1;
+
+        if (this->terms.size() >= 2) {
+            if (this->terms[1] == falsifiedLit) {
+                std::swap(this->terms[1], this->terms[0]);
+            }
+
+            checkPosition(0, numFound, watcher, prop.assignment);
+
+            if (numFound < 2) {
+                checkPosition(1, numFound, watcher, prop.assignment);
+            }
+
+            size_t pos = this->propagationSearchStart;
+            for (size_t i = 0; i < this->terms.size() - 2 && numFound < 2; i++) {
+                checkPosition(pos, numFound, watcher, prop.assignment);
+                pos += 1;
+                if (pos == this->terms.size()) {
+                    pos = 2;
+                }
+            }
+            this->propagationSearchStart = pos;
+        } else if (this->terms.size() == 1) {
+            checkPosition(0, numFound, watcher, prop.assignment);
+        }
+
+        // LOG(debug) << "numFound: "<< numFound << EOM;
+        if (numFound == 1) {
+            Lit lit = this->terms[watcher[0]];
+            if (prop.assignment[lit] == State::Unassigned) {
+                prop.enqueue(lit);
+            }
+        }
+
+        if (numFound == 0) {
+            prop.conflict();
+        }
+
+        if (this->terms.size() >= 2) {
+            // This variables controlles if we want to update all
+            // watches (2) or just the falsified watch (1). The
+            // problem with updating all watches is that it might
+            // cause memory blowup unless we remove the swaped out
+            // watcher.
+            const size_t numUpdatedWatches = 1;
+            for (size_t i = 0; i < numUpdatedWatches; i++) {
+                auto& lits = this->terms;
+                std::swap(lits[i], lits[watcher[i]]);
+                if (watcher[i] >= 2 || initial || lits[i] == falsifiedLit) { // was not a watched literal / needs to be readded
+                    WatchInfo<Clause> watchInfo;
+                    watchInfo.ineq = this;
+                    watchInfo.other = lits[watcher[(i + 1) % 2]];
+                    prop.watch(lits[i], watchInfo);
+                }
+            }
+            if (numUpdatedWatches == 1 && numFound == 2 && watcher[1] >= 2) {
+                // Let us start the search where we found the second
+                // non falsified literal.
+                this->propagationSearchStart = watcher[1];
+            }
+        }
+    }
+};
+
 
 template<typename T>
 class FixedSizeInequality {
@@ -583,7 +726,7 @@ public:
 
         std::swap(terms[i], terms[j]);
 
-        WatchInfo<T> w;
+        WatchInfo<FixedSizeInequality<T>> w;
         w.ineq = this;
         w.other = blockingLiteral;
         prop.watch(nw, w);
@@ -660,7 +803,7 @@ public:
                 slack += terms[i].coeff;
 
                 if (init) {
-                    WatchInfo<T> w;
+                    WatchInfo<FixedSizeInequality<T>> w;
                     w.ineq = this;
                     prop.watch(terms[i].lit, w);
                 }
@@ -946,7 +1089,7 @@ public:
 template<typename T>
 class PropEngine {
 private:
-    typedef WatchInfo<T> WatchedType;
+    typedef WatchInfo<FixedSizeInequality<T>> WatchedType;
     typedef std::vector<WatchedType> WatchList;
     typedef std::unordered_set<Inequality<T>*>  OccursList;
 
@@ -1398,7 +1541,7 @@ public:
         current.conflict = true;
     }
 
-    void watch(Lit lit, WatchInfo<T>& w) {
+    void watch(Lit lit, WatchedType& w) {
         if (this->updateWatch) {
             watchlist[lit].push_back(w);
         }

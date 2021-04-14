@@ -901,48 +901,6 @@ public:
         }
     }
 
-    void restrictBy(const Assignment& a){
-        this->terms.erase(
-            std::remove_if(
-                this->terms.begin(),
-                this->terms.end(),
-                [this, &a](Term<T>& term){
-                    switch (a[term.lit]) {
-                        case State::True:
-                            this->degree -= term.coeff;
-                            term.coeff = 0;
-                            break;
-                        case State::False:
-                            term.coeff = 0;
-                            break;
-                        default:
-                            break;
-                    }
-                    return term.coeff == 0;
-                }),
-            this->terms.end());
-    }
-
-    void restrictByFalseLits(const Assignment& a){
-        this->terms.erase(
-            std::remove_if(
-                this->terms.begin(),
-                this->terms.end(),
-                [this, &a](Term<T>& term){
-                    switch (a[term.lit]) {
-                        case State::True:
-                            break;
-                        case State::False:
-                            term.coeff = 0;
-                            break;
-                        default:
-                            break;
-                    }
-                    return term.coeff == 0;
-                }),
-            this->terms.end());
-    }
-
     size_t mem() const {
         return sizeof(FixedSizeInequality<T>) + terms.size() * sizeof(Term<T>);
     }

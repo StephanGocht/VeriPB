@@ -381,7 +381,10 @@ template<typename T>
 class FixedSizeInequality;
 
 template<typename T>
-class FixedSizeInequalityHandler;
+class ConstraintHandler;
+
+template<typename T>
+using FixedSizeInequalityHandler = ConstraintHandler<FixedSizeInequality<T>>;
 
 template<typename T>
 class PropEngine;
@@ -836,63 +839,69 @@ struct PropState {
     bool conflict = false;
 };
 
-template<typename T>
-class FixedSizeInequalityHandler {
+template<typename TConstraint>
+class ConstraintHandler {
 private:
     void* malloc(size_t size) {
         capacity = size;
         size_t extra = extra_size_requirement<
-                typename FixedSizeInequality<T>::TVec,
-                typename FixedSizeInequality<T>::TElement
+                typename TConstraint::TVec,
+                typename TConstraint::TElement
             >::value(size);
-        size_t memSize = sizeof(FixedSizeInequality<T>) + extra;
+        size_t memSize = sizeof(TConstraint) + extra;
         // return std::aligned_alloc(64, memSize);
         return std::malloc(memSize);
     }
 
     void free(){
         if (ineq != nullptr) {
-            ineq->~FixedSizeInequality<T>();
+            ineq->~TConstraint();
             std::free(ineq);
             ineq = nullptr;
         }
     }
 
 public:
-    FixedSizeInequality<T>* ineq = nullptr;
+    TConstraint* ineq = nullptr;
     size_t capacity = 0;
 
-    FixedSizeInequalityHandler(const FixedSizeInequality<T>& copyFrom) {
+    ConstraintHandler(const TConstraint& copyFrom) {
         void* addr = malloc(copyFrom.terms.size());
-        ineq = new (addr) FixedSizeInequality<T>(copyFrom);
+        ineq = new (addr) TConstraint(copyFrom);
     }
 
-    FixedSizeInequalityHandler(const FixedSizeInequalityHandler<T>& other):
-        FixedSizeInequalityHandler(*other.ineq) {}
+    ConstraintHandler(const ConstraintHandler<TConstraint>& other):
+        ConstraintHandler(*other.ineq) {}
 
-    FixedSizeInequalityHandler(FixedSizeInequalityHandler<T>&& other) {
+    ConstraintHandler(ConstraintHandler<TConstraint>&& other) {
         ineq = other.ineq;
         other.ineq = nullptr;
     }
 
-    FixedSizeInequality<T>& operator*(){
+    TConstraint& operator*(){
         return *ineq;
     }
 
-    FixedSizeInequality<T>* operator->(){
+    TConstraint* operator->(){
         return ineq;
     }
 
-    FixedSizeInequalityHandler& operator=(FixedSizeInequalityHandler&& other) {
+    ConstraintHandler& operator=(ConstraintHandler&& other) {
         this->free();
         ineq = other.ineq;
         other.ineq = nullptr;
     }
 
-    FixedSizeInequalityHandler(std::vector<Term<T>>& terms, T degree) {
-        void* addr = malloc(terms.size());
-        ineq = new (addr) FixedSizeInequality<T>(terms, degree);
+    template <typename ...Args>
+    ConstraintHandler(size_t size, Args && ...args) {
+        void* addr = malloc(size);
+        ineq = new (addr) TConstraint(std::forward<Args>(args)...);
     }
+
+    // ConstraintHandler(std::vector<Term<T>>& terms, T degree) {
+    //     void* addr = malloc(terms.size());
+    //     ineq = new (addr) TConstraint(terms, degree);
+    // }
 
     void resize(size_t size) {
         if (ineq != nullptr && size == capacity) {
@@ -900,10 +909,10 @@ public:
         }
         free();
         void* addr = malloc(size);
-        ineq = new (addr) FixedSizeInequality<T>(size);
+        ineq = new (addr) TConstraint(size);
     }
 
-    ~FixedSizeInequalityHandler(){
+    ~ConstraintHandler(){
         free();
     }
 };
@@ -1578,14 +1587,14 @@ public:
     }
 
     Inequality(std::vector<Term<T>>& terms_, T degree_)
-        : handler(terms_, degree_)
+        : handler(terms_.size(), terms_, degree_)
     {
         expand();
         contract();
     }
 
     Inequality(std::vector<Term<T>>&& terms_, T degree_)
-        : handler(terms_, degree_)
+        : handler(terms_.size(), terms_, degree_)
     {
         expand();
         contract();

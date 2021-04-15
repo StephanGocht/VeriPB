@@ -485,6 +485,100 @@ public:
     };
 };
 
+class Propagator {
+protected:
+    size_t qhead = 0;
+
+public:
+    virtual void propagate() = 0;
+    virtual void increaseNumVarsTo(size_t) = 0;
+    virtual void undo_trail_till(size_t pos) {
+        if (qhead > pos)
+            qhead = pos;
+    };
+    virtual ~Propagator(){};
+};
+
+using PropagatorPtr = std::unique_ptr<Propagator>;
+
+class PropagationMaster {
+private:
+    Assignment assignment;
+    Assignment phase;
+    std::vector<Lit> trail;
+    PropState current;
+
+    bool trailUnchanged = true;
+
+    friend class AutoReset;
+
+public:
+    std::vector<PropagatorPtr> propagators;
+
+    const Assignment& getAssignment() {return assignment;}
+    const Assignment& getPhase() {return phase;}
+    const std::vector<Lit>& getTrail() {return trail;}
+
+    PropagationMaster(size_t nVars)
+        : assignment(nVars)
+        , phase(nVars)
+    {
+        trail.reserve(nVars);
+    }
+
+    void increaseNumVarsTo(size_t _nVars) {
+        assignment.resize(_nVars);
+        phase.resize(_nVars);
+        for (PropagatorPtr& propagator: propagators) {
+            propagator->increaseNumVarsTo(_nVars);
+        }
+    }
+
+    void conflict() {
+        current.conflict = true;
+    }
+
+    bool isConflicting() {
+        return current.conflict;
+    }
+
+    void enqueue(Lit lit) {
+        std::cout << "Enqueueing: " << lit << std::endl;
+        trailUnchanged = false;
+        assignment.assign(lit);
+        phase.assign(lit);
+        trail.push_back(lit);
+    }
+
+    void propagate() {
+        while (current.qhead < trail.size()) {
+            trailUnchanged = true;
+            for (PropagatorPtr& propagator: propagators) {
+                propagator->propagate();
+                if (!trailUnchanged) {
+                    break;
+                }
+            }
+            if (trailUnchanged) {
+                current.qhead = trail.size();
+            }
+        }
+    }
+
+    void reset(PropState resetState) {
+        for (PropagatorPtr& propagator: propagators) {
+            propagator->undo_trail_till(resetState.qhead);
+        }
+
+        while (trail.size() > resetState.qhead) {
+            assignment.unassign(trail.back());
+            trail.pop_back();
+        }
+
+        current = resetState;
+    }
+};
+
 class ClausePropagator {
 public:
     using WatchedType = WatchInfo<Clause>;
@@ -520,28 +614,28 @@ private:
 
 public:
     size_t propagationSearchStart = 2;
-    InlineVec<Lit> terms;
+    InlineVec<Lit> literals;
 
 private:
     Clause(size_t size)
-        :terms(size) {
+        :literals(size) {
     }
 
     Clause(const Clause& other)
-        : terms(other.terms.size())
+        : literals(other.literals.size())
     {
         using namespace std;
-        copy(other.terms.begin(), other.terms.end(), this->terms.begin());
+        copy(other.literals.begin(), other.literals.end(), this->literals.begin());
     }
 
-    Clause(std::vector<Lit>& _terms)
-        : terms(_terms.size())
+    Clause(std::vector<Lit>& _literals)
+        : literals(_literals.size())
     {
-        std::copy(_terms.begin(),_terms.end(), this->terms.begin());
+        std::copy(_literals.begin(),_literals.end(), this->literals.begin());
     }
 
     void checkPosition(size_t pos, int &numFound, size_t (&watcher)[2], Assignment& assignment) {
-        Lit& lit = this->terms[pos];
+        Lit& lit = this->literals[pos];
         switch(assignment[lit]) {
             case State::True:
                 // watcher[numFound] = pos;
@@ -567,9 +661,9 @@ public:
         watcher[0] = 0;
         watcher[1] = 1;
 
-        if (this->terms.size() >= 2) {
-            if (this->terms[1] == falsifiedLit) {
-                std::swap(this->terms[1], this->terms[0]);
+        if (this->literals.size() >= 2) {
+            if (this->literals[1] == falsifiedLit) {
+                std::swap(this->literals[1], this->literals[0]);
             }
 
             checkPosition(0, numFound, watcher, prop.assignment);
@@ -579,21 +673,21 @@ public:
             }
 
             size_t pos = this->propagationSearchStart;
-            for (size_t i = 0; i < this->terms.size() - 2 && numFound < 2; i++) {
+            for (size_t i = 0; i < this->literals.size() - 2 && numFound < 2; i++) {
                 checkPosition(pos, numFound, watcher, prop.assignment);
                 pos += 1;
-                if (pos == this->terms.size()) {
+                if (pos == this->literals.size()) {
                     pos = 2;
                 }
             }
             this->propagationSearchStart = pos;
-        } else if (this->terms.size() == 1) {
+        } else if (this->literals.size() == 1) {
             checkPosition(0, numFound, watcher, prop.assignment);
         }
 
         // LOG(debug) << "numFound: "<< numFound << EOM;
         if (numFound == 1) {
-            Lit lit = this->terms[watcher[0]];
+            Lit lit = this->literals[watcher[0]];
             if (prop.assignment[lit] == State::Unassigned) {
                 prop.enqueue(lit);
             }
@@ -604,7 +698,7 @@ public:
         }
 
         bool keep = false;
-        if (this->terms.size() >= 2) {
+        if (this->literals.size() >= 2) {
             // This variables controlles if we want to update all
             // watches (2) or just the falsified watch (1). The
             // problem with updating all watches is that it might
@@ -612,7 +706,7 @@ public:
             // watcher.
             const size_t numUpdatedWatches = initial?2:1;
             for (size_t i = 0; i < numUpdatedWatches; i++) {
-                auto& lits = this->terms;
+                auto& lits = this->literals;
                 std::swap(lits[i], lits[watcher[i]]);
                 if (lits[i] == falsifiedLit) {
                     keep = true;
@@ -633,6 +727,9 @@ public:
     }
 };
 
+
+template<typename T>
+class IneqPropagator;
 
 template<typename T>
 class FixedSizeInequality {
@@ -675,6 +772,20 @@ private:
         std::copy(_terms.begin(),_terms.end(), this->terms.begin());
     }
 
+    FixedSizeInequality(Clause& clause)
+        : degree(1)
+        , terms(clause.literals.size())
+    {
+        Term<T> term;
+        term.coeff = 1;
+        Term<T>* it = this->terms.begin();
+        for (Lit lit: clause) {
+            term.lit = lit;
+            *it = term;
+            ++it;
+        }
+    }
+
     void computeWatchSize() {
         if (terms.size() == 0) {
             return;
@@ -704,7 +815,7 @@ private:
     }
 
 public:
-    void clearWatches(PropEngine<T>& prop) {
+    void clearWatches(IneqPropagator<T>& prop) {
         for (size_t i = 0; i < this->watchSize; i++) {
             auto& ws = prop.watchlist[terms[i].lit];
             ws.erase(
@@ -721,7 +832,7 @@ public:
     }
 
 
-    void swapWatch(PropEngine<T>& prop, size_t& i, size_t& j, bool& keepWatch, Lit& blockingLiteral, Lit& falsifiedLit, bool init) {
+    void swapWatch(IneqPropagator<T>& prop, size_t& i, size_t& j, bool& keepWatch, Lit& blockingLiteral, Lit& falsifiedLit, bool init) {
         const Lit old = terms[i].lit;
         const Lit nw = terms[j].lit;
         if (old != falsifiedLit && !init) {
@@ -751,10 +862,10 @@ public:
 
     // returns if the watch is kept
     template<bool autoInit>
-    bool updateWatch(PropEngine<T>& prop, Lit falsifiedLit = Lit::Undef()) {
+    bool updateWatch(IneqPropagator<T>& prop, Lit falsifiedLit = Lit::Undef()) {
         // bool isSat = false;
         bool keepWatch = true;
-        prop.visit += 1;
+        // prop.visit += 1;
 
         // std::cout << "updateWatch: " << *this << std::endl;
         const bool init = autoInit && (watchSize == 0);
@@ -770,7 +881,7 @@ public:
         size_t j = this->watchSize;
         size_t k = this->watchSize;
 
-        auto& value = prop.assignment.value;
+        const auto& value = prop.propMaster.getAssignment().value;
 
         // if (this->watchSize == 2 && this->degree == 1) {
         //     if (!init && falsifiedLit != Lit::Undef() && terms[0].lit != falsifiedLit && terms[1].lit != falsifiedLit) {
@@ -798,7 +909,7 @@ public:
         for (size_t i = 0; i < this->watchSize; i++) {
             if (value[terms[i].lit] == State::False) {
                 if (init) {for (;k < terms.size(); k++) {
-                    if (prop.phase[terms[k].lit] == State::True) {
+                    if (prop.propMaster.getPhase()[terms[k].lit] == State::True) {
                         swapWatch(prop,i,k,keepWatch,blockingLiteral,falsifiedLit,init);
                         slack += terms[i].coeff;
                         k++;
@@ -843,15 +954,15 @@ public:
         // }
 
         if (slack < 0) {
-            prop.conflict();
-            prop.visit_required += 1;
+            prop.propMaster.conflict();
+            // prop.visit_required += 1;
         } else if (slack < maxCoeff) {
             for (size_t i = 0; i < this->watchSize; i++) {
                 if (terms[i].coeff > slack
                     && value[terms[i].lit] == State::Unassigned)
                 {
-                    prop.enqueue(terms[i].lit);
-                    prop.visit_required += 1;
+                    prop.propMaster.enqueue(terms[i].lit);
+                    // prop.visit_required += 1;
                 }
             }
         }
@@ -1057,51 +1168,126 @@ public:
 };
 
 template<typename T>
-class PropEngine {
-private:
+class IneqPropagator: public Propagator {
+public:
     typedef WatchInfo<FixedSizeInequality<T>> WatchedType;
     typedef std::vector<WatchedType> WatchList;
+
+    PropagationMaster& propMaster;
+    LitIndexedVec<WatchList> watchlist;
+
+    IneqPropagator(PropagationMaster& _propMaster, size_t _nVars)
+        : propMaster(_propMaster)
+        , watchlist(2 * (_nVars + 1))
+    {
+        for (auto& ws: watchlist) {
+            ws.reserve(50);
+        }
+    }
+
+
+    void watch(Lit lit, WatchedType& w) {
+        watchlist[lit].push_back(w);
+    }
+
+    virtual void increaseNumVarsTo(size_t _nVars){
+        watchlist.resize(2 * (_nVars + 1));
+    }
+
+    virtual void propagate() {
+        const auto& trail = propMaster.getTrail();
+        std::cout << "propagating from: " << qhead << std::endl;
+        while (qhead < trail.size() and !propMaster.isConflicting()) {
+            Lit falsifiedLit = ~trail[qhead];
+            // std::cout << "propagating: " << trail[qhead] << std::endl;
+
+            WatchList& ws = watchlist[falsifiedLit];
+
+            const WatchedType* end = ws.data() + ws.size();
+            WatchedType* sat = ws.data();
+            // WatchedType* it  = ws.data();
+            // for (; it != end; it++) {
+            //     if (assignment.value[it->other] == State::True) {
+            //         std::swap(*it, *sat);
+            //         ++sat;
+            //     }
+            // }
+
+
+            WatchedType* next = &(*sat);
+            WatchedType* kept = next;
+
+            const uint lookAhead = 3;
+            for (; next != end && !propMaster.isConflicting(); next++) {
+                auto fetch = next + lookAhead;
+                if (fetch < end) {
+                    __builtin_prefetch(fetch->ineq);
+                }
+                assert(next->other != Lit::Undef() || propMaster.getAssignment().value[next->other] == State::Unassigned);
+
+                bool keepWatch = true;
+                if (propMaster.getAssignment().value[next->other] != State::True) {
+                    keepWatch = next->ineq->template updateWatch<false>(*this, falsifiedLit);
+                }
+                if (keepWatch) {
+                    *kept = *next;
+                    kept += 1;
+                }
+            }
+
+            // in case of conflict copy remaining watches
+            for (; next != end; next++) {
+                *kept = *next;
+                kept += 1;
+            }
+
+            ws.erase(ws.begin() + (kept - ws.data()), ws.end());
+
+            qhead += 1;
+        }
+    }
+};
+
+/*
+ * Automatically resets the trail to its previous state after the
+ * scope is left. Requires that only new things were put on the
+ * trail, i.e., the trail did not grow shorter.
+ */
+class AutoReset {
+private:
+    PropagationMaster& engine;
+    PropState base;
+public:
+    AutoReset(PropagationMaster& engine_)
+        : engine(engine_)
+        , base(engine.current) {
+
+    }
+
+    ~AutoReset(){
+        engine.reset(base);
+    }
+};
+
+
+template<typename T>
+class PropEngine {
+private:
     typedef std::unordered_set<Inequality<T>*>  OccursList;
 
     typedef Inequality<T> Ineq;
     std::unordered_set<Ineq*, PointedHash<Ineq>, PointedEq<Ineq>> constraintLookup;
 
     size_t nVars;
-    std::vector<Lit> trail;
-
-    PropState current;
-
     bool updateWatch = true;
     size_t dbMem = 0;
     size_t cumDbMem = 0;
     size_t maxDbMem = 0;
 
-
-    /*
-     * Automatically resets the trail to its previous state after the
-     * scope is left. Requires that only new things were put on the
-     * trail, i.e., the trail did not grow shorter.
-     */
-    class AutoReset {
-    private:
-        PropEngine& engine;
-        PropState base;
-    public:
-        AutoReset(PropEngine& engine_)
-            : engine(engine_)
-            , base(engine.current) {
-
-        }
-
-        ~AutoReset(){
-            engine.reset(base);
-        }
-    };
+    PropagationMaster propMaster;
 
 public:
-    Assignment assignment;
-    Assignment phase;
-    LitIndexedVec<WatchList> watchlist;
+    IneqPropagator<T>* propagator;
     LitIndexedVec<OccursList> occurs;
     std::vector<Inequality<T>*> unattached;
     std::vector<Inequality<T>*> propagatingAt0;
@@ -1118,18 +1304,14 @@ public:
 
     PropEngine(size_t _nVars)
         : nVars(_nVars)
-        , assignment(_nVars)
-        , phase(_nVars)
-        , watchlist(2 * (_nVars + 1))
+        , propMaster(_nVars)
         , occurs(2 * (_nVars + 1))
         , timeEffected(0)
         , timeFind(0)
         , timeInitProp(0)
     {
-        for (auto& ws: watchlist) {
-            ws.reserve(50);
-        }
-        trail.reserve(nVars);
+        propMaster.propagators.emplace_back(new IneqPropagator<T>(propMaster, _nVars));
+        propagator = static_cast<IneqPropagator<T>*>(propMaster.propagators.back().get());
     }
 
     void printStats() {
@@ -1165,85 +1347,30 @@ public:
         std::cout << "c statistic: lookup_requests: " << lookup_requests << std::endl;
     }
 
-    void enqueue(Lit lit) {
-        assignment.assign(lit);
-        phase.assign(lit);
-        trail.push_back(lit);
-    }
-
     void increaseNumVarsTo(size_t _nVars){
         assert(nVars <= _nVars);
         if (nVars < _nVars) {
             this->nVars = _nVars;
-            assignment.resize(_nVars);
-            phase.resize(_nVars);
-            watchlist.resize(2 * (_nVars + 1));
+            propMaster.increaseNumVarsTo(_nVars);
             occurs.resize(2 * (_nVars + 1));
         }
     }
 
-    void propagate() {
-        while (current.qhead < trail.size() and !current.conflict) {
-            Lit falsifiedLit = ~trail[current.qhead];
-            // std::cout << "propagating: " << trail[current.qhead] << std::endl;
-
-            WatchList& ws = watchlist[falsifiedLit];
-
-            const WatchedType* end = ws.data() + ws.size();
-            WatchedType* sat = ws.data();
-            // WatchedType* it  = ws.data();
-            // for (; it != end; it++) {
-            //     if (assignment.value[it->other] == State::True) {
-            //         std::swap(*it, *sat);
-            //         ++sat;
-            //     }
-            // }
-
-
-            WatchedType* next = &(*sat);
-            WatchedType* kept = next;
-
-            const uint lookAhead = 3;
-            for (; next != end && !current.conflict; next++) {
-                auto fetch = next + lookAhead;
-                if (fetch < end) {
-                    __builtin_prefetch(fetch->ineq);
-                }
-                assert(next->other != Lit::Undef() || assignment.value[next->other] == State::Unassigned);
-
-                bool keepWatch = true;
-                if (assignment.value[next->other] != State::True) {
-                    keepWatch = next->ineq->template updateWatch<false>(*this, falsifiedLit);
-                }
-                if (keepWatch) {
-                    *kept = *next;
-                    kept += 1;
-                }
-            }
-
-            // in case of conflict copy remaining watches
-            for (; next != end; next++) {
-                *kept = *next;
-                kept += 1;
-            }
-
-            ws.erase(ws.begin() + (kept - ws.data()), ws.end());
-
-            current.qhead += 1;
-        }
+    void propagate(){
+        propMaster.propagate();
     }
 
     bool propagate4sat(std::vector<int>& lits) {
-        AutoReset autoReset(*this);
+        AutoReset reset(this->propMaster);
 
         for (int lit: lits) {
             Lit l(lit);
-            auto val = assignment.value[l];
+            auto val = propMaster.getAssignment().value[l];
 
             if (val == State::Unassigned) {
-                enqueue(l);
+                propMaster.enqueue(l);
             } else if (val == State::False) {
-                conflict();
+                propMaster.conflict();
                 break;
             }
         }
@@ -1251,10 +1378,10 @@ public:
         propagate();
 
         bool success = false;
-        if (!current.conflict) {
+        if (!propMaster.isConflicting()) {
             success = true;
             for (uint var = 1; var <= nVars; var++) {
-                auto val = assignment.value[Lit(var)];
+                auto val = propMaster.getAssignment().value[Lit(var)];
                 if (val == State::Unassigned) {
                     success = false;
                     break;
@@ -1266,17 +1393,17 @@ public:
     }
 
     bool checkSat(std::vector<int>& lits) {
-        AutoReset reset(*this);
+        AutoReset reset(this->propMaster);
         initPropagation();
         return propagate4sat(lits);
     }
 
     void _attach(Inequality<T>* ineq) {
-        AutoReset autoReset(*this);
+        AutoReset reset(this->propMaster);
 
-        assert(this->trail.size() == 0);
+        assert(propMaster.getTrail().size() == 0);
         ineq->updateWatch(*this);
-        if (this->trail.size() > 0 || isConflicting()) {
+        if (propMaster.getTrail().size() > 0 || propMaster.isConflicting()) {
             this->propagatingAt0.push_back(ineq);
         }
     }
@@ -1306,7 +1433,7 @@ public:
 
     void initPropagation() {
         Timer timer(timeInitProp);
-        assert(this->current.qhead == 0);
+        assert(propMaster.getTrail().size() == 0);
         attachUnattached();
         for (Inequality<T>* ineq: this->propagatingAt0) {
             ineq->updateWatch(*this);
@@ -1373,34 +1500,14 @@ public:
         }
     }
 
-    /*
-     * Propagates a constraint once without attaching it.
-     * Returns true if some variable was propagated.
-     */
-    bool singleTmpPropagation(FixedSizeInequality<T>& ineq) {
-        disableWatchUpdate();
-        ineq.template updateWatch<true>(*this);
-        enableWatchUpdate();
-
-        return (current.qhead != trail.size());
-    }
-
-    void disableWatchUpdate(){
-        this->updateWatch = false;
-    }
-
-    void enableWatchUpdate(){
-        this->updateWatch = true;
-    }
-
     std::vector<int> propagatedLits() {
-        AutoReset reset(*this);
+        AutoReset reset(this->propMaster);
         initPropagation();
         propagate();
 
         std::vector<int> assignment;
         for (uint var = 1; var <= nVars; var++) {
-            State val = this->assignment.value[Lit(var)];
+            State val = propMaster.getAssignment().value[Lit(var)];
             int lit = var;
             if (val != State::Unassigned) {
                 if (val == State::True) {
@@ -1414,23 +1521,24 @@ public:
     }
 
     bool rupCheck(const FixedSizeInequality<T>& redundant) {
-        AutoReset reset(*this);
+        AutoReset reset(this->propMaster);
         initPropagation();
 
         FixedSizeInequalityHandler<T> negated(redundant);
         negated->negate();
 
-        while (!current.conflict &&
-                singleTmpPropagation(*negated))
-        {
-            propagate();
-        }
+        propMaster.propagators.emplace_back(new IneqPropagator<T>(propMaster, nVars));
+        IneqPropagator<T>* tmpPropagator = static_cast<IneqPropagator<T>*>(propMaster.propagators.back().get());
+        negated->template updateWatch<true>(*tmpPropagator);
 
+        propagate();
+
+        propMaster.propagators.pop_back();
         // for (Lit lit : this->trail) {
         //     std::cout << lit << " ";
         // }
         // std::cout << std::endl;
-        return current.conflict;
+        return propMaster.isConflicting();
     }
 
     long long estimateNumEffected(Substitution& sub) {
@@ -1494,39 +1602,12 @@ public:
         }
     }
 
-
-    void reset(PropState base) {
-        while (trail.size() > base.qhead) {
-            assignment.unassign(trail.back());
-            trail.pop_back();
-        }
-        current = base;
-    }
-
-    bool isConflicting(){
-        return current.conflict;
-    }
-
-    void conflict() {
-        current.conflict = true;
-    }
-
-    void watch(Lit lit, WatchedType& w) {
-        if (this->updateWatch) {
-            watchlist[lit].push_back(w);
-        }
-    }
-
     void addOccurence(Lit lit, Inequality<T>& w) {
-        if (this->updateWatch) {
-            occurs[lit].emplace(&w);
-        }
+        occurs[lit].emplace(&w);
     }
 
     void rmOccurence(Lit lit, Inequality<T>& w) {
-        if (this->updateWatch) {
-            occurs[lit].erase(&w);
-        }
+        occurs[lit].erase(&w);
     }
 
 };
@@ -1760,13 +1841,13 @@ public:
             propagating.end()
         );
 
-        ineq->clearWatches(prop);
+        ineq->clearWatches(*prop.propagator);
     }
 
     void updateWatch(PropEngine<T>& prop) {
         assert(frozen && "Call freeze() first.");
         // ineq->updateWatch<true>(prop);
-        ineq->template updateWatch<true>(prop);
+        ineq->template updateWatch<true>(*prop.propagator);
     }
 
     Inequality* saturate(){

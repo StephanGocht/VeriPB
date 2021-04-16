@@ -9,9 +9,12 @@
 #include "constraints.hpp"
 
 void ClausePropagator::propagate() {
-    while (current.qhead < trail.size() and !current.conflict) {
-        Lit falsifiedLit = ~trail[current.qhead];
-        // std::cout << "propagating: " << trail[current.qhead] << std::endl;
+    // std::cout << "ClausePropagator: propagating from: " << qhead << std::endl;
+    const auto& trail = propMaster.getTrail();
+    const Assignment& assignment = propMaster.getAssignment();
+    while (qhead < trail.size() and !propMaster.isConflicting()) {
+        Lit falsifiedLit = ~trail[qhead];
+        // std::cout << "propagating: " << trail[qhead] << std::endl;
 
         WatchList& ws = watchlist[falsifiedLit];
 
@@ -26,16 +29,16 @@ void ClausePropagator::propagate() {
         // }
 
 
-        WatchedType* next = &(*sat);
+        WatchedType* next = sat;
         WatchedType* kept = next;
 
         const uint lookAhead = 3;
-        for (; next != end && !current.conflict; next++) {
+        for (; next != end && !propMaster.isConflicting(); next++) {
             auto fetch = next + lookAhead;
             if (fetch < end) {
                 __builtin_prefetch(fetch->ineq);
             }
-            assert(next->other != Lit::Undef() || assignment.value[next->other] == State::Unassigned);
+            assert(next->other != Lit::Undef() || assignment[next->other] == State::Unassigned);
 
             bool keepWatch = true;
             if (assignment.value[next->other] != State::True) {
@@ -55,7 +58,7 @@ void ClausePropagator::propagate() {
 
         ws.erase(ws.begin() + (kept - ws.data()), ws.end());
 
-        current.qhead += 1;
+        qhead += 1;
     }
 }
 

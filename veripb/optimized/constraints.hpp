@@ -13,6 +13,10 @@
 
 #include "BigInt.hpp"
 
+#ifndef NDEBUG
+    #include <execinfo.h>
+#endif
+
 using CoefType = int;
 // use one of the following lines istead to increas precision.
 // using CoefType = long long;
@@ -36,6 +40,18 @@ public:
 inline bool assert_handler(std::string condition, std::string file, int line) {
     std::stringstream s;
     s << std::endl << file << ":" << line << " Assertion failed: '" << condition << "'";
+
+    #ifndef NDEBUG
+        void *array[10];
+        size_t size;
+
+        // get void*'s for all entries on the stack
+        size = backtrace(array, 10);
+
+        // print out all the frames to stderr
+        backtrace_symbols_fd(array, size, STDERR_FILENO);
+    #endif
+
     throw assertion_error(s.str());
     return false;
 }
@@ -235,14 +251,14 @@ public:
     // using std::vector<T>::operator[];
     T& operator[](Var idx) = delete;
     T& operator[](Lit idx) {
-        return this->std::vector<T>::operator[](
-            static_cast<size_t>(idx)
-        );
+        size_t pos = static_cast<size_t>(idx);
+        assert(pos < this->size());
+        return this->std::vector<T>::operator[](pos);
     }
     const T& operator[](Lit idx) const {
-        return this->std::vector<T>::operator[](
-            static_cast<size_t>(idx)
-        );
+        size_t pos = static_cast<size_t>(idx);
+        assert(pos < this->size());
+        return this->std::vector<T>::operator[](pos);
     }
 };
 
@@ -258,14 +274,14 @@ public:
     // using std::vector<T>::operator[];
     T& operator[](Lit idx) = delete;
     T& operator[](Var idx) {
-        return this->std::vector<T>::operator[](
-            static_cast<size_t>(idx)
-        );
+        size_t pos = static_cast<size_t>(idx);
+        assert(pos < this->size());
+        return this->std::vector<T>::operator[](pos);
     }
     const T& operator[](Var idx) const {
-        return this->std::vector<T>::operator[](
-            static_cast<size_t>(idx)
-        );
+        size_t pos = static_cast<size_t>(idx);
+        assert(pos < this->size());
+        return this->std::vector<T>::operator[](pos);
     }
 };
 
@@ -446,6 +462,10 @@ public:
         return data[index];
     }
 
+    const Element& operator[](size_t index) const {
+        return data[index];
+    }
+
     const Element* begin() const {
         return data;
     }
@@ -513,7 +533,7 @@ private:
     friend class AutoReset;
 
 public:
-    std::vector<PropagatorPtr> propagators;
+    std::vector<Propagator*> propagators;
 
     const Assignment& getAssignment() {return assignment;}
     const Assignment& getPhase() {return phase;}
@@ -529,7 +549,7 @@ public:
     void increaseNumVarsTo(size_t _nVars) {
         assignment.resize(_nVars);
         phase.resize(_nVars);
-        for (PropagatorPtr& propagator: propagators) {
+        for (Propagator* propagator: propagators) {
             propagator->increaseNumVarsTo(_nVars);
         }
     }
@@ -543,7 +563,7 @@ public:
     }
 
     void enqueue(Lit lit) {
-        std::cout << "Enqueueing: " << lit << std::endl;
+        // std::cout << "Enqueueing: " << lit << std::endl;
         trailUnchanged = false;
         assignment.assign(lit);
         phase.assign(lit);
@@ -553,7 +573,7 @@ public:
     void propagate() {
         while (current.qhead < trail.size()) {
             trailUnchanged = true;
-            for (PropagatorPtr& propagator: propagators) {
+            for (Propagator* propagator: propagators) {
                 propagator->propagate();
                 if (!trailUnchanged) {
                     break;
@@ -566,7 +586,8 @@ public:
     }
 
     void reset(PropState resetState) {
-        for (PropagatorPtr& propagator: propagators) {
+        // std::cout << "Reset to trail pos " << resetState.qhead << std::endl;
+        for (Propagator* propagator: propagators) {
             propagator->undo_trail_till(resetState.qhead);
         }
 
@@ -579,30 +600,31 @@ public:
     }
 };
 
-class ClausePropagator {
+class ClausePropagator: public Propagator {
 public:
     using WatchedType = WatchInfo<Clause>;
     using WatchList = std::vector<WatchedType>;
 
-    Assignment& assignment;
-    std::vector<Lit>& trail;
-    PropState current;
+    PropagationMaster& propMaster;
     LitIndexedVec<WatchList> watchlist;
 
-    void enqueue(Lit lit) {
-        // todo master propagator?
-    }
+    ClausePropagator(PropagationMaster& _propMaster, size_t nVars)
+        : propMaster(_propMaster)
+        , watchlist(2 * (nVars + 1))
+    {
 
-    void conflict() {
-        current.conflict = true;
-        // todo master propagator?
     }
 
     void watch(Lit lit, WatchedType& w) {
+        // std::cout << "adding watch  " << lit << std::endl;
         watchlist[lit].push_back(w);
     }
 
-    void propagate();
+    virtual void increaseNumVarsTo(size_t nVars) {
+        watchlist.resize(2 * (nVars + 1));
+    }
+
+    virtual void propagate();
 };
 
 class Clause {
@@ -611,6 +633,7 @@ private:
     using TVec = InlineVec<TElement>;
 
     friend ClauseHandler;
+    friend std::ostream& operator<<(std::ostream& os, const Clause& v);
 
 public:
     size_t propagationSearchStart = 2;
@@ -634,13 +657,28 @@ private:
         std::copy(_literals.begin(),_literals.end(), this->literals.begin());
     }
 
-    void checkPosition(size_t pos, int &numFound, size_t (&watcher)[2], Assignment& assignment) {
+    template<typename T>
+    Clause(const FixedSizeInequality<T>& other)
+        : literals(other.terms.size())
+    {
+        for (size_t i = 0; i < other.terms.size(); ++i) {
+            literals[i] = other.terms[i].lit;
+        }
+    }
+
+    void checkPosition(size_t pos, int &numFound, size_t (&watcher)[2], const Assignment& assignment) {
         Lit& lit = this->literals[pos];
         switch(assignment[lit]) {
             case State::True:
-                // watcher[numFound] = pos;
-                // numFound = 2;
-                // break;
+                if (pos == 1) {
+                    watcher[0] = 0;
+                    watcher[1] = 1;
+                } else {
+                    watcher[0] = pos;
+                    watcher[1] = 1;
+                }
+                numFound = 2;
+                break;
             case State::Unassigned:
                 watcher[numFound] = pos;
                 numFound += 1;
@@ -650,7 +688,29 @@ private:
         }
     }
 public:
+    void clearWatches(ClausePropagator& prop) {
+        size_t nWatcher = std::min((size_t) 2, literals.size());
+        for (size_t i = 0; i < nWatcher; i++) {
+            auto& ws = prop.watchlist[literals[i]];
+            ws.erase(
+                std::remove_if(
+                    ws.begin(),
+                    ws.end(),
+                    [this](auto& watch){
+                        return watch.ineq == this;
+                    }
+                ),
+                ws.end()
+            );
+        }
+    }
+
     void initWatch(ClausePropagator& prop) {
+        for (Lit lit: literals) {
+            assert(static_cast<size_t>(lit.var()) < prop.propMaster.getAssignment().value.size());
+            assert(static_cast<size_t>(lit) < prop.watchlist.size());
+        }
+        // std::cout << "initializing " << *this << std::endl;
         updateWatch(prop, Lit::Undef(), true);
     }
 
@@ -658,23 +718,22 @@ public:
         int numFound = 0;
         // watcher will contain the position of the literals to be watched
         size_t watcher[2];
-        watcher[0] = 0;
-        watcher[1] = 1;
+
+        const Assignment& assignment = prop.propMaster.getAssignment();
 
         if (this->literals.size() >= 2) {
             if (this->literals[1] == falsifiedLit) {
-                std::swap(this->literals[1], this->literals[0]);
+                std::swap(this->literals[0], this->literals[1]);
             }
 
-            checkPosition(0, numFound, watcher, prop.assignment);
-
+            checkPosition(0, numFound, watcher, assignment);
             if (numFound < 2) {
-                checkPosition(1, numFound, watcher, prop.assignment);
+                checkPosition(1, numFound, watcher, assignment);
             }
 
             size_t pos = this->propagationSearchStart;
             for (size_t i = 0; i < this->literals.size() - 2 && numFound < 2; i++) {
-                checkPosition(pos, numFound, watcher, prop.assignment);
+                checkPosition(pos, numFound, watcher, assignment);
                 pos += 1;
                 if (pos == this->literals.size()) {
                     pos = 2;
@@ -682,42 +741,51 @@ public:
             }
             this->propagationSearchStart = pos;
         } else if (this->literals.size() == 1) {
-            checkPosition(0, numFound, watcher, prop.assignment);
+            checkPosition(0, numFound, watcher, assignment);
         }
 
         // LOG(debug) << "numFound: "<< numFound << EOM;
         if (numFound == 1) {
             Lit lit = this->literals[watcher[0]];
-            if (prop.assignment[lit] == State::Unassigned) {
-                prop.enqueue(lit);
+            if (assignment[lit] == State::Unassigned) {
+                prop.propMaster.enqueue(lit);
             }
         }
 
         if (numFound == 0) {
-            prop.conflict();
+            prop.propMaster.conflict();
         }
 
-        bool keep = false;
+        bool keep = true;
         if (this->literals.size() >= 2) {
-            // This variables controlles if we want to update all
-            // watches (2) or just the falsified watch (1). The
-            // problem with updating all watches is that it might
-            // cause memory blowup unless we remove the swaped out
-            // watcher.
-            const size_t numUpdatedWatches = initial?2:1;
-            for (size_t i = 0; i < numUpdatedWatches; i++) {
-                auto& lits = this->literals;
-                std::swap(lits[i], lits[watcher[i]]);
-                if (lits[i] == falsifiedLit) {
-                    keep = true;
-                } else if (watcher[i] >= 2 || initial) { // was not a watched literal / needs to be readded
+            if (numFound == 0) {
+                watcher[0] = 0;
+                watcher[1] = 1;
+            } else if (numFound == 1) {
+                if (watcher[0] == 1) {
+                    watcher[0] = 0;
+                    watcher[1] = 1;
+                } else {
+                    watcher[1] = 1;
+                }
+            } else if (watcher[0] == 1) {
+                std::swap(watcher[0], watcher[1]);
+            }
+
+            for (size_t i = 0; i < 2; i++) {
+                assert(watcher[i] < literals.size());
+
+                if (initial || (i == 0 && watcher[i] >= 2)) { // was not a watched literal / needs to be readded
+                    keep = false;
+                    std::swap(literals[i], literals[watcher[i]]);
                     WatchInfo<Clause> watchInfo;
                     watchInfo.ineq = this;
-                    watchInfo.other = lits[watcher[(i + 1) % 2]];
-                    prop.watch(lits[i], watchInfo);
+                    watchInfo.other = literals[watcher[(i + 1) % 2]];
+                    prop.watch(literals[i], watchInfo);
                 }
             }
-            if (numUpdatedWatches == 1 && numFound == 2 && watcher[1] >= 2) {
+
+            if (!initial && numFound == 2 && watcher[1] >= 2) {
                 // Let us start the search where we found the second
                 // non falsified literal.
                 this->propagationSearchStart = watcher[1];
@@ -727,6 +795,17 @@ public:
     }
 };
 
+
+inline std::ostream& operator<<(std::ostream& os, const Clause& v) {
+    Term<int> term;
+    term.coeff = 1;
+    for (Lit lit: v.literals) {
+        term.lit = lit;
+        os << term << " ";
+    };
+    os << " >= 1";
+    return os;
+}
 
 template<typename T>
 class IneqPropagator;
@@ -1063,6 +1142,24 @@ inline std::ostream& operator<<(std::ostream& os, const FixedSizeInequality<T>& 
     return os;
 }
 
+inline std::ostream& operator<<(std::ostream& os, const ClausePropagator& v) {
+    os << "ClausePropagator State:\n";
+    for (size_t i = 1; i < v.watchlist.size() / 2; ++i) {
+        Var var(i);
+        for (bool sign: {false, true}) {
+            Lit lit1(var, sign);
+            if (v.watchlist[lit1].size() == 0) {
+                continue;
+            }
+            os << "\t" << lit1 << ":\n";
+            for (size_t j = 0; j < v.watchlist[lit1].size(); ++j) {
+                os << "\t\t" << *v.watchlist[lit1][j].ineq << "\n";
+            }
+        }
+    }
+    return os;
+}
+
 template<typename TConstraint>
 class ConstraintHandler {
 private:
@@ -1102,6 +1199,8 @@ public:
         other.ineq = nullptr;
     }
 
+    ConstraintHandler() {}
+
     TConstraint& operator*(){
         return *ineq;
     }
@@ -1114,6 +1213,7 @@ public:
         this->free();
         ineq = other.ineq;
         other.ineq = nullptr;
+        return *this;
     }
 
     template <typename ...Args>
@@ -1196,7 +1296,7 @@ public:
 
     virtual void propagate() {
         const auto& trail = propMaster.getTrail();
-        std::cout << "propagating from: " << qhead << std::endl;
+        // std::cout << "IneqPropagator: propagating from: " << qhead << std::endl;
         while (qhead < trail.size() and !propMaster.isConflicting()) {
             Lit falsifiedLit = ~trail[qhead];
             // std::cout << "propagating: " << trail[qhead] << std::endl;
@@ -1287,7 +1387,9 @@ private:
     PropagationMaster propMaster;
 
 public:
-    IneqPropagator<T>* propagator;
+    IneqPropagator<T> ineqPropagator;
+    ClausePropagator clausePropagator;
+
     LitIndexedVec<OccursList> occurs;
     std::vector<Inequality<T>*> unattached;
     std::vector<Inequality<T>*> propagatingAt0;
@@ -1305,13 +1407,15 @@ public:
     PropEngine(size_t _nVars)
         : nVars(_nVars)
         , propMaster(_nVars)
+        , ineqPropagator(propMaster, _nVars)
+        , clausePropagator(propMaster, _nVars)
         , occurs(2 * (_nVars + 1))
         , timeEffected(0)
         , timeFind(0)
         , timeInitProp(0)
     {
-        propMaster.propagators.emplace_back(new IneqPropagator<T>(propMaster, _nVars));
-        propagator = static_cast<IneqPropagator<T>*>(propMaster.propagators.back().get());
+        propMaster.propagators.push_back(&clausePropagator);
+        propMaster.propagators.push_back(&ineqPropagator);
     }
 
     void printStats() {
@@ -1438,6 +1542,8 @@ public:
         for (Inequality<T>* ineq: this->propagatingAt0) {
             ineq->updateWatch(*this);
         }
+        // std::cout << "after init:\n";
+        // std::cout << clausePropagator;
         // propagate();
     }
 
@@ -1494,6 +1600,17 @@ public:
                     assert(unattached.back() == ineq);
                     unattached.pop_back();
                 } else {
+                    auto& propagating = propagatingAt0;
+                    propagating.erase(
+                        std::remove_if(
+                            propagating.begin(),
+                            propagating.end(),
+                            [ineq](auto& other){
+                                return other == ineq;
+                            }
+                        ),
+                        propagating.end()
+                    );
                     ineq->clearWatches(*this);
                 }
             }
@@ -1527,9 +1644,9 @@ public:
         FixedSizeInequalityHandler<T> negated(redundant);
         negated->negate();
 
-        propMaster.propagators.emplace_back(new IneqPropagator<T>(propMaster, nVars));
-        IneqPropagator<T>* tmpPropagator = static_cast<IneqPropagator<T>*>(propMaster.propagators.back().get());
-        negated->template updateWatch<true>(*tmpPropagator);
+        IneqPropagator<T> tmpPropagator(propMaster, nVars);
+        propMaster.propagators.push_back(&tmpPropagator);
+        negated->template updateWatch<true>(tmpPropagator);
 
         propagate();
 
@@ -1762,10 +1879,10 @@ private:
 
     FixedSizeInequalityHandler<T> handler;
     FixedSizeInequality<T>* &ineq = handler.ineq;
+    ClauseHandler clauseHandler;
 
     static std::vector<FatInequalityPtr<T>> pool;
 
-    friend PropEngine<T>;
     friend std::hash<Inequality<T>>;
 public:
     bool isAttached = false;
@@ -1829,25 +1946,24 @@ public:
     void clearWatches(PropEngine<T>& prop) {
         assert(frozen);
 
-        auto& propagating = prop.propagatingAt0;
-        propagating.erase(
-            std::remove_if(
-                propagating.begin(),
-                propagating.end(),
-                [this](auto& ineq){
-                    return ineq == this;
-                }
-            ),
-            propagating.end()
-        );
-
-        ineq->clearWatches(*prop.propagator);
+        if (clauseHandler.ineq) {
+            clauseHandler.ineq->clearWatches(prop.clausePropagator);
+        } else {
+            ineq->clearWatches(prop.ineqPropagator);
+        }
     }
 
     void updateWatch(PropEngine<T>& prop) {
         assert(frozen && "Call freeze() first.");
-        // ineq->updateWatch<true>(prop);
-        ineq->template updateWatch<true>(*prop.propagator);
+
+        if (ineq->degree == 1) {
+            if (!clauseHandler.ineq) {
+                clauseHandler = ClauseHandler(ineq->terms.size(), *ineq);
+            }
+            clauseHandler.ineq->initWatch(prop.clausePropagator);
+        } else {
+            ineq->template updateWatch<true>(prop.ineqPropagator);
+        }
     }
 
     Inequality* saturate(){

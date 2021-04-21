@@ -1,6 +1,6 @@
 ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
-.PHONY: all test install cpp dist clean
+.PHONY: all test install cpp dist clean dev
 
 CPP_FILES:=\
 	./veripb/optimized/constraints.cpp \
@@ -26,13 +26,28 @@ CYTHON_COMPILED_C=$(CYTHON:.py=.c)
 # if you want to use asan you need prepend the following
 # when running veripb, if compiled with gcc
 # LD_PRELOAD=$(gcc -print-file-name=libasan.so)
-CXX_FLAGS?=-O3 -g -DNDEBUG #-fsanitize=address
+CXX_FLAGS?=-O3 -g
+CXX_FLAGS:=${CXX_FLAGS} -DNDEBUG
+# CXX_FLAGS:=${CXX_FLAGS} -fsanitize=address
+
+
+# use full for getting better profiling without too much overhead
+# required for perf profiling
+# CXX_FLAGS:=${CXX_FLAGS} -fno-omit-frame-pointer
+# no inlining can give more details but might lead to slower
+# performance and hence skew the profiling information
+# CXX_FLAGS:=${CXX_FLAGS} -fno-inline
+
+
 
 PYBINDINCLUDE:=`python3 -m pybind11 --includes`
 
 .PHONY: install test all
 
-all: install
+#all: install
+all: dev
+
+dev: veripb/optimized/constraints.o
 
 test: cpp
 	python3 -m pytest ${ROOT_DIR}
@@ -41,7 +56,7 @@ install:
 	pip3 install --user -e ${ROOT_DIR}
 
 %.o: %.cpp ${HPP_FILES} Makefile
-	$(CXX) -c -Wall -std=c++17 -fPIC ${CXX_FLAGS}\
+	$(CXX) -c -Wall -std=c++17 -fPIC ${CXX_FLAGS} -fmax-errors=3\
 			-o $@ \
 			${PYBINDINCLUDE} \
 			$< \
@@ -49,7 +64,7 @@ install:
 
 
 cpp: ${CPP_FILES_COMPILED} ${HPP_FILES}
-	$(CXX) -Wall -shared -std=c++17 -fPIC \
+	$(CXX) -Wall -shared -std=c++17 -fPIC ${CXX_FLAGS} \
 		${CPP_FILES_COMPILED} \
 		-o veripb/optimized/pybindings`python3-config --extension-suffix` \
 		-lgmp -lgmpxx -DPY_BINDINGS

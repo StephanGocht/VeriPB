@@ -1280,9 +1280,9 @@ public:
         : propMaster(_propMaster)
         , watchlist(2 * (_nVars + 1))
     {
-        for (auto& ws: watchlist) {
-            ws.reserve(50);
-        }
+        // for (auto& ws: watchlist) {
+        //     ws.reserve(50);
+        // }
     }
 
 

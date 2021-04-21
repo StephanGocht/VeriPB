@@ -1800,7 +1800,7 @@ public:
 
         auto pos = ineq.terms.begin();
         for (Var var: this->usedList) {
-            T coeff = this->coeffs[var];
+            T& coeff = this->coeffs[var];
             Lit lit(var, coeff < 0);
             using namespace std;
             coeff = abs(coeff);
@@ -1808,7 +1808,7 @@ public:
             if (coeff > 0) {
                 assert(var != Substitution::one().var());
                 assert(pos != ineq.terms.end());
-                pos->coeff = coeff;
+                pos->coeff = std::move(coeff);
                 pos->lit = lit;
                 pos += 1;
             }
@@ -1845,9 +1845,13 @@ public:
         Var var = term.lit.var();
         this->use(var);
         T a = this->coeffs[var];
-        this->coeffs[var] = a + b;
-        T cancellation = max<T>(0, max(abs(a), abs(b)) - abs(this->coeffs[var]));
-        this->degree -= cancellation;
+        if (a == 0) {
+            this->coeffs[var] = b;
+        } else {
+            this->coeffs[var] = a + b;
+            T cancellation = max<T>(0, max(abs(a), abs(b)) - abs(this->coeffs[var]));
+            this->degree -= cancellation;
+        }
     }
 
     void add(const FixedSizeInequality<T>& other) {

@@ -75,6 +75,50 @@ public:
 
 extern int hashColision;
 
+class IJunkyard {
+public:
+    virtual void clear() = 0;
+};
+
+class MasterJunkyard {
+public:
+    std::vector<IJunkyard*> yards;
+
+    static MasterJunkyard& get() {
+        static MasterJunkyard junkyard;
+        return junkyard;
+    }
+
+    void clearAll() {
+        for (IJunkyard* yard: yards) {
+            yard->clear();
+        }
+    }
+};
+
+template<typename T>
+class Junkyard : public IJunkyard {
+private:
+    std::vector<T> junk;
+
+public:
+    Junkyard(MasterJunkyard& master) {
+        master.yards.push_back(this);
+    }
+
+    static Junkyard<T>& get() {
+        static Junkyard<T> junkyard(MasterJunkyard::get());
+        return junkyard;
+    }
+
+    void add(T&& value) {
+        junk.push_back(std::move(value));
+    }
+
+    void clear() {
+        junk.clear();
+    }
+};
 
 template<typename T>
 struct PointedEq {
@@ -617,7 +661,21 @@ public:
         reasons.emplace_back(std::move(reason));
     }
 
+    bool isTrailClean() {
+        for (ReasonPtr& reason: reasons) {
+            if (reason->isMarkedForDeletion()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     void cleanupTrail() {
+        if (isTrailClean()) {
+            return;
+        }
+
         std::vector<ReasonPtr> oldReasons;
         std::swap(oldReasons, reasons);
         std::vector<Lit> oldTrail;
@@ -641,6 +699,8 @@ public:
                 enqueue(oldTrail[i], nullptr);
             }
         }
+
+        assert(isTrailClean());
     }
 
     void cleanupWatches() {
@@ -731,6 +791,10 @@ public:
     InlineVec<Lit> literals;
 
 private:
+    // size_t size() const {
+    //     return literals.size();
+    // }
+
     Clause(size_t size)
         :literals(size) {
     }
@@ -806,6 +870,13 @@ public:
     }
 
     bool updateWatch(ClausePropagator& prop, Lit falsifiedLit, bool initial = false) {
+        bool keep = true;
+
+        if (header.isMarkedForDeletion) {
+            keep = false;
+            return keep;
+        }
+
         int numFound = 0;
         // watcher will contain the position of the literals to be watched
         size_t watcher[2];
@@ -849,7 +920,6 @@ public:
             prop.propMaster.conflict();
         }
 
-        bool keep = true;
         if (this->literals.size() >= 2) {
             if (numFound == 0) {
                 watcher[0] = 0;
@@ -915,7 +985,7 @@ public:
     DBConstraintHeader header;
 
     T degree;
-    T maxCoeff;
+    T maxCoeff = 0;
 
     using TElement = Term<T>;
     using TVec = std::conditional_t<
@@ -929,6 +999,10 @@ public:
 private:
     friend FixedSizeInequalityHandler<T>;
     friend std::hash<FixedSizeInequality<T>>;
+
+    size_t size() const {
+        return terms.size();
+    }
 
     FixedSizeInequality(size_t size)
         :terms(size) {
@@ -963,19 +1037,21 @@ private:
         }
     }
 
+    void computeMaxCoeff(){
+        std::sort(terms.begin(), terms.end(), orderByCoeff<Term<T>>);
+        maxCoeff = terms[terms.size() - 1].coeff;
+    }
+
     void computeWatchSize() {
         if (terms.size() == 0) {
             return;
         }
 
-        // improve: that is just lazy... we probably want to have
-        // pair<T, int> in general.
-        std::sort(terms.begin(), terms.end(), orderByCoeff<Term<T>>);
+        computeMaxCoeff();
 
         // we propagate lit[i] if slack < coeff[i] so we
         // need to make sure that if no watch is falsified we
         // have always slack() >= maxCoeff
-        maxCoeff = terms[terms.size() - 1].coeff;
         T value = -this->degree;
 
         size_t i = 0;
@@ -992,6 +1068,29 @@ private:
     }
 
 public:
+
+    bool isPropagatingAt0() {
+        if (terms.size() == 0) {
+            return false;
+        }
+
+        if (maxCoeff == 0) {
+            computeMaxCoeff();
+        }
+
+        T value = -this->degree;
+
+        size_t i = 0;
+        for (; i < terms.size(); i++) {
+            value += terms[i].coeff;
+            if (value >= maxCoeff) {
+                break;
+            }
+        }
+
+        return value < maxCoeff;
+    }
+
     void clearWatches(IneqPropagator<T>& prop) {
         for (size_t i = 0; i < this->watchSize; i++) {
             auto& ws = prop.watchlist[terms[i].lit];
@@ -1046,6 +1145,11 @@ public:
     bool updateWatch(IneqPropagator<T>& prop, Lit falsifiedLit = Lit::Undef()) {
         // bool isSat = false;
         bool keepWatch = true;
+
+        if (header.isMarkedForDeletion) {
+            keepWatch = false;
+            return keepWatch;
+        }
         // prop.visit += 1;
 
         // std::cout << "updateWatch: " << *this << std::endl;
@@ -1246,6 +1350,25 @@ inline std::ostream& operator<<(std::ostream& os, const FixedSizeInequality<T>& 
     return os;
 }
 
+template<typename T>
+inline std::ostream& operator<<(std::ostream& os, const IneqPropagator<T>& v) {
+    os << "IneqPropagator State:\n";
+    for (size_t i = 1; i < v.watchlist.size() / 2; ++i) {
+        Var var(i);
+        for (bool sign: {false, true}) {
+            Lit lit1(var, sign);
+            if (v.watchlist[lit1].size() == 0) {
+                continue;
+            }
+            os << "\t" << lit1 << ":\n";
+            for (size_t j = 0; j < v.watchlist[lit1].size(); ++j) {
+                os << "\t\t" << *v.watchlist[lit1][j].ineq << "\n";
+            }
+        }
+    }
+    return os;
+}
+
 inline std::ostream& operator<<(std::ostream& os, const ClausePropagator& v) {
     os << "ClausePropagator State:\n";
     for (size_t i = 1; i < v.watchlist.size() / 2; ++i) {
@@ -1290,19 +1413,18 @@ public:
     TConstraint* ineq = nullptr;
     size_t capacity = 0;
 
+    ConstraintHandler(ConstraintHandler<TConstraint>&& other) noexcept {
+        ineq = other.ineq;
+        other.ineq = nullptr;
+    }
+
     ConstraintHandler(const TConstraint& copyFrom) {
-        void* addr = malloc(copyFrom.terms.size());
+        void* addr = malloc(copyFrom.size());
         ineq = new (addr) TConstraint(copyFrom);
     }
 
     ConstraintHandler(const ConstraintHandler<TConstraint>& other):
         ConstraintHandler(*other.ineq) {}
-
-    ConstraintHandler(ConstraintHandler<TConstraint>&& other) {
-        ineq = other.ineq;
-        other.ineq = nullptr;
-    }
-
     ConstraintHandler() {}
 
     TConstraint& operator*(){
@@ -1346,32 +1468,6 @@ public:
 };
 
 template<typename T>
-class ConstraintDatabase {
-private:
-    typedef FixedSizeInequalityHandler<T> Handler;
-    typedef std::vector<Handler> HandleList;
-    HandleList handled;
-
-public:
-    void take(FixedSizeInequalityHandler<T>&& t) {
-        handled.emplace_back(t);
-    }
-
-    void clean() {
-        handled.erase(
-            std::remove_if(
-                handled.begin(),
-                handled.end(),
-                [](Handler& handler){
-                    return handler->ineq.isDeleted();
-                }
-            ),
-            handled.end()
-        );
-    }
-};
-
-template<typename T>
 class IneqPropagator: public Propagator {
 public:
     typedef WatchInfo<FixedSizeInequality<T>> WatchedType;
@@ -1401,6 +1497,7 @@ public:
     virtual void propagate() {
         const auto& trail = propMaster.getTrail();
         // std::cout << "IneqPropagator: propagating from: " << qhead << std::endl;
+        // std::cout << *this << std::endl;
         while (qhead < trail.size() and !propMaster.isConflicting()) {
             Lit falsifiedLit = ~trail[qhead];
             // std::cout << "propagating: " << trail[qhead] << std::endl;
@@ -1504,6 +1601,7 @@ private:
     size_t maxDbMem = 0;
 
     PropagationMaster propMaster;
+    bool hasDetached = false;
 
 public:
     IneqPropagator<T> ineqPropagator;
@@ -1515,6 +1613,7 @@ public:
     std::chrono::duration<double> timeEffected;
     std::chrono::duration<double> timeFind;
     std::chrono::duration<double> timeInitProp;
+    std::chrono::duration<double> timePropagate;
 
 
     long long visit = 0;
@@ -1566,6 +1665,11 @@ public:
             << std::fixed << std::setprecision(2)
             << timeInitProp.count() << std::endl ;
 
+        std::cout << "c statistic: time propagate: "
+            << std::fixed << std::setprecision(2)
+            << timePropagate.count() << std::endl ;
+
+
         std::cout << "c statistic: hashColisions: " << hashColision << std::endl;
         std::cout << "c statistic: lookup_requests: " << lookup_requests << std::endl;
     }
@@ -1580,6 +1684,7 @@ public:
     }
 
     void propagate(){
+        Timer timer(timePropagate);
         propMaster.propagate();
     }
 
@@ -1616,19 +1721,20 @@ public:
     }
 
     bool checkSat(std::vector<int>& lits) {
-        AutoReset reset(this->propMaster);
+        // AutoReset reset(this->propMaster);
         initPropagation();
+        propagate();
         return propagate4sat(lits);
     }
 
     void _attach(Inequality<T>* ineq) {
-        AutoReset reset(this->propMaster);
+        ineq->wasAttached = true;
 
-        assert(propMaster.getTrail().size() == 0);
-        ineq->updateWatch(*this);
-        if (propMaster.getTrail().size() > 0 || propMaster.isConflicting()) {
+        if (ineq->isPropagatingAt0()) {
             this->propagatingAt0.push_back(ineq);
         }
+
+        ineq->updateWatch(*this);
     }
 
     Inequality<T>* attach(Inequality<T>* toAttach, uint64_t id) {
@@ -1656,11 +1762,20 @@ public:
 
     void initPropagation() {
         Timer timer(timeInitProp);
-        assert(propMaster.getTrail().size() == 0);
-        attachUnattached();
-        for (Inequality<T>* ineq: this->propagatingAt0) {
-            ineq->updateWatch(*this);
+
+        if (hasDetached) {
+            if (!propMaster.isTrailClean()) {
+                propMaster.cleanupTrail();
+                for (Inequality<T>* ineq: this->propagatingAt0) {
+                    ineq->updateWatch(*this);
+                }
+            }
+            // propMaster.cleanupWatches();
+            // MasterJunkyard::get().clearAll();
+            hasDetached = false;
         }
+
+        attachUnattached();
         // std::cout << "after init:\n";
         // std::cout << clausePropagator;
         // propagate();
@@ -1719,6 +1834,7 @@ public:
                     assert(unattached.back() == ineq);
                     unattached.pop_back();
                 } else {
+                    hasDetached = true;
                     auto& propagating = propagatingAt0;
                     propagating.erase(
                         std::remove_if(
@@ -1730,14 +1846,17 @@ public:
                         ),
                         propagating.end()
                     );
+
                     ineq->clearWatches(*this);
+
+                    ineq->markedForDeletion();
                 }
             }
         }
     }
 
     std::vector<int> propagatedLits() {
-        AutoReset reset(this->propMaster);
+        // AutoReset reset(this->propMaster);
         initPropagation();
         propagate();
 
@@ -1757,24 +1876,27 @@ public:
     }
 
     bool rupCheck(const FixedSizeInequality<T>& redundant) {
-        AutoReset reset(this->propMaster);
         initPropagation();
-
-        FixedSizeInequalityHandler<T> negated(redundant);
-        negated->negate();
-
-        IneqPropagator<T> tmpPropagator(propMaster, nVars);
-        propMaster.propagators.push_back(&tmpPropagator);
-        negated->template updateWatch<true>(tmpPropagator);
-
         propagate();
 
-        propMaster.propagators.pop_back();
-        // for (Lit lit : this->trail) {
-        //     std::cout << lit << " ";
-        // }
-        // std::cout << std::endl;
-        return propMaster.isConflicting();
+        {
+            AutoReset reset(this->propMaster);
+            FixedSizeInequalityHandler<T> negated(redundant);
+            negated->negate();
+
+            IneqPropagator<T> tmpPropagator(propMaster, nVars);
+            propMaster.propagators.push_back(&tmpPropagator);
+            negated->template updateWatch<true>(tmpPropagator);
+
+            propagate();
+
+            propMaster.propagators.pop_back();
+            // for (Lit lit : this->trail) {
+            //     std::cout << lit << " ";
+            // }
+            // std::cout << std::endl;
+            return propMaster.isConflicting();
+        }
     }
 
     long long estimateNumEffected(Substitution& sub) {
@@ -2009,6 +2131,7 @@ private:
     friend std::hash<Inequality<T>>;
 public:
     bool isAttached = false;
+    bool wasAttached = false;
     uint64_t minId = std::numeric_limits<uint64_t>::max();
     std::unordered_set<uint64_t> ids;
     uint detachCount = 0;
@@ -2052,6 +2175,13 @@ public:
 
     ~Inequality(){
         contract();
+
+        if (wasAttached) {
+            if (clauseHandler.ineq) {
+                Junkyard<ClauseHandler>::get().add(std::move(clauseHandler));
+            }
+            Junkyard<FixedSizeInequalityHandler<T>>::get().add(std::move(handler));
+        }
     }
 
     void freeze(size_t numVars) {
@@ -2068,12 +2198,23 @@ public:
 
     void clearWatches(PropEngine<T>& prop) {
         assert(frozen);
-
+        wasAttached = false;
         if (clauseHandler.ineq) {
             clauseHandler.ineq->clearWatches(prop.clausePropagator);
         } else {
             ineq->clearWatches(prop.ineqPropagator);
         }
+    }
+
+    void markedForDeletion() {
+        if (ineq->degree == 1 && clauseHandler.ineq) {
+            clauseHandler.ineq->header.isMarkedForDeletion = true;
+        }
+        ineq->header.isMarkedForDeletion = true;
+    }
+
+    bool isPropagatingAt0() {
+        return ineq->isPropagatingAt0();
     }
 
     void updateWatch(PropEngine<T>& prop) {

@@ -10,6 +10,7 @@
 
 void ClausePropagator::propagate() {
     // std::cout << "ClausePropagator: propagating from: " << qhead << std::endl;
+    // std::cout << *this << std::endl;
     const auto& trail = propMaster.getTrail();
     const Assignment& assignment = propMaster.getAssignment();
     while (qhead < trail.size() and !propMaster.isConflicting()) {

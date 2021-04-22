@@ -505,12 +505,55 @@ public:
     };
 };
 
+struct DBConstraintHeader {
+    bool isMarkedForDeletion = false;
+};
+
+
+class Reason {
+public:
+    virtual void rePropagate() = 0;
+    virtual bool isMarkedForDeletion() = 0;
+    virtual ~Reason(){};
+};
+
+using ReasonPtr = std::unique_ptr<Reason>;
+
+template<typename TConstraint, typename TPropagator>
+class GenericDBReason: public Reason {
+    TConstraint& constraint;
+    TPropagator& propagator;
+
+public:
+    GenericDBReason(TConstraint& _constraint, TPropagator& _propagator)
+        : constraint(_constraint)
+        , propagator(_propagator)
+    {}
+
+    virtual void rePropagate() {
+        // tdod: this may causing duplicate entries in the watch list
+        // as init will always add an entry to the watch list no
+        // matter if there was an existing entry before, maybe we
+        // should have something like initWatch, updateAllWatches,
+        // updateSingleWatch.
+        constraint.initWatch(propagator);
+    }
+
+    virtual bool isMarkedForDeletion() {
+        return constraint.header.isMarkedForDeletion;
+    }
+
+    virtual ~GenericDBReason() {}
+};
+
+
 class Propagator {
 protected:
     size_t qhead = 0;
 
 public:
     virtual void propagate() = 0;
+    virtual void cleanupWatches() = 0;
     virtual void increaseNumVarsTo(size_t) = 0;
     virtual void undo_trail_till(size_t pos) {
         if (qhead > pos)
@@ -526,6 +569,9 @@ private:
     Assignment assignment;
     Assignment phase;
     std::vector<Lit> trail;
+    std::vector<ReasonPtr> reasons;
+
+
     PropState current;
 
     bool trailUnchanged = true;
@@ -562,12 +608,45 @@ public:
         return current.conflict;
     }
 
-    void enqueue(Lit lit) {
+    void enqueue(Lit lit, ReasonPtr&& reason) {
         // std::cout << "Enqueueing: " << lit << std::endl;
         trailUnchanged = false;
         assignment.assign(lit);
         phase.assign(lit);
         trail.push_back(lit);
+        reasons.emplace_back(std::move(reason));
+    }
+
+    void cleanupTrail() {
+        std::vector<ReasonPtr> oldReasons;
+        std::swap(oldReasons, reasons);
+        std::vector<Lit> oldTrail;
+        std::swap(oldTrail, trail);
+
+        for (Lit lit: oldTrail) {
+            assignment.unassign(lit);
+        }
+
+        PropState emptyTrail;
+        reset(emptyTrail);
+
+        for (size_t i = 0; i < oldTrail.size(); ++i) {
+            ReasonPtr& reason = oldReasons[i];
+            if (reason.get() != nullptr) {
+                // deleted constraints are not supposed to propagate
+                // so this will make sure that no deleted constraint
+                // is left on the cleaned up trail.
+                reason->rePropagate();
+            } else {
+                enqueue(oldTrail[i], nullptr);
+            }
+        }
+    }
+
+    void cleanupWatches() {
+        for (Propagator* propagator: propagators) {
+            propagator->cleanupWatches();
+        }
     }
 
     void propagate() {
@@ -585,6 +664,12 @@ public:
         }
     }
 
+    void undoOne() {
+        assignment.unassign(trail.back());
+        trail.pop_back();
+        reasons.pop_back();
+    }
+
     void reset(PropState resetState) {
         // std::cout << "Reset to trail pos " << resetState.qhead << std::endl;
         for (Propagator* propagator: propagators) {
@@ -592,8 +677,7 @@ public:
         }
 
         while (trail.size() > resetState.qhead) {
-            assignment.unassign(trail.back());
-            trail.pop_back();
+            undoOne();
         }
 
         current = resetState;
@@ -625,7 +709,13 @@ public:
     }
 
     virtual void propagate();
+
+    virtual void cleanupWatches();
 };
+
+class Clause;
+
+using ClauseReason = GenericDBReason<Clause, ClausePropagator>;
 
 class Clause {
 private:
@@ -636,6 +726,7 @@ private:
     friend std::ostream& operator<<(std::ostream& os, const Clause& v);
 
 public:
+    DBConstraintHeader header;
     size_t propagationSearchStart = 2;
     InlineVec<Lit> literals;
 
@@ -748,7 +839,9 @@ public:
         if (numFound == 1) {
             Lit lit = this->literals[watcher[0]];
             if (assignment[lit] == State::Unassigned) {
-                prop.propMaster.enqueue(lit);
+                prop.propMaster.enqueue(
+                    lit,
+                    std::make_unique<ClauseReason>(*this, prop));
             }
         }
 
@@ -811,11 +904,16 @@ template<typename T>
 class IneqPropagator;
 
 template<typename T>
+using IneqReason = GenericDBReason<FixedSizeInequality<T>, IneqPropagator<T>>;
+
+template<typename T>
 class FixedSizeInequality {
 private:
     uint32_t watchSize = 0;
 
 public:
+    DBConstraintHeader header;
+
     T degree;
     T maxCoeff;
 
@@ -939,6 +1037,10 @@ public:
         prop.watch(nw, w);
     }
 
+    void initWatch(IneqPropagator<T>& prop) {
+        this->template updateWatch<true>(prop);
+    }
+
     // returns if the watch is kept
     template<bool autoInit>
     bool updateWatch(IneqPropagator<T>& prop, Lit falsifiedLit = Lit::Undef()) {
@@ -1040,7 +1142,9 @@ public:
                 if (terms[i].coeff > slack
                     && value[terms[i].lit] == State::Unassigned)
                 {
-                    prop.propMaster.enqueue(terms[i].lit);
+                    prop.propMaster.enqueue(
+                        terms[i].lit,
+                        std::make_unique<IneqReason<T>>(*this, prop));
                     // prop.visit_required += 1;
                 }
             }
@@ -1346,6 +1450,21 @@ public:
             qhead += 1;
         }
     }
+
+    virtual void cleanupWatches() {
+        for (WatchList& wl: watchlist) {
+            wl.erase(
+                std::remove_if(
+                    wl.begin(),
+                    wl.end(),
+                    [](auto& watch){
+                        return watch.ineq->header.isMarkedForDeletion;
+                    }
+                ),
+                wl.end()
+            );
+        }
+    }
 };
 
 /*
@@ -1472,7 +1591,7 @@ public:
             auto val = propMaster.getAssignment().value[l];
 
             if (val == State::Unassigned) {
-                propMaster.enqueue(l);
+                propMaster.enqueue(l, nullptr);
             } else if (val == State::False) {
                 propMaster.conflict();
                 break;
@@ -1966,7 +2085,7 @@ public:
             }
             clauseHandler.ineq->initWatch(prop.clausePropagator);
         } else {
-            ineq->template updateWatch<true>(prop.ineqPropagator);
+            ineq->initWatch(prop.ineqPropagator);
         }
     }
 

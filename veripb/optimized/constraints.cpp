@@ -62,6 +62,21 @@ void ClausePropagator::propagate() {
     }
 }
 
+void ClausePropagator::cleanupWatches() {
+    for (WatchList& wl: watchlist) {
+        wl.erase(
+            std::remove_if(
+                wl.begin(),
+                wl.end(),
+                [](auto& watch){
+                    return watch.ineq->header.isMarkedForDeletion;
+                }
+            ),
+            wl.end()
+        );
+    }
+}
+
 int main(int argc, char const *argv[])
 {
     /* code */

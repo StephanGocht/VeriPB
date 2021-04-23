@@ -70,6 +70,7 @@ void ClausePropagator::cleanupWatches() {
                 wl.begin(),
                 wl.end(),
                 [](auto& watch){
+                    // assert(!watch.ineq->header.isMarkedForDeletion);
                     return watch.ineq->header.isMarkedForDeletion;
                 }
             ),

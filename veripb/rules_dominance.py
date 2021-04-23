@@ -645,7 +645,7 @@ class AddRedundant(MultiGoalRule):
             # reification, so only do rup check first if there are
             # many effected constraints, otherwise it will be cheap to
             # compute the effected constraitns anyway.
-            if estimateNumEffected > 1:
+            if estimateNumEffected > 2:
                 if ineq.rupCheck(context.propEngine) or \
                         context.propEngine.find(ineq) is not None:
                     self.autoProof(context, antecedents)

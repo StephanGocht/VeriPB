@@ -580,7 +580,7 @@ public:
         // matter if there was an existing entry before, maybe we
         // should have something like initWatch, updateAllWatches,
         // updateSingleWatch.
-        constraint.initWatch(propagator);
+        constraint.updateWatch(propagator);
     }
 
     virtual bool isMarkedForDeletion() {
@@ -869,13 +869,20 @@ public:
         updateWatch(prop, Lit::Undef(), true);
     }
 
-    bool updateWatch(ClausePropagator& prop, Lit falsifiedLit, bool initial = false) {
+    bool updateWatch(ClausePropagator& prop, Lit falsifiedLit = Lit::Undef(), bool initial = false) {
         bool keep = true;
 
         if (header.isMarkedForDeletion) {
             keep = false;
             return keep;
         }
+
+        assert(falsifiedLit == Lit::Undef()
+                || (this->literals.size() < 2
+                    || (this->literals[0] == falsifiedLit
+                        || this->literals[1] == falsifiedLit
+            )));
+
 
         int numFound = 0;
         // watcher will contain the position of the literals to be watched
@@ -935,16 +942,24 @@ public:
                 std::swap(watcher[0], watcher[1]);
             }
 
-            for (size_t i = 0; i < 2; i++) {
-                assert(watcher[i] < literals.size());
+            if (initial || numFound > 0) {
+                for (size_t i = 0; i < 2; i++) {
+                    assert(watcher[i] < literals.size());
 
-                if (initial || (i == 0 && watcher[i] >= 2)) { // was not a watched literal / needs to be readded
-                    keep = false;
-                    std::swap(literals[i], literals[watcher[i]]);
-                    WatchInfo<Clause> watchInfo;
-                    watchInfo.ineq = this;
-                    watchInfo.other = literals[watcher[(i + 1) % 2]];
-                    prop.watch(literals[i], watchInfo);
+                    if (initial
+                        || (i == 0
+                            && watcher[i] >= 2
+                            && falsifiedLit != Lit::Undef())) {
+                        // was not a watched literal / needs to be readded
+                        keep = false;
+                        // assert(watcher[0] < watcher[1] || watcher[1] == 1);
+                        assert(initial || (literals[i] == falsifiedLit));
+                        std::swap(literals[i], literals[watcher[i]]);
+                        WatchInfo<Clause> watchInfo;
+                        watchInfo.ineq = this;
+                        watchInfo.other = literals[watcher[(i + 1) % 2]];
+                        prop.watch(literals[i], watchInfo);
+                    }
                 }
             }
 
@@ -1137,12 +1152,16 @@ public:
     }
 
     void initWatch(IneqPropagator<T>& prop) {
-        this->template updateWatch<true>(prop);
+        this->template fixWatch<true>(prop);
+    }
+
+    bool updateWatch(IneqPropagator<T>& prop, Lit falsifiedLit = Lit::Undef()) {
+        return this->template fixWatch<false>(prop, falsifiedLit);
     }
 
     // returns if the watch is kept
     template<bool autoInit>
-    bool updateWatch(IneqPropagator<T>& prop, Lit falsifiedLit = Lit::Undef()) {
+    bool fixWatch(IneqPropagator<T>& prop, Lit falsifiedLit = Lit::Undef()) {
         // bool isSat = false;
         bool keepWatch = true;
 
@@ -1528,7 +1547,7 @@ public:
 
                 bool keepWatch = true;
                 if (propMaster.getAssignment().value[next->other] != State::True) {
-                    keepWatch = next->ineq->template updateWatch<false>(*this, falsifiedLit);
+                    keepWatch = next->ineq->updateWatch(*this, falsifiedLit);
                 }
                 if (keepWatch) {
                     *kept = *next;
@@ -1555,6 +1574,7 @@ public:
                     wl.begin(),
                     wl.end(),
                     [](auto& watch){
+                        // assert(!watch.ineq->header.isMarkedForDeletion);
                         return watch.ineq->header.isMarkedForDeletion;
                     }
                 ),
@@ -1734,7 +1754,7 @@ public:
             this->propagatingAt0.push_back(ineq);
         }
 
-        ineq->updateWatch(*this);
+        ineq->initWatch(*this);
     }
 
     Inequality<T>* attach(Inequality<T>* toAttach, uint64_t id) {
@@ -1770,8 +1790,10 @@ public:
                     ineq->updateWatch(*this);
                 }
             }
+            // either cleanupWatches here or when detached, currently
+            // watches should be cleaned while detached
             // propMaster.cleanupWatches();
-            // MasterJunkyard::get().clearAll();
+            MasterJunkyard::get().clearAll();
             hasDetached = false;
         }
 
@@ -1886,7 +1908,7 @@ public:
 
             IneqPropagator<T> tmpPropagator(propMaster, nVars);
             propMaster.propagators.push_back(&tmpPropagator);
-            negated->template updateWatch<true>(tmpPropagator);
+            negated->initWatch(tmpPropagator);
 
             propagate();
 
@@ -2177,9 +2199,12 @@ public:
         contract();
 
         if (wasAttached) {
+
             if (clauseHandler.ineq) {
+                // assert(clauseHandler.ineq->header.isMarkedForDeletion);
                 Junkyard<ClauseHandler>::get().add(std::move(clauseHandler));
             }
+            // assert(ineq->header.isMarkedForDeletion);
             Junkyard<FixedSizeInequalityHandler<T>>::get().add(std::move(handler));
         }
     }
@@ -2198,7 +2223,6 @@ public:
 
     void clearWatches(PropEngine<T>& prop) {
         assert(frozen);
-        wasAttached = false;
         if (clauseHandler.ineq) {
             clauseHandler.ineq->clearWatches(prop.clausePropagator);
         } else {
@@ -2217,16 +2241,26 @@ public:
         return ineq->isPropagatingAt0();
     }
 
+    void initWatch(PropEngine<T>& prop) {
+        assert(frozen && "Call freeze() first.");
+
+        if (ineq->degree == 1) {
+            assert(!clauseHandler.ineq);
+            clauseHandler = ClauseHandler(ineq->terms.size(), *ineq);
+            clauseHandler.ineq->initWatch(prop.clausePropagator);
+        } else {
+            ineq->initWatch(prop.ineqPropagator);
+        }
+    }
+
     void updateWatch(PropEngine<T>& prop) {
         assert(frozen && "Call freeze() first.");
 
         if (ineq->degree == 1) {
-            if (!clauseHandler.ineq) {
-                clauseHandler = ClauseHandler(ineq->terms.size(), *ineq);
-            }
-            clauseHandler.ineq->initWatch(prop.clausePropagator);
+            assert(clauseHandler.ineq);
+            clauseHandler.ineq->updateWatch(prop.clausePropagator);
         } else {
-            ineq->initWatch(prop.ineqPropagator);
+            ineq->updateWatch(prop.ineqPropagator);
         }
     }
 
@@ -2297,6 +2331,7 @@ public:
             handler.resize(expanded->size());
             expanded->unload(*ineq);
             pool.push_back(std::move(expanded));
+            expanded = nullptr;
             loaded = false;
         }
     }

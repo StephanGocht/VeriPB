@@ -78,9 +78,9 @@ public:
 
     void next() {
         start = nextStart;
-        if (start != string_view::npos) {
+        if (start != std::string::npos) {
             endPos = line.find_first_of(" ", start);
-            if (endPos == string_view::npos) {
+            if (endPos == std::string::npos) {
                 nextStart = endPos;
                 endPos = line.size();
             } else {
@@ -102,6 +102,9 @@ public:
     static std::istream& getline(std::istream& stream, WordIter& it) {
         it.fileInfo.line += 1;
         std::istream& result = std::getline(stream, it.line);
+        if (!it.line.empty() && it.line.back() == '\r') {
+            it.line.pop_back();
+        }
         it.init();
         return result;
     }
@@ -690,11 +693,10 @@ public:
             if (formula) {
                 formula->maxVar = std::max(formula->maxVar, static_cast<size_t>(lit.var()));
             }
-            if (duplicateDetection.add(lit.var())) {
-                throw ParseError(it, "Douplicated variables are not supported in constraints.");
+            if (!duplicateDetection.add(lit.var())) {
+                terms.emplace_back(1, lit);
             }
 
-            terms.emplace_back(1, lit);
             ++it;
         }
         if (*it != "0") {

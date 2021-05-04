@@ -234,17 +234,17 @@ def runUI(*args, **kwargs):
 
     except ParseError as e:
         logging.error(e)
-        return 1
+        return 2
 
     except NotImplementedError as e:
         logging.error("Not Implemented: %s" % str(e))
-        return 1
+        return 3
 
     except Exception as e:
         if logging.getLogger().getEffectiveLevel() != logging.DEBUG:
             logging.error("Sorry, there was an internal error. Please rerun with debugging "
                 "and make a bug report.")
-            return 1
+            return 4
         else:
             print("Sorry, there was an internal error. Because you are running in "
                 "debug mode I will give you the exception.")

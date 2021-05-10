@@ -693,9 +693,17 @@ public:
             if (formula) {
                 formula->maxVar = std::max(formula->maxVar, static_cast<size_t>(lit.var()));
             }
-            if (!duplicateDetection.add(lit.var())) {
-                terms.emplace_back(1, lit);
-            }
+
+            terms.emplace_back(1, lit);
+
+            // Note that douplicate variables will be handled during
+            // construction of the Inequality that is if a literal
+            // appears twice it will get coefficient 2, if a variable
+            // appears with positive as well as negative polarity then
+            // a cancelation will be triggered reducing the degree to
+            // 0 and thereby trivializing the constraint.
+
+            // todo: maybe add warning if douplicate variables occur?
 
             ++it;
         }

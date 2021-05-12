@@ -2149,6 +2149,7 @@ private:
     ClauseHandler clauseHandler;
 
     static std::vector<FatInequalityPtr<T>> pool;
+    const bool useClauses = true;
 
     friend std::hash<Inequality<T>>;
 public:
@@ -2231,7 +2232,7 @@ public:
     }
 
     void markedForDeletion() {
-        if (ineq->degree == 1 && clauseHandler.ineq) {
+        if (useClauses && ineq->degree == 1 && clauseHandler.ineq) {
             clauseHandler.ineq->header.isMarkedForDeletion = true;
         }
         ineq->header.isMarkedForDeletion = true;
@@ -2244,7 +2245,7 @@ public:
     void initWatch(PropEngine<T>& prop) {
         assert(frozen && "Call freeze() first.");
 
-        if (ineq->degree == 1) {
+        if (useClauses && ineq->degree == 1) {
             assert(!clauseHandler.ineq);
             clauseHandler = ClauseHandler(ineq->terms.size(), *ineq);
             clauseHandler.ineq->initWatch(prop.clausePropagator);
@@ -2256,7 +2257,7 @@ public:
     void updateWatch(PropEngine<T>& prop) {
         assert(frozen && "Call freeze() first.");
 
-        if (ineq->degree == 1) {
+        if (useClauses && ineq->degree == 1) {
             assert(clauseHandler.ineq);
             clauseHandler.ineq->updateWatch(prop.clausePropagator);
         } else {

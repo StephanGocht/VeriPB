@@ -64,24 +64,22 @@ class RuleParserBase():
         # don't count the proof header line
         return num - 1
 
-
-    def isEmpty(self, line):
-        if len(line) == 0 \
-            or line == "\n" \
-            or line[0] == self.commentChar \
-            or ((line[0] == " " or line[0] == "\t")
-                and line.strip() == ""):
-
-            return True
+    def getRuleId(self, words):
+        try:
+            ruleId = next(words)
+        except StopIteration:
+            pass
         else:
-            return False
+            if ruleId[0] != self.commentChar:
+                return ruleId
+        return None
 
     @TimedFunction.timeIter("RuleParserBase.parse")
     def parse(self, rules, file, dumpLine = False, defaultRule = None):
         self.parseContext.rules = rules_to_dict(rules, defaultRule)
 
         lineNum = 1
-        lines = iter(file)
+        lines = LineParser(file)
 
         defaultIdSize = 1
         # the first line is not allowed to be comment line or empty but must be the header
@@ -97,36 +95,26 @@ class RuleParserBase():
             lineNum = 0
 
         try:
-            for line in lines:
+            for words in lines:
                 lineNum += 1
 
                 if dumpLine:
-                    print("line %03d: %s"% (lineNum, line.rstrip()))
+                    print("line %03d: %s"% (lineNum, words.line.rstrip()))
 
-                # skip indendation
-                origLine = line
-                line = line.lstrip()
-                columnOffset = len(origLine) - len(line)
-                line = line.rstrip()
-
-                if not self.isEmpty(line):
-                    # find first word
-                    ruleId = line.split(" ")[0]
-                    idSize = len(ruleId)
-
+                ruleId = self.getRuleId(words)
+                if ruleId is not None:
                     try:
-                        rule = self.parseContext.rules[line[0:idSize]]
+                        rule = self.parseContext.rules[ruleId]
                     except KeyError as e:
                         rule = self.parseContext.rules.get("", None)
-                        if rule is None:
-                            raise ParseError("Unsupported rule '%s'"%(line[:idSize]),
-                                line = lineNum, column = columnOffset)
-                        idSize = 0
-
-                    columnOffset += idSize
+                        if rule is not None:
+                            words.putback(ruleId)
+                        else:
+                            raise ParseError("Unsupported rule '%s'"%(ruleId),
+                                line = lineNum)
 
                     try:
-                        step = rule.parse(WordParser(line[idSize:]), self.parseContext.context)
+                        step = rule.parse(words, self.parseContext.context)
 
                         step.lineInFile = lineNum
                         yield step
@@ -141,8 +129,6 @@ class RuleParserBase():
 
                     except veripb.ParseError as e:
                         e.line = lineNum
-                        if e.column is not None:
-                            e.column += columnOffset
                         raise e
         except UnicodeDecodeError as e:
             raise ParseError(e, line = lineNum + 1)

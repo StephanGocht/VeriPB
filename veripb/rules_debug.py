@@ -1,7 +1,7 @@
 from veripb import InvalidProof
 from veripb.rules import Rule, EmptyRule
 from veripb.rules_register import register_rule
-from veripb.parser import OPBParser, WordParser
+from veripb.parser import OPBParser, MaybeWordParser
 
 @register_rule
 class IsDeleted(EmptyRule):
@@ -9,7 +9,7 @@ class IsDeleted(EmptyRule):
 
     @classmethod
     def parse(cls, line, context):
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             parser = OPBParser(
                 ineqFactory = context.ineqFactory,
                 allowEq = False)

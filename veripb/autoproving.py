@@ -2,7 +2,7 @@ from veripb import InvalidProof
 from veripb.rules import Rule, EmptyRule, register_rule
 from veripb.rules import ReversePolishNotation, IsContradiction
 from veripb.rules_register import register_rule, dom_friendly_rules, rules_to_dict
-from veripb.parser import OPBParser, WordParser, ParseContext
+from veripb.parser import OPBParser, MaybeWordParser, ParseContext
 from veripb.optimized.constraints import Substitution as CppSubstitution
 
 from veripb import verifier

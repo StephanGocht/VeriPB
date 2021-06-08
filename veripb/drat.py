@@ -1,5 +1,5 @@
 from veripb.rules import Rule, EmptyRule, ReverseUnitPropagation, LoadFormula
-from veripb.parser import RuleParserBase, WordParser
+from veripb.parser import RuleParserBase, MaybeWordParser
 from veripb.exceptions import ParseError, InvalidProof
 
 class DRATClauseFinder():
@@ -66,7 +66,7 @@ class DRATFind(EmptyRule):
 
     @classmethod
     def parse(cls, line, context):
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             lits = parseIntList(words)
         return cls(lits)
 
@@ -93,7 +93,7 @@ class DRATDeletion(EmptyRule):
 
     @classmethod
     def parse(cls, line, context):
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             lits = parseIntList(words)
 
         clauseFinder = DRATClauseFinder.get(context)
@@ -115,7 +115,7 @@ class DRATDeletion(EmptyRule):
 class DRAT(ReverseUnitPropagation):
     @classmethod
     def parse(cls, line, context):
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             lits = parseIntList(words)
 
             clauseFinder = DRATClauseFinder.get(context)

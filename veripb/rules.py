@@ -2,7 +2,7 @@ import logging
 
 import veripb.constraints
 from veripb.constraints import Term
-from veripb.parser import OPBParser, WordParser
+from veripb.parser import OPBParser, MaybeWordParser
 from veripb.timed_function import TimedFunction
 from veripb.rules_register import register_rule
 
@@ -104,7 +104,7 @@ class DeleteConstraints(EmptyRule):
 
     @classmethod
     def parse(cls, line, context):
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             which = list(map(int, words))
 
             if (which[-1] == 0):
@@ -128,7 +128,7 @@ class DeleteConstraints2(EmptyRule):
 
     @classmethod
     def parse(cls, line, context):
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             del_type = next(words)
             if del_type == "id":
                 which = list(map(int, words))
@@ -159,7 +159,7 @@ class Assumption(Rule):
 
     @classmethod
     def parse(cls, line, context):
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             parser = OPBParser(
                     ineqFactory = context.ineqFactory,
                     allowEq = False)
@@ -193,7 +193,7 @@ class ReverseUnitPropagation(Rule):
 
     @classmethod
     def parse(cls, line, context):
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             parser = OPBParser(
                     ineqFactory = context.ineqFactory,
                     allowEq = False)
@@ -231,7 +231,7 @@ class ReverseUnitPropagation(Rule):
 class CompareToConstraint(Rule):
     @classmethod
     def parse(cls, line, context = None):
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             which = words.nextInt()
 
             parser = OPBParser(
@@ -323,7 +323,7 @@ class Solution(Rule):
             else:
                 return context.ineqFactory.name2Num(name)
 
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             result = list(map(lit2int, words))
 
         return cls(result)
@@ -368,7 +368,7 @@ class ObjectiveBound(Rule):
             else:
                 return context.ineqFactory.name2Num(name)
 
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             result = list(map(lit2int, words))
 
         return cls(result)
@@ -418,7 +418,7 @@ class IsContradiction(Rule):
 
     @classmethod
     def parse(cls, line, context):
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             which = list(map(int, words))
 
             if (which[-1] == 0):
@@ -489,7 +489,7 @@ class ReversePolishNotation(Rule):
 
             return word
 
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             sequence = list(map(f, words))
 
             if len(sequence) > 0:
@@ -604,7 +604,7 @@ class LoadFormula(Rule):
     def parse(cls, line, context):
         context.foundLoadFormula = True
         numConstraints = len(context.formula)
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             try:
                 num = int(next(words))
             except StopIteration:
@@ -640,7 +640,7 @@ class LoadAxiom(Rule):
 
     @classmethod
     def parse(cls, line, context):
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             num = words.nextInt()
             words.expectEnd()
             return cls(num)
@@ -712,7 +712,7 @@ class SetLevel(EmptyRule):
     @classmethod
     def parse(cls, line, context):
         levelStack = LevelStack.setup(context)
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             level = words.nextInt()
             words.expectEnd()
         levelStack.setLevel(level)
@@ -727,7 +727,7 @@ class WipeLevel(EmptyRule):
     @classmethod
     def parse(cls, line, context):
         levelStack = LevelStack.setup(context)
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             level = words.nextInt()
             words.expectEnd()
 

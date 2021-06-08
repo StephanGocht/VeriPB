@@ -126,7 +126,7 @@ class RuleParserBase():
                     columnOffset += idSize
 
                     try:
-                        step = rule.parse(line[idSize:], self.parseContext.context)
+                        step = rule.parse(WordParser(line[idSize:]), self.parseContext.context)
 
                         step.lineInFile = lineNum
                         yield step
@@ -155,7 +155,7 @@ class RuleParser(RuleParserBase):
             raise ValueError("Unsuported rule '%s'."%(Id))
 
     def parseHeader(self, line):
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             words.expectExact("pseudo-Boolean")
             words.expectExact("proof")
             words.expectExact("version")
@@ -257,7 +257,7 @@ class OPBParser():
             }
 
     def parseHeader(self, line):
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             words.expectExact("*")
             words.expectExact("#variable=")
             numVar = words.nextInt()
@@ -271,7 +271,7 @@ class OPBParser():
         if len(line.strip()) == 0 or line[0] == "*":
             return []
         else:
-            with WordParser(line) as words:
+            with MaybeWordParser(line) as words:
                 if self.objective is None:
                     try:
                         peek = next(words)
@@ -392,7 +392,7 @@ class CNFParser():
             }
 
     def parseHeader(self, line):
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             words.expectExact("p")
             words.expectExact("cnf")
             numVar = words.nextInt()
@@ -407,7 +407,7 @@ class CNFParser():
         if self.isEmpty(line):
             return []
         else:
-            with WordParser(line) as words:
+            with MaybeWordParser(line) as words:
                 result = self.parseCNF(words)
                 words.expectEnd()
                 return result
@@ -424,6 +424,30 @@ class CNFParser():
             raise ValueError("Expected 0 at end of constraint.")
 
         return [self.ineqFactory.fromTerms([Term(1,self.ineqFactory.intlit2int(l)) for l in lits], 1)]
+
+class LineParser():
+    def __init__(self, file):
+        self.file = file
+        self.lines = iter(self.file)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return WordParser(next(self.lines))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exec_type, exec_value, exec_traceback):
+        pass
+
+# dummy method for refactoring
+def MaybeWordParser(what):
+    if isinstance(what, WordParser):
+        return what
+    else:
+        return WordParser(what)
 
 class WordParser():
     def __init__(self, line):

@@ -2,7 +2,7 @@ from veripb import InvalidProof
 from veripb.rules import Rule, EmptyRule, register_rule
 from veripb.rules import ReversePolishNotation, IsContradiction
 from veripb.rules_register import register_rule, dom_friendly_rules, rules_to_dict
-from veripb.parser import OPBParser, WordParser, ParseContext
+from veripb.parser import OPBParser, MaybeWordParser, ParseContext
 
 from veripb.optimized.constraints import maxId as getMaxConstraintId
 constraintMaxId = getMaxConstraintId()
@@ -171,7 +171,7 @@ class LoadOrder(EmptyRule):
     def parse(cls, line, context):
         orderContext = OrderContext.setup(context)
 
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             try:
                 name = next(words)
             except StopIteration:
@@ -211,7 +211,7 @@ class OrderVarsBase(EmptyRule):
     @classmethod
     def parse(cls, line, context):
         lits = []
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             for nxt in words:
                 lits.append(context.ineqFactory.lit2int(nxt))
 
@@ -269,7 +269,7 @@ class OrderDefinition(EmptyRule):
     @classmethod
     def parse(cls, line, context):
         lits = []
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             parser = OPBParser(
                     ineqFactory = context.ineqFactory,
                     allowEq = True)
@@ -531,7 +531,7 @@ class StrictOrder(SubVerifier):
 
     @classmethod
     def parse(cls, line, context):
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             name = next(words)
 
         return cls(name)
@@ -604,7 +604,7 @@ class AddRedundant(MultiGoalRule):
         orderContext = OrderContext.setup(context)
         order = orderContext.activeOrder
 
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             parser = OPBParser(
                 ineqFactory = context.ineqFactory,
                 allowEq = False)
@@ -688,7 +688,7 @@ class DominanceRule(MultiGoalRule):
         orderContext = OrderContext.setup(context)
         order = orderContext.activeOrder
 
-        with WordParser(line) as words:
+        with MaybeWordParser(line) as words:
             parser = OPBParser(
                 ineqFactory = context.ineqFactory,
                 allowEq = False)

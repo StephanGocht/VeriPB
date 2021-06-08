@@ -68,6 +68,8 @@ public:
 
 class WordIter {
 public:
+    const char* wordSeperator = " \t";
+
     FileInfo fileInfo;
     std::string line;
     string_view word;
@@ -79,12 +81,12 @@ public:
     void next() {
         start = nextStart;
         if (start != std::string::npos) {
-            endPos = line.find_first_of(" ", start);
+            endPos = line.find_first_of(wordSeperator, start);
             if (endPos == std::string::npos) {
                 nextStart = endPos;
                 endPos = line.size();
             } else {
-                nextStart = line.find_first_not_of(" ", endPos);
+                nextStart = line.find_first_not_of(wordSeperator, endPos);
             }
 
             word = string_view(&line.data()[start], endPos - start);
@@ -119,7 +121,7 @@ public:
 
     void init() {
         endPos = 0;
-        nextStart = line.find_first_not_of(" ", endPos);
+        nextStart = line.find_first_not_of(wordSeperator, endPos);
         next();
     }
 
@@ -194,6 +196,10 @@ public:
         return !(a==b);
     }
 };
+
+bool nextLine(std::ifstream* stream, WordIter* it) {
+    return !!WordIter::getline(*stream, *it);
+}
 
 WordIter WordIter::end;
 
@@ -786,6 +792,17 @@ void init_parsing(py::module &m){
             return mngr.getName(Var(value));
         });
 
+    py::class_<std::ifstream>(m, "ifstream")
+        .def(py::init<std::string>())
+        .def("close", &std::ifstream::close);
+
+    m.def("nextLine", &nextLine);
+
+    py::class_<WordIter>(m, "WordIter")
+        .def(py::init<std::string>())
+        .def("next", &WordIter::operator++)
+        .def("get", &WordIter::get)
+        .def("isEnd", &WordIter::isEnd);
 
     py::class_<Formula<CoefType>>(m, "Formula")
         .def(py::init<>())

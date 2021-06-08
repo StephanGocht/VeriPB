@@ -14,6 +14,8 @@ from veripb.timed_function import TimedFunction
 
 from veripb.rules_register import rules_to_dict
 
+from veripb.optimized.parsing import WordIter, ifstream, nextLine
+
 class ParseContext():
     def __init__(self, context):
         self.context = context
@@ -413,14 +415,20 @@ class CNFParser():
 
 class LineParser():
     def __init__(self, file):
-        self.file = file
-        self.lines = iter(self.file)
+        self.file = ifstream(file.name)
+        self.iter = WordIter(file.name)
+        self.pyiter = PyWordIter(self.iter)
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        return WordParser(next(self.lines))
+        self.pyiter.reset()
+        ok = nextLine(self.file, self.iter)
+        if not ok:
+            raise StopIteration()
+        else:
+            return WordParser(line = "", wordIter = self.pyiter)
 
     def __enter__(self):
         return self
@@ -435,11 +443,37 @@ def MaybeWordParser(what):
     else:
         return WordParser(what)
 
+class PyWordIter:
+    def __init__(self, wordIter):
+        self.wordIter = wordIter
+        self.first = True
+
+    def reset(self):
+        self.first = True
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if not self.first:
+            self.wordIter.next()
+
+        self.first = False
+
+        if self.wordIter.isEnd():
+            raise StopIteration()
+        else:
+            return self.wordIter.get()
+
+
 class WordParser():
-    def __init__(self, line):
+    def __init__(self, line, wordIter = None):
         self.line = line
         self.words = line.split()
-        self.wordIter = iter(line.split())
+        if wordIter is None:
+            self.wordIter = iter(line.split())
+        else:
+            self.wordIter = wordIter
 
     def __iter__(self):
         return self

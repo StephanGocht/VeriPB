@@ -47,7 +47,7 @@ PYBINDINCLUDE:=`python3 -m pybind11 --includes`
 #all: install
 all: dev
 
-dev: veripb/optimized/constraints.o
+dev: veripb/optimized/parsing.o
 
 test: cpp
 	python3 -m pytest ${ROOT_DIR}

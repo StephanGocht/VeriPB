@@ -1621,6 +1621,7 @@ private:
     size_t maxDbMem = 0;
 
     PropagationMaster propMaster;
+    IneqPropagator<T> tmpPropagator;
     bool hasDetached = false;
 
 public:
@@ -1634,6 +1635,7 @@ public:
     std::chrono::duration<double> timeFind;
     std::chrono::duration<double> timeInitProp;
     std::chrono::duration<double> timePropagate;
+    std::chrono::duration<double> timeRUP;
 
 
     long long visit = 0;
@@ -1645,12 +1647,14 @@ public:
     PropEngine(size_t _nVars)
         : nVars(_nVars)
         , propMaster(_nVars)
+        , tmpPropagator(propMaster, _nVars)
         , ineqPropagator(propMaster, _nVars)
         , clausePropagator(propMaster, _nVars)
         , occurs(2 * (_nVars + 1))
         , timeEffected(0)
         , timeFind(0)
         , timeInitProp(0)
+        , timeRUP(0)
     {
         propMaster.propagators.push_back(&clausePropagator);
         propMaster.propagators.push_back(&ineqPropagator);
@@ -1688,6 +1692,10 @@ public:
         std::cout << "c statistic: time propagate: "
             << std::fixed << std::setprecision(2)
             << timePropagate.count() << std::endl ;
+
+        std::cout << "c statistic: time rup: "
+            << std::fixed << std::setprecision(2)
+            << timeRUP.count() << std::endl ;
 
 
         std::cout << "c statistic: hashColisions: " << hashColision << std::endl;
@@ -1898,6 +1906,7 @@ public:
     }
 
     bool rupCheck(const FixedSizeInequality<T>& redundant) {
+        Timer timer(timeRUP);
         initPropagation();
         propagate();
 
@@ -1906,12 +1915,13 @@ public:
             FixedSizeInequalityHandler<T> negated(redundant);
             negated->negate();
 
-            IneqPropagator<T> tmpPropagator(propMaster, nVars);
+            tmpPropagator.increaseNumVarsTo(nVars);
             propMaster.propagators.push_back(&tmpPropagator);
             negated->initWatch(tmpPropagator);
 
             propagate();
 
+            negated->clearWatches(tmpPropagator);
             propMaster.propagators.pop_back();
             // for (Lit lit : this->trail) {
             //     std::cout << lit << " ";

@@ -636,7 +636,7 @@ class AddRedundant(MultiGoalRule):
 
     @TimedFunction.time("Redundant.compute")
     def compute(self, antecedents, context):
-        ineq = self.constraint.copy()
+        ineq = self.constraint
         witness = self.witness.get()
 
         if self.autoProveAll:
@@ -651,7 +651,7 @@ class AddRedundant(MultiGoalRule):
                     self.autoProof(context, antecedents)
                     return super().compute(antecedents, context)
 
-        negated = ineq.negated()
+        negated = ineq.copy().negated()
         self.addAvailable(negated)
 
 

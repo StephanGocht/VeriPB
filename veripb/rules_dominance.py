@@ -600,26 +600,30 @@ class AddRedundant(MultiGoalRule):
     Ids = ["red"]
 
     @classmethod
-    def parse(cls, line, context):
+    def parse(cls, words, context):
         orderContext = OrderContext.setup(context)
         order = orderContext.activeOrder
 
-        with MaybeWordParser(line) as words:
-            parser = OPBParser(
-                ineqFactory = context.ineqFactory,
-                allowEq = False)
-            ineq = parser.parseConstraint(words)
+        cppWordIter = words.wordIter.wordIter
+        cppWordIter.next()
+        ineq = context.ineqFactory.parse(cppWordIter, allowMultiple = False)
+        words.wordIter.first = True
 
-            substitution = Substitution.parse(
-                words = words,
-                ineqFactory = context.ineqFactory,
-                forbidden = order.vars)
+        # parser = OPBParser(
+        #     ineqFactory = context.ineqFactory,
+        #     allowEq = False)
+        # ineq = parser.parseConstraint(words)
 
-            context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
+        substitution = Substitution.parse(
+            words = words,
+            ineqFactory = context.ineqFactory,
+            forbidden = order.vars)
 
-            autoProveAll = not cls.parseHasExplicitSubproof(words)
+        context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
 
-        return cls(context, ineq[0], substitution, autoProveAll)
+        autoProveAll = not cls.parseHasExplicitSubproof(words)
+
+        return cls(context, ineq, substitution, autoProveAll)
 
     def __init__(self, context, constraint, witness, autoProveAll):
         super().__init__(context)

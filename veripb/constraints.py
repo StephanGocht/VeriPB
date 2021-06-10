@@ -1,5 +1,6 @@
 from veripb.optimized.constraints import CppInequality, CppInequalityBigInt
-from veripb.optimized.parsing import VariableNameManager
+from veripb.optimized.parsing import VariableNameManager, parseConstraintOpbBigInt, parseConstraintOpb
+from veripb.exceptions import ParseError
 
 
 def copysign(a, b):
@@ -409,6 +410,14 @@ class CppIneqFactory(IneqFactory):
         lits  = list(lits)
         return CppInequality(coefs, lits, degree)
 
+    def parse(self, wordIter, allowMultiple = False):
+        result = parseConstraintOpb(self.varNameMgr, wordIter)
+        if allowMultiple:
+            return result
+        else:
+            return result[0]
+
+
 class BigIntIneqFactory(IneqFactory):
     def __init__(self, enableFreeNames = True):
         super().__init__(enableFreeNames)
@@ -421,3 +430,13 @@ class BigIntIneqFactory(IneqFactory):
         coefs = list(coefs)
         lits  = list(lits)
         return CppInequalityBigInt(coefs, lits, degree)
+
+    def parse(self, wordIter, allowMultiple = False):
+        result = parseConstraintOpbBigInt(self.varNameMgr, wordIter)
+        if allowMultiple:
+            return result
+        else:
+            if (result[1] != None):
+                raise ParseError("Equality not allowed here.")
+            return result[0]
+

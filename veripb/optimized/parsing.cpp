@@ -487,6 +487,9 @@ public:
                 }
 
                 auto res = parseConstraint(it);
+                if (it != WordIter::end) {
+                    throw ParseError(it, "Expected end line after constraint.");
+                }
                 formula->add(std::move(res[0]));
                 if (res[1] != nullptr) {
                     formula->add(std::move(res[1]));
@@ -588,10 +591,6 @@ public:
             ++it;
             it.expect(";");
             ++it;
-        }
-
-        if (it != WordIter::end) {
-            throw ParseError(it, "Expected end line after constraint.");
         }
 
         T normalizedDegree = degree + degreeOffset;
@@ -736,6 +735,13 @@ std::unique_ptr<Formula<T>> parseOpb(std::string fileName, VariableNameManager& 
 }
 
 template<typename T>
+std::array<std::unique_ptr<Inequality<T>>, 2> parseOpbConstraint(VariableNameManager& varMgr, WordIter& it) {
+    OPBParser<T> parser(varMgr);
+    return parser.parseConstraint(it);
+}
+
+
+template<typename T>
 std::unique_ptr<Formula<T>> parseCnf(std::string fileName, VariableNameManager& varMgr) {
     std::ifstream f(fileName);
     CNFParser<T> parser(varMgr);
@@ -769,6 +775,8 @@ void init_parsing(py::module &m){
     m.def("parseCnf", &parseCnf<CoefType>, "Parse cnf file with fixed precision.");
     m.def("parseCnfBigInt", &parseCnf<BigInt>, "Parse cnf file with arbitrary precision.");
 
+    m.def("parseConstraintOpb", &parseOpbConstraint<CoefType>, "Parse opb consraint with fixed precision.");
+    m.def("parseConstraintOpbBigInt", &parseOpbConstraint<BigInt>, "Parse opb constraint with arbitrary precision.");
 
     py::register_exception_translator([](std::exception_ptr p) {
         try {

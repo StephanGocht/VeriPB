@@ -127,23 +127,24 @@ class DeleteConstraints2(EmptyRule):
     Ids = ["del"]
 
     @classmethod
-    def parse(cls, line, context):
-        with MaybeWordParser(line) as words:
-            del_type = next(words)
-            if del_type == "id":
-                which = list(map(int, words))
+    def parse(cls, words, context):
+        del_type = next(words)
+        if del_type == "id":
+            which = list(map(int, words))
 
-                if (which[-1] == 0):
-                    which = which[:-1]
+            if (which[-1] == 0):
+                which = which[:-1]
 
-                if 0 in which:
-                    raise ValueError("Can not delete constraint with index 0.")
-            elif del_type == "find":
-                parser = OPBParser(
-                    ineqFactory = context.ineqFactory,
-                    allowEq = False)
-                ineq = parser.parseConstraint(words)
-                which = context.propEngine.getDeletions(ineq[0])
+            if 0 in which:
+                raise ValueError("Can not delete constraint with index 0.")
+        elif del_type == "find":
+
+            cppWordIter = words.wordIter.wordIter
+            cppWordIter.next()
+            ineq = context.ineqFactory.parse(cppWordIter, allowMultiple = False)
+            words.wordIter.first = True
+
+            which = context.propEngine.getDeletions(ineq)
 
         return cls(which)
 

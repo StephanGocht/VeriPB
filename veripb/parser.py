@@ -444,6 +444,8 @@ def MaybeWordParser(what):
         return WordParser(what)
 
 class PyWordIter:
+    """Wrapper arround the cpp WordIter to get a pythonic interface."""
+
     def __init__(self, wordIter):
         self.wordIter = wordIter
         self.first = True

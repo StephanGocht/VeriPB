@@ -160,6 +160,9 @@ class Verifier():
         def __repr__(self):
             return type(self).__name__ + repr(vars(self))
 
+    def print_stats(self):
+        print("c statistic: num rules checked: %i"%(self.checked_rules))
+
     def antecedents(self, ids, ruleNum):
         if ids == "all":
             for Id, c in enumerate(self.db):
@@ -198,6 +201,7 @@ class Verifier():
 
         context.verifierSettings = self.settings
         self.context = context
+        self.checked_rules = 0
 
     @TimedFunction.time("propEngine.attach")
     def attach(self, constraint, constraintId):
@@ -208,6 +212,7 @@ class Verifier():
         self.context.propEngine.detach(constraint, constraintId)
 
     def handleRule(self, ruleNum, rule):
+        self.checked_rules += 1
         if self.settings.progressBar:
             printProgressBar(ruleNum,self.context.ruleCount,self.start_time,length=50)
 

@@ -207,8 +207,8 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
             print()
             TimedFunction.print_stats()
             context.propEngine.printStats()
-
             dominance_stats.print_stats()
+            verify.print_stats()
 
         if profile:
             pr.disable()
@@ -218,6 +218,10 @@ def runUI(*args, **kwargs):
     try:
         result = run(*args, **kwargs)
         result.print()
+
+    except KeyboardInterrupt as e:
+        print("Interrupted by user.")
+        return 100
 
     except InvalidProof as e:
         print("Verification failed.")

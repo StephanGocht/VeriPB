@@ -88,7 +88,7 @@ class Substitution:
                 raise ValueError("Substitution should only"
                     "map variables, not negated literals.")
             if frm in forbidden:
-                raise ValueError("Substitution contains forbidden variable.")
+                raise InvalidProof("Substitution contains forbidden variable.")
 
             try:
                 nxt = next(words)

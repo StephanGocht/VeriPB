@@ -195,6 +195,27 @@ public:
     friend bool operator!=(const WordIter& a, const WordIter& b) {
         return !(a==b);
     }
+
+    size_t getColumn() const {
+        size_t column;
+        if (this->start == std::string::npos) {
+            column = this->line.size() + 1;
+        } else {
+            column = this->start + 1;
+        }
+        return column;
+    }
+
+    size_t getLine() const {
+        return this->fileInfo.line;
+    }
+
+    std::string getFileName() const {
+        return this->fileInfo.fileName;
+    }
+
+
+
 };
 
 bool nextLine(std::ifstream* stream, WordIter* it) {
@@ -206,13 +227,9 @@ WordIter WordIter::end;
 ParseError::ParseError(const WordIter& it, const std::string& what_arg)
     : std::runtime_error(what_arg)
 {
-    fileName = it.fileInfo.fileName;
-    line = it.fileInfo.line;
-    if (it.start == std::string::npos) {
-        column = it.line.size() + 1;
-    } else {
-        column = it.start + 1;
-    }
+    fileName = it.getFileName();
+    line = it.getLine();
+    column = it.getColumn();
 }
 
 /**
@@ -810,7 +827,10 @@ void init_parsing(py::module &m){
         .def(py::init<std::string>())
         .def("next", &WordIter::operator++)
         .def("get", &WordIter::get)
-        .def("isEnd", &WordIter::isEnd);
+        .def("isEnd", &WordIter::isEnd)
+        .def("getFileName", &WordIter::getFileName)
+        .def("getLine", &WordIter::getLine)
+        .def("getColumn", &WordIter::getColumn);
 
     py::class_<Formula<CoefType>>(m, "Formula")
         .def(py::init<>())

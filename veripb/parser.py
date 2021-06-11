@@ -81,22 +81,20 @@ class RuleParserBase():
         self.parseContext.rules = rules_to_dict(rules, defaultRule)
 
         lineNum = 1
-        lines = LineParser(file)
+        with LineParser(file) as lines:
+            defaultIdSize = 1
+            # the first line is not allowed to be comment line or empty but must be the header
+            if hasattr(self, "parseHeader"):
+                try:
+                    self.parseHeader(next(lines))
+                except ParseError as e:
+                    e.line = lineNum
+                    raise e
+                except StopIteration:
+                    raise ParseError("Expected Header.")
+            else:
+                lineNum = 0
 
-        defaultIdSize = 1
-        # the first line is not allowed to be comment line or empty but must be the header
-        if hasattr(self, "parseHeader"):
-            try:
-                self.parseHeader(next(lines))
-            except ParseError as e:
-                e.line = lineNum
-                raise e
-            except StopIteration:
-                raise ParseError("Expected Header.")
-        else:
-            lineNum = 0
-
-        try:
             for words in lines:
                 lineNum += 1
 
@@ -112,28 +110,20 @@ class RuleParserBase():
                         if rule is not None:
                             words.putback(ruleId)
                         else:
-                            raise ParseError("Unsupported rule '%s'"%(ruleId),
-                                line = lineNum)
+                            raise ParseError("Unsupported rule '%s'"%(ruleId))
 
-                    try:
-                        step = rule.parse(words, self.parseContext.context)
+                    step = rule.parse(words, self.parseContext.context)
 
-                        step.lineInFile = lineNum
-                        yield step
+                    step.lineInFile = lineNum
+                    yield step
 
-                        self.parseContext = step.newParseContext(self.parseContext)
-                        numConstraints = step.numConstraints()
-                        oldFree = self.parseContext.firstFreeId
-                        newFree = oldFree + numConstraints
-                        self.parseContext.firstFreeId = newFree
-                        for listener in self.parseContext.addIneqListener:
-                            listener(range(oldFree, newFree), self.parseContext.context)
-
-                    except veripb.ParseError as e:
-                        e.line = lineNum
-                        raise e
-        except UnicodeDecodeError as e:
-            raise ParseError(e, line = lineNum + 1)
+                    self.parseContext = step.newParseContext(self.parseContext)
+                    numConstraints = step.numConstraints()
+                    oldFree = self.parseContext.firstFreeId
+                    newFree = oldFree + numConstraints
+                    self.parseContext.firstFreeId = newFree
+                    for listener in self.parseContext.addIneqListener:
+                        listener(range(oldFree, newFree), self.parseContext.context)
 
 class RuleParser(RuleParserBase):
     commentChar = "*"
@@ -433,8 +423,23 @@ class LineParser():
     def __enter__(self):
         return self
 
+    def raiseParseError(self, error):
+        raise ParseError(error,
+            self.iter.getFileName(),
+            self.iter.getLine(),
+            self.iter.getColumn())
+
     def __exit__(self, exec_type, exec_value, exec_traceback):
-        pass
+        if exec_type is not None:
+            if issubclass(exec_type, ValueError):
+                self.raiseParseError(exec_value)
+
+            if issubclass(exec_type, StopIteration) \
+                    and exec_value.value is self.pyiter:
+                self.raiseParseError("Expected another word.")
+
+            if issubclass(exec_type, UnicodeDecodeError):
+                self.raiseParseError(exec_value)
 
 # dummy method for refactoring
 def MaybeWordParser(what):

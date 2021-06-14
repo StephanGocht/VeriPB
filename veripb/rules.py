@@ -139,10 +139,8 @@ class DeleteConstraints2(EmptyRule):
                 raise ValueError("Can not delete constraint with index 0.")
         elif del_type == "find":
 
-            cppWordIter = words.wordIter.wordIter
-            cppWordIter.next()
+            cppWordIter = words.wordIter.getNative()
             ineq = context.ineqFactory.parse(cppWordIter, allowMultiple = False)
-            words.wordIter.first = True
 
             which = context.propEngine.getDeletions(ineq)
 
@@ -193,14 +191,10 @@ class ReverseUnitPropagation(Rule):
     Ids = ["u"]
 
     @classmethod
-    def parse(cls, line, context):
-        with MaybeWordParser(line) as words:
-            parser = OPBParser(
-                    ineqFactory = context.ineqFactory,
-                    allowEq = False)
-            ineq = parser.parseConstraint(words)
-
-        return cls(ineq[0])
+    def parse(cls, words, context):
+        cppWordIter = words.wordIter.getNative()
+        ineq = context.ineqFactory.parse(cppWordIter, allowMultiple = False)
+        return cls(ineq)
 
     def __init__(self, constraint):
         self.constraint = constraint

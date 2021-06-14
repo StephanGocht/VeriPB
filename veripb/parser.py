@@ -453,24 +453,38 @@ class PyWordIter:
 
     def __init__(self, wordIter):
         self.wordIter = wordIter
-        self.first = True
+        self.consumeNext = False
 
     def reset(self):
-        self.first = True
+        self.consumeNext = False
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        if not self.first:
+        # for better reporting of a parse error location, we only
+        # want to move the itterator forward after we are done
+        # handling, the element, i.e., when the next element is
+        # queried.
+        if self.consumeNext:
             self.wordIter.next()
 
-        self.first = False
+        self.consumeNext = True
 
         if self.wordIter.isEnd():
             raise StopIteration()
         else:
             return self.wordIter.get()
+
+    def getNative(self):
+        # the iterater still points at the last element returned by
+        # next(), hence we want to move it forward when passed to a
+        # native handler.
+        next(self)
+        # After the native handler we expect the iterator to point to
+        # the first unhandled word, so we do not want to consume it.
+        self.consumeNext = False
+        return self.wordIter
 
 
 class WordParser():

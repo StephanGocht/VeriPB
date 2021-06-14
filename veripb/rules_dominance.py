@@ -604,10 +604,8 @@ class AddRedundant(MultiGoalRule):
         orderContext = OrderContext.setup(context)
         order = orderContext.activeOrder
 
-        cppWordIter = words.wordIter.wordIter
-        cppWordIter.next()
+        cppWordIter = words.wordIter.getNative()
         ineq = context.ineqFactory.parse(cppWordIter, allowMultiple = False)
-        words.wordIter.first = True
 
         # parser = OPBParser(
         #     ineqFactory = context.ineqFactory,

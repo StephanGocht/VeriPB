@@ -696,6 +696,9 @@ public:
                 // is left on the cleaned up trail.
                 reason->rePropagate();
             } else {
+                // nullptr reason can happen when we have decisions,
+                // e.g., when checking if an assignment is
+                // satisfiable.
                 enqueue(oldTrail[i], nullptr);
             }
         }
@@ -1045,7 +1048,7 @@ private:
         Term<T> term;
         term.coeff = 1;
         Term<T>* it = this->terms.begin();
-        for (Lit lit: clause) {
+        for (Lit lit: clause.literals) {
             term.lit = lit;
             *it = term;
             ++it;

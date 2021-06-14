@@ -79,29 +79,29 @@ void ClausePropagator::cleanupWatches() {
     }
 }
 
-int main(int argc, char const *argv[])
-{
-    /* code */
-    {
-    Inequality<CoefType> foo({1,1,1},{1,1,1},1);
-    Inequality<CoefType> baa({1,1,1},{-1,-1,-1},3);
-    PropEngine<CoefType> p(10);
-    foo.eq(&baa);
-    foo.implies(&baa);
-    foo.negated();
-    Inequality<CoefType> test(baa);
-    p.attach(&foo, 1);
-    }
-    Inequality<CoefType> foo({1,1,1},{1,1,1},1);
+// int main(int argc, char const *argv[])
+// {
+//     /* code */
+//     {
+//     Inequality<CoefType> foo({1,1,1},{1,1,1},1);
+//     Inequality<CoefType> baa({1,1,1},{-1,-1,-1},3);
+//     PropEngine<CoefType> p(10);
+//     foo.eq(&baa);
+//     foo.implies(&baa);
+//     foo.negated();
+//     Inequality<CoefType> test(baa);
+//     p.attach(&foo, 1);
+//     }
+//     Inequality<CoefType> foo({1,1,1},{1,1,1},1);
 
-    std::cout << foo.isContradiction() << std::endl;
+//     std::cout << foo.isContradiction() << std::endl;
 
-    std::cout << std::endl;
-    std::cout << (~Lit(Var(2), false)).var() << std::endl;
-    int test = 4 ^ 1;
-    std::cout << test << std::endl;
-    return 0;
-}
+//     std::cout << std::endl;
+//     std::cout << (~Lit(Var(2), false)).var() << std::endl;
+//     int test = 4 ^ 1;
+//     std::cout << test << std::endl;
+//     return 0;
+// }
 
 int hashColision = 0;
 

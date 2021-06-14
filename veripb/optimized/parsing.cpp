@@ -766,23 +766,43 @@ std::unique_ptr<Formula<T>> parseCnf(std::string fileName, VariableNameManager& 
     return result;
 }
 
-// int main(int argc, char const *argv[])
-// {
+int main(int argc, char const *argv[])
+{
 
-//     std::cout << "start reading file..." << std::endl;
-//     std::string fileName(argv[1]);
-//     std::ifstream f(fileName);
+    std::cout << "start reading file..." << std::endl;
+    std::string fileName(argv[1]);
+    std::ifstream f(fileName);
 
 
-//     VariableNameManager manager(false);
-//     OPBParser<int> parser(manager);
-//     try {
-//         std::cout << parser.parse(f, fileName)->getConstraints().size() << std::endl;
-//     } catch (const ParseError& e) {
-//         std::cout << e.what() << std::endl;
-//     }
-//     return 0;
-// }
+    VariableNameManager manager(false);
+    size_t rupSteps = 0;
+    size_t delSteps = 0;
+    size_t count = 0;
+    WordIter it(argv[1]);
+    while (WordIter::getline(f, it)) {
+        if (it.get() == "u") {
+            rupSteps += 1;
+            it.next();
+            parseOpbConstraint<CoefType>(manager, it);
+        } else if (it.get() == "del") {
+            delSteps += 1;
+            it.next();
+            it.next();
+            parseOpbConstraint<CoefType>(manager, it);
+        } else {
+            while (!it.isEnd()) {
+                it.next();
+                count += 1;
+            }
+        }
+    }
+
+    std::cout << count << std::endl;
+
+    std::cout << "rupSteps: " << rupSteps << std::endl;
+    std::cout << "delSteps: " << delSteps << std::endl;
+    return 0;
+}
 
 #ifdef PY_BINDINGS
 void init_parsing(py::module &m){

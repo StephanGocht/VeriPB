@@ -26,12 +26,6 @@ class DummyPropEngine():
     def reset(self):
         raise RuntimeError()
 
-def fileLineNum(ruleNum, rule):
-    try:
-        return "from line %i" % (rule.lineInFile)
-    except AttributeError:
-        return "unknown line - %i-th step" %(ruleNum)
-
 # Print iterations progress
 def printProgressBar (iteration, total, start_time, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r", stream = sys.stderr):
     """

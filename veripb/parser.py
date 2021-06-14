@@ -80,7 +80,6 @@ class RuleParserBase():
     def parse(self, rules, file, dumpLine = False, defaultRule = None):
         self.parseContext.rules = rules_to_dict(rules, defaultRule)
 
-        lineNum = 1
         with LineParser(file) as lines:
             defaultIdSize = 1
             # the first line is not allowed to be comment line or empty but must be the header
@@ -88,18 +87,15 @@ class RuleParserBase():
                 try:
                     self.parseHeader(next(lines))
                 except ParseError as e:
-                    e.line = lineNum
+                    e.line = lines.iter.getLine()
                     raise e
                 except StopIteration:
                     raise ParseError("Expected Header.")
-            else:
-                lineNum = 0
 
             for words in lines:
-                lineNum += 1
 
                 if dumpLine:
-                    print("line %03d: %s"% (lineNum, words.line.rstrip()))
+                    print("line %03d: %s"% (lines.iter.getLine(), lines.iter.getLineText().rstrip()))
 
                 ruleId = self.getRuleId(words)
                 if ruleId is not None:
@@ -110,20 +106,20 @@ class RuleParserBase():
                         if rule is not None:
                             words.putback(ruleId)
                         else:
-                            raise ParseError("Unsupported rule '%s'"%(ruleId))
+                            raise ValueError("Unsupported rule '%s'"%(ruleId))
 
                     step = rule.parse(words, self.parseContext.context)
-
-                    step.lineInFile = lineNum
+                    step.lineInFile = lines.iter.getLine()
                     yield step
 
                     self.parseContext = step.newParseContext(self.parseContext)
                     numConstraints = step.numConstraints()
-                    oldFree = self.parseContext.firstFreeId
-                    newFree = oldFree + numConstraints
-                    self.parseContext.firstFreeId = newFree
-                    for listener in self.parseContext.addIneqListener:
-                        listener(range(oldFree, newFree), self.parseContext.context)
+                    if numConstraints > 0:
+                        oldFree = self.parseContext.firstFreeId
+                        newFree = oldFree + numConstraints
+                        self.parseContext.firstFreeId = newFree
+                        for listener in self.parseContext.addIneqListener:
+                            listener(range(oldFree, newFree), self.parseContext.context)
 
 class RuleParser(RuleParserBase):
     commentChar = "*"

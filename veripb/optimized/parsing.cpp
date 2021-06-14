@@ -210,6 +210,10 @@ public:
         return this->fileInfo.line;
     }
 
+    std::string getLineText() const {
+        return this->line;
+    }
+
     std::string getFileName() const {
         return this->fileInfo.fileName;
     }
@@ -900,6 +904,7 @@ void init_parsing(py::module &m){
         .def("isEnd", &WordIter::isEnd)
         .def("getFileName", &WordIter::getFileName)
         .def("getLine", &WordIter::getLine)
+        .def("getLineText", &WordIter::getLineText)
         .def("getColumn", &WordIter::getColumn);
 
     py::class_<Formula<CoefType>>(m, "Formula")

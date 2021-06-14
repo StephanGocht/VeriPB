@@ -770,37 +770,87 @@ int main(int argc, char const *argv[])
 {
 
     std::cout << "start reading file..." << std::endl;
-    std::string fileName(argv[1]);
-    std::ifstream f(fileName);
-
+    std::string proofFileName(argv[2]);
+    std::string instanceFileName(argv[1]);
+    std::ifstream proof(proofFileName);
 
     VariableNameManager manager(false);
+    auto formula = parseCnf<CoefType>(instanceFileName, manager);
+    PropEngine<CoefType> engine(formula->maxVar);
+    std::vector<InequalityPtr<CoefType>> constraints;
+    constraints.push_back(nullptr);
+    uint64_t id = 0;
+    for (auto* constraint: formula->getConstraints()) {
+        engine.attach(constraint, ++id);
+        constraints.push_back(nullptr);
+    }
+
+    uint64_t formulaIds = id;
+
     size_t rupSteps = 0;
     size_t delSteps = 0;
     size_t count = 0;
     WordIter it(argv[1]);
-    while (WordIter::getline(f, it)) {
-        if (it.get() == "u") {
+    while (WordIter::getline(proof, it)) {
+        if (it.get() == "pseudo-Boolean") {
+
+        } else if (it.get() == "f") {
+        } else if (it.get() == "u") {
             rupSteps += 1;
             it.next();
-            parseOpbConstraint<CoefType>(manager, it);
+            auto c = parseOpbConstraint<CoefType>(manager, it);
+            if (!c[0]->rupCheck(engine)) {
+                std::cout << "Verification Failed." << std::endl;
+                return 1;
+            };
+            Inequality<CoefType>* ineq = engine.attach(c[0].get(), ++id);
+            if (ineq == c[0].get()) {
+                constraints.emplace_back(std::move(c[0]));
+            } else {
+                constraints.push_back(nullptr);
+            }
+
         } else if (it.get() == "del") {
             delSteps += 1;
             it.next();
             it.next();
-            parseOpbConstraint<CoefType>(manager, it);
+            auto c = parseOpbConstraint<CoefType>(manager, it);
+            auto ineq = engine.find(c[0].get());
+            if (ineq == nullptr) {
+                std::cout << "Verification Failed." << std::endl;
+                return 1;
+            }
+            assert(ineq->ids.size() > 0);
+            uint64_t id = 0;
+            for (uint64_t tid: ineq->ids) {
+                id = tid;
+                if (id != ineq->minId) {
+                    break;
+                }
+            }
+
+            engine.detach(ineq, id);
+            if (ineq->ids.size() == 0) {
+                assert(id <= formulaIds || constraints[id] != nullptr);
+                constraints[id] = nullptr;
+            }
+
+        } else if (it.get() == "c") {
         } else {
             while (!it.isEnd()) {
+                std::cout << it.get() << " ";
                 it.next();
-                count += 1;
             }
+            count += 1;
+            std::cout << "\n";
         }
     }
 
-    std::cout << count << std::endl;
+    std::cout << "unkonwn lines:" << count << std::endl;
 
     std::cout << "rupSteps: " << rupSteps << std::endl;
     std::cout << "delSteps: " << delSteps << std::endl;
+    engine.printStats();
     return 0;
 }
 

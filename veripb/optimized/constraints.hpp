@@ -14,6 +14,7 @@
 #include "BigInt.hpp"
 
 #ifndef NDEBUG
+    #include <unistd.h>
     #include <execinfo.h>
 #endif
 

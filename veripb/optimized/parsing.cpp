@@ -792,6 +792,7 @@ int main(int argc, char const *argv[])
     uint64_t formulaIds = id;
 
     size_t rupSteps = 0;
+    size_t nLits = 0;
     size_t delSteps = 0;
     size_t count = 0;
     WordIter it(argv[1]);
@@ -807,6 +808,7 @@ int main(int argc, char const *argv[])
                 std::cout << "Verification Failed." << std::endl;
                 return 1;
             };
+            nLits += c[0]->size();
             Inequality<CoefType>* ineq = engine.attach(c[0].get(), ++id);
             if (ineq == c[0].get()) {
                 constraints.emplace_back(std::move(c[0]));
@@ -851,6 +853,8 @@ int main(int argc, char const *argv[])
     }
 
     std::cout << "unkonwn lines:" << count << std::endl;
+
+    std::cout << "avgSize:" << ((float) nLits) / rupSteps << std::endl;
 
     std::cout << "rupSteps: " << rupSteps << std::endl;
     std::cout << "delSteps: " << delSteps << std::endl;

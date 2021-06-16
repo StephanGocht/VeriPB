@@ -552,6 +552,7 @@ public:
 
 struct DBConstraintHeader {
     bool isMarkedForDeletion = false;
+    bool isReason = false;
 };
 
 
@@ -559,6 +560,8 @@ class Reason {
 public:
     virtual void rePropagate() = 0;
     virtual bool isMarkedForDeletion() = 0;
+    virtual void setIsReason() = 0;
+    virtual void unsetIsReason() = 0;
     virtual ~Reason(){};
 };
 
@@ -586,6 +589,14 @@ public:
 
     virtual bool isMarkedForDeletion() {
         return constraint.header.isMarkedForDeletion;
+    }
+
+    virtual void setIsReason() {
+        constraint.header.isReason = true;
+    }
+
+    virtual void unsetIsReason() {
+        constraint.header.isReason = false;
     }
 
     virtual ~GenericDBReason() {}
@@ -625,6 +636,7 @@ private:
 
 public:
     std::vector<Propagator*> propagators;
+    std::chrono::duration<double> timeCleanupTrail;
 
     const Assignment& getAssignment() {return assignment;}
     const Assignment& getPhase() {return phase;}
@@ -660,6 +672,10 @@ public:
         phase.assign(lit);
         trail.push_back(lit);
         reasons.emplace_back(std::move(reason));
+        if (reasons.back().get() != nullptr) {
+            reasons.back()->setIsReason();
+        }
+
     }
 
     bool isTrailClean() {
@@ -673,6 +689,7 @@ public:
     }
 
     void cleanupTrail() {
+        Timer timer(timeCleanupTrail);
         if (isTrailClean()) {
             return;
         }
@@ -731,6 +748,9 @@ public:
     void undoOne() {
         assignment.unassign(trail.back());
         trail.pop_back();
+        if (reasons.back().get() != nullptr) {
+            reasons.back()->unsetIsReason();
+        }
         reasons.pop_back();
     }
 
@@ -1693,6 +1713,10 @@ public:
             << std::fixed << std::setprecision(2)
             << timeInitProp.count() << std::endl ;
 
+        std::cout << "c statistic: time cleanupTrail: "
+            << std::fixed << std::setprecision(2)
+            << propMaster.timeCleanupTrail.count() << std::endl ;
+
         std::cout << "c statistic: time propagate: "
             << std::fixed << std::setprecision(2)
             << timePropagate.count() << std::endl ;
@@ -1868,18 +1892,22 @@ public:
                     assert(unattached.back() == ineq);
                     unattached.pop_back();
                 } else {
-                    hasDetached = true;
-                    auto& propagating = propagatingAt0;
-                    propagating.erase(
-                        std::remove_if(
-                            propagating.begin(),
-                            propagating.end(),
-                            [ineq](auto& other){
-                                return other == ineq;
-                            }
-                        ),
-                        propagating.end()
-                    );
+                    if (ineq->isReason()) {
+                        hasDetached = true;
+                    }
+                    if (ineq->isPropagatingAt0()) {
+                        auto& propagating = propagatingAt0;
+                        propagating.erase(
+                            std::remove_if(
+                                propagating.begin(),
+                                propagating.end(),
+                                [ineq](auto& other){
+                                    return other == ineq;
+                                }
+                            ),
+                            propagating.end()
+                        );
+                    }
 
                     ineq->clearWatches(*this);
 
@@ -1914,9 +1942,9 @@ public:
         initPropagation();
         propagate();
 
+        FixedSizeInequalityHandler<T> negated(redundant);
         {
             AutoReset reset(this->propMaster);
-            FixedSizeInequalityHandler<T> negated(redundant);
             negated->negate();
 
             tmpPropagator.increaseNumVarsTo(nVars);
@@ -2180,6 +2208,10 @@ public:
         this->minId = other.minId;
     }
 
+    size_t size() {
+        return ineq->terms.size();
+    }
+
     Inequality(std::vector<Term<T>>& terms_, T degree_)
         : handler(terms_.size(), terms_, degree_)
     {
@@ -2222,6 +2254,11 @@ public:
             // assert(ineq->header.isMarkedForDeletion);
             Junkyard<FixedSizeInequalityHandler<T>>::get().add(std::move(handler));
         }
+    }
+
+    bool isReason() {
+        return (ineq->header.isReason
+            || (clauseHandler.ineq && clauseHandler.ineq->header.isReason));
     }
 
     void freeze(size_t numVars) {

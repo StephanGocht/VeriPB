@@ -89,9 +89,9 @@ class Order:
                     substitution.map(leftVar, var)
                 substitution.map(rightVar, var)
 
-            for var in self.auxVars:
+            for aux in self.auxVars:
                 try:
-                    substitution.map(var, witnessDict[var])
+                    substitution.map(aux, witnessDict[aux])
                 except KeyError:
                     pass
 

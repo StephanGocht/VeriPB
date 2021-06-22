@@ -133,9 +133,10 @@ public:
 
 template<>
 class Term<void> {
-    Lit lit;
-
 public:
+    Lit lit;
+    static const int8_t coeff = 1;
+
     using coeff_type = int8_t;
 
     const int8_t& getCoeff() const {
@@ -376,6 +377,12 @@ int main(int argc, char const *argv[])
     ineq32.terms.emplace_back(1,Lit(1));
     ineq32.terms.emplace_back(2,Lit(2));
     Inequality b(&ineq32);
+
+    Term<void> x(1, Lit(1));
+
+    std::cout << "Size of clause:" << sizeof(Term<void>) << std::endl;
+    std::cout << "Size of term32:" << sizeof(Term<int32_t>) << std::endl;
+    std::cout << x.coeff << std::endl;
 
     if (a.implies(&b)) {
         std::cout << "a implies b" << std::endl;

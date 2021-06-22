@@ -342,6 +342,8 @@ T cpsign(T a, Lit b) {
 
 template<typename T>
 struct Term {
+    using coeff_type = T;
+
     T coeff;
     Lit lit;
 
@@ -371,6 +373,44 @@ struct Term {
         return result;
     }
 };
+
+template<>
+struct Term<void> {
+    using coeff_type = int8_t;
+
+    Lit lit;
+    static constexpr int8_t coeff = 1;
+
+    Term(){}
+
+    template<typename T>
+    Term(T _coeff, Lit _lit)
+        : lit(_lit)
+    {
+        assert(_coeff == 1);
+    }
+
+    Term<void>& operator=(const Lit& _lit) {
+        lit = _lit;
+        return *this;
+    }
+
+    template<typename T>
+    Term<void>& operator=(const Term<T>& other) {
+        assert(other.coeff == 1);
+        lit = other.lit;
+        return *this;
+    }
+
+
+    bool operator==(const Term<void>& other) const {
+        return (this->lit == other.lit);
+    }
+};
+
+// While this is not reqired for correctness, we do want that clauses
+// only take up space for terms and not for coefficients.
+static_assert(sizeof(Term<void>) == sizeof(Lit));
 
 template<typename T>
 inline std::ostream& operator<<(std::ostream& os, const Term<T>& term) {
@@ -768,6 +808,8 @@ public:
     }
 };
 
+class Clause;
+
 class ClausePropagator: public Propagator {
 public:
     using WatchedType = WatchInfo<Clause>;
@@ -797,56 +839,57 @@ public:
     virtual void cleanupWatches();
 };
 
-class Clause;
-
 using ClauseReason = GenericDBReason<Clause, ClausePropagator>;
 
 class Clause {
 private:
-    using TElement = Lit;
+    using TElement = Term<void>;
     using TVec = InlineVec<TElement>;
 
     friend ClauseHandler;
     friend std::ostream& operator<<(std::ostream& os, const Clause& v);
 
 public:
-    DBConstraintHeader header;
     size_t propagationSearchStart = 2;
-    InlineVec<Lit> literals;
+
+    // common constraint interface:
+    DBConstraintHeader header;
+    static constexpr int8_t degree = 1;
+    TVec terms;
 
 private:
     // size_t size() const {
-    //     return literals.size();
+    //     return terms.size();
     // }
 
     Clause(size_t size)
-        :literals(size) {
+        :terms(size) {
     }
 
     Clause(const Clause& other)
-        : literals(other.literals.size())
+        : terms(other.terms.size())
     {
         using namespace std;
-        copy(other.literals.begin(), other.literals.end(), this->literals.begin());
+        copy(other.terms.begin(), other.terms.end(), this->terms.begin());
     }
 
-    Clause(std::vector<Lit>& _literals)
-        : literals(_literals.size())
+    Clause(std::vector<Lit>& _terms)
+        : terms(_terms.size())
     {
-        std::copy(_literals.begin(),_literals.end(), this->literals.begin());
+        std::copy(_terms.begin(),_terms.end(), this->terms.begin());
     }
 
     template<typename T>
     Clause(const FixedSizeInequality<T>& other)
-        : literals(other.terms.size())
+        : terms(other.terms.size())
     {
         for (size_t i = 0; i < other.terms.size(); ++i) {
-            literals[i] = other.terms[i].lit;
+            terms[i].lit = other.terms[i].lit;
         }
     }
 
     void checkPosition(size_t pos, int &numFound, size_t (&watcher)[2], const Assignment& assignment) {
-        Lit& lit = this->literals[pos];
+        Lit& lit = this->terms[pos].lit;
         switch(assignment[lit]) {
             case State::True:
                 if (pos == 1) {
@@ -868,9 +911,9 @@ private:
     }
 public:
     void clearWatches(ClausePropagator& prop) {
-        size_t nWatcher = std::min((size_t) 2, literals.size());
+        size_t nWatcher = std::min((size_t) 2, terms.size());
         for (size_t i = 0; i < nWatcher; i++) {
-            auto& ws = prop.watchlist[literals[i]];
+            auto& ws = prop.watchlist[terms[i].lit];
             ws.erase(
                 std::remove_if(
                     ws.begin(),
@@ -885,9 +928,9 @@ public:
     }
 
     void initWatch(ClausePropagator& prop) {
-        for (Lit lit: literals) {
-            assert(static_cast<size_t>(lit.var()) < prop.propMaster.getAssignment().value.size());
-            assert(static_cast<size_t>(lit) < prop.watchlist.size());
+        for (Term<void> term: terms) {
+            assert(static_cast<size_t>(term.lit.var()) < prop.propMaster.getAssignment().value.size());
+            assert(static_cast<size_t>(term.lit) < prop.watchlist.size());
         }
         // std::cout << "initializing " << *this << std::endl;
         updateWatch(prop, Lit::Undef(), true);
@@ -902,21 +945,21 @@ public:
         }
 
         assert(falsifiedLit == Lit::Undef()
-                || (this->literals.size() < 2
-                    || (this->literals[0] == falsifiedLit
-                        || this->literals[1] == falsifiedLit
+                || (this->terms.size() < 2
+                    || (this->terms[0].lit == falsifiedLit
+                        || this->terms[1].lit == falsifiedLit
             )));
 
 
         int numFound = 0;
-        // watcher will contain the position of the literals to be watched
+        // watcher will contain the position of the terms to be watched
         size_t watcher[2];
 
         const Assignment& assignment = prop.propMaster.getAssignment();
 
-        if (this->literals.size() >= 2) {
-            if (this->literals[1] == falsifiedLit) {
-                std::swap(this->literals[0], this->literals[1]);
+        if (this->terms.size() >= 2) {
+            if (this->terms[1].lit == falsifiedLit) {
+                std::swap(this->terms[0], this->terms[1]);
             }
 
             checkPosition(0, numFound, watcher, assignment);
@@ -925,21 +968,21 @@ public:
             }
 
             size_t pos = this->propagationSearchStart;
-            for (size_t i = 0; i < this->literals.size() - 2 && numFound < 2; i++) {
+            for (size_t i = 0; i < this->terms.size() - 2 && numFound < 2; i++) {
                 checkPosition(pos, numFound, watcher, assignment);
                 pos += 1;
-                if (pos == this->literals.size()) {
+                if (pos == this->terms.size()) {
                     pos = 2;
                 }
             }
             this->propagationSearchStart = pos;
-        } else if (this->literals.size() == 1) {
+        } else if (this->terms.size() == 1) {
             checkPosition(0, numFound, watcher, assignment);
         }
 
         // LOG(debug) << "numFound: "<< numFound << EOM;
         if (numFound == 1) {
-            Lit lit = this->literals[watcher[0]];
+            Lit lit = this->terms[watcher[0]].lit;
             if (assignment[lit] == State::Unassigned) {
                 prop.propMaster.enqueue(
                     lit,
@@ -951,7 +994,7 @@ public:
             prop.propMaster.conflict();
         }
 
-        if (this->literals.size() >= 2) {
+        if (this->terms.size() >= 2) {
             if (numFound == 0) {
                 watcher[0] = 0;
                 watcher[1] = 1;
@@ -968,7 +1011,7 @@ public:
 
             if (initial || numFound > 0) {
                 for (size_t i = 0; i < 2; i++) {
-                    assert(watcher[i] < literals.size());
+                    assert(watcher[i] < terms.size());
 
                     if (initial
                         || (i == 0
@@ -977,12 +1020,12 @@ public:
                         // was not a watched literal / needs to be readded
                         keep = false;
                         // assert(watcher[0] < watcher[1] || watcher[1] == 1);
-                        assert(initial || (literals[i] == falsifiedLit));
-                        std::swap(literals[i], literals[watcher[i]]);
+                        assert(initial || (terms[i].lit == falsifiedLit));
+                        std::swap(terms[i], terms[watcher[i]]);
                         WatchInfo<Clause> watchInfo;
                         watchInfo.ineq = this;
-                        watchInfo.other = literals[watcher[(i + 1) % 2]];
-                        prop.watch(literals[i], watchInfo);
+                        watchInfo.other = terms[watcher[(i + 1) % 2]].lit;
+                        prop.watch(terms[i].lit, watchInfo);
                     }
                 }
             }
@@ -999,10 +1042,7 @@ public:
 
 
 inline std::ostream& operator<<(std::ostream& os, const Clause& v) {
-    Term<int> term;
-    term.coeff = 1;
-    for (Lit lit: v.literals) {
-        term.lit = lit;
+    for (Term<void> term: v.terms) {
         os << term << " ";
     };
     os << " >= 1";
@@ -1021,9 +1061,6 @@ private:
     uint32_t watchSize = 0;
 
 public:
-    DBConstraintHeader header;
-
-    T degree;
     T maxCoeff = 0;
 
     using TElement = Term<T>;
@@ -1032,7 +1069,10 @@ public:
             InlineVec<TElement>,
             std::vector<TElement>
         >;
-    // Term<T> terms[];
+
+    // common constraint interface:
+    DBConstraintHeader header;
+    T degree;
     TVec terms;
 
 private:
@@ -1062,19 +1102,20 @@ private:
         std::copy(_terms.begin(),_terms.end(), this->terms.begin());
     }
 
-    FixedSizeInequality(Clause& clause)
-        : degree(1)
-        , terms(clause.literals.size())
-    {
-        Term<T> term;
-        term.coeff = 1;
-        Term<T>* it = this->terms.begin();
-        for (Lit lit: clause.literals) {
-            term.lit = lit;
-            *it = term;
-            ++it;
-        }
-    }
+    // FixedSizeInequality(Clause& clause)
+    //     : degree(1)
+    //     , terms(clause.terms.size())
+    // {
+    //     std::copy(clause.terms.begin(),clause.terms.end(), this->terms.begin());
+    //     // Term<T> term;
+    //     // term.coeff = 1;
+    //     // Term<T>* it = this->terms.begin();
+    //     // for (Term<void> term: clause.terms) {
+    //     //     term.lit = lit;
+    //     //     *it = term;
+    //     //     ++it;
+    //     // }
+    // }
 
     void computeMaxCoeff(){
         std::sort(terms.begin(), terms.end(), orderByCoeff<Term<T>>);

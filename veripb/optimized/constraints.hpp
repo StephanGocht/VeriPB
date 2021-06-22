@@ -347,7 +347,7 @@ struct Term {
     T coeff;
     Lit lit;
 
-    Term(){}
+    Term() = default;
 
     Term(T coeff_, Lit lit_)
         : coeff(coeff_)
@@ -381,7 +381,7 @@ struct Term<void> {
     Lit lit;
     static constexpr int8_t coeff = 1;
 
-    Term(){}
+    Term() = default;
 
     template<typename T>
     Term(T _coeff, Lit _lit)
@@ -2113,16 +2113,22 @@ public:
         bussy = false;
     }
 
-    void load(FixedSizeInequality<T>& ineq) {
+    template<typename TConstraint>
+    void load(TConstraint& ineq) {
         assert(!bussy && "critical error: I am used twice!");
         bussy = true;
 
         this->degree = ineq.degree;
-        for (Term<T>& term: ineq.terms) {
+        Term<T> myTerm;
+        for (auto& term: ineq.terms) {
             if (term.coeff < 0) {
-                term.lit = ~term.lit;
-                term.coeff = -term.coeff;
+                myTerm.lit = ~term.lit;
+                myTerm.coeff = term.coeff;
+                myTerm.coeff = -term.coeff;
                 this->degree += term.coeff;
+            } else {
+                myTerm.lit = term.lit;
+                myTerm.coeff = std::move(term.coeff);
             }
             addLhs(term);
             // T coeff = cpsign(term.coeff, term.lit);
@@ -2185,9 +2191,11 @@ public:
     }
 
     /* requires positive coefficients */
-    void addLhs(const Term<T> &term) {
+    template<typename IntType>
+    void addLhs(const Term<IntType> &term) {
         using namespace std;
-        T b = cpsign(term.coeff, term.lit);
+        using OtherCoeffTyep = typename Term<IntType>::coeff_type;
+        OtherCoeffTyep b = cpsign(term.coeff, term.lit);
         Var var = term.lit.var();
         this->use(var);
         T a = this->coeffs[var];
@@ -2200,7 +2208,8 @@ public:
         }
     }
 
-    void add(const FixedSizeInequality<T>& other) {
+    template<typename TConstraint>
+    void add(const TConstraint& other) {
         for (const Term<T> &term:other.terms) {
             addLhs(term);
         }
@@ -2208,6 +2217,92 @@ public:
         this->degree += other.degree;
     }
 };
+
+struct callLoad {
+    template<typename TConstraint, typename Calee>
+    void operator()(TConstraint& constraint, Calee& callee){
+        callee.load(constraint);
+    }
+};
+
+using IneqBig = FixedSizeInequality<CoefType>;
+
+enum class TypeId {
+    Clause, IneqBig
+};
+
+template<typename T>
+struct type_id {
+    static constexpr TypeId value = TypeId::IneqBig;
+};
+
+template<>
+struct type_id<Clause> {
+    static constexpr TypeId value = TypeId::Clause;
+};
+
+class BaseHandle {
+public:
+    const TypeId typeId;
+    BaseHandle(TypeId _typeId)
+        : typeId(_typeId)
+    {}
+};
+
+using HandlePtr = std::unique_ptr<BaseHandle>;
+
+template<typename TConstraint>
+struct Handle : public BaseHandle {
+    TConstraint& ref;
+
+    Handle(TConstraint& _ref)
+        : BaseHandle(type_id<TConstraint>::value)
+        , ref(_ref)
+    {}
+};
+
+constexpr int8_t combineTypeId(TypeId idA, TypeId idB) {
+    return static_cast<int8_t>(idA) << 4 | static_cast<int8_t>(idB);
+};
+
+template<typename method, typename ...Args>
+auto callUnpacked(method m, BaseHandle* a, Args && ...args) {
+    // we could totaly use virtual function calls here, but as we need
+    // the infrastructure anyway to call methods on pairs of
+    // inequalities, why not use it allways and save(?) some typing.
+    switch (a->typeId) {
+        case TypeId::Clause:
+            return m(static_cast<Handle<Clause>*>(a)->ref, std::forward<Args>(args)...);
+            break;
+        case TypeId::IneqBig:
+            return m(static_cast<Handle<IneqBig>*>(a)->ref, std::forward<Args>(args)...);
+            break;
+        default:
+            assert(false);
+    }
+}
+
+template<typename method>
+auto callUnpacked(method m, BaseHandle* a, BaseHandle* b) {
+    int8_t test = combineTypeId(a->typeId, b->typeId);
+    switch (test) {
+        case combineTypeId(TypeId::Clause, TypeId::Clause):
+            return m(static_cast<Handle<Clause>*>(a)->ref, static_cast<Handle<Clause>*>(b)->ref);
+            break;
+        case combineTypeId(TypeId::Clause, TypeId::IneqBig):
+            return m(static_cast<Handle<Clause>*>(a)->ref, static_cast<Handle<IneqBig>*>(b)->ref);
+            break;
+        case combineTypeId(TypeId::IneqBig, TypeId::Clause):
+            return m(static_cast<Handle<IneqBig>*>(a)->ref, static_cast<Handle<Clause>*>(b)->ref);
+            break;
+        case combineTypeId(TypeId::IneqBig, TypeId::IneqBig):
+            return m(static_cast<Handle<IneqBig>*>(a)->ref, static_cast<Handle<IneqBig>*>(b)->ref);
+            break;
+        default:
+            assert(false);
+    }
+}
+
 
 template<typename T>
 using FatInequalityPtr = std::unique_ptr<FatInequality<T>>;
@@ -2230,6 +2325,8 @@ private:
     FixedSizeInequalityHandler<T> handler;
     FixedSizeInequality<T>* &ineq = handler.ineq;
     ClauseHandler clauseHandler;
+
+    HandlePtr handle = HandlePtr(new Handle<IneqBig>(*handler.ineq));
 
     static std::vector<FatInequalityPtr<T>> pool;
     const bool useClauses = true;
@@ -2414,7 +2511,8 @@ public:
             } else {
                 expanded = std::make_unique<FatInequality<T>>();
             }
-            expanded->load(*ineq);
+
+            callUnpacked(callLoad(), handle.get(), *expanded);
         }
     }
 

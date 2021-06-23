@@ -19,6 +19,8 @@
 //     num.str(base);
 // }
 #include <string_view>
+#include <functional>
+
 
 template <class T>
 inline void hash_combine(std::size_t& seed, const T& v)
@@ -37,6 +39,17 @@ namespace std {
     template<>
     struct hash<mpz_class> {
         std::size_t operator()(const mpz_class& y) const {
+            if (y.fits_slong_p()) {
+                // this check is crucial to get the same result for
+                // different int types, i.e., we want that the hash
+                // value of BigInt(1) is the same as the hash value of
+                // int32_t(1)
+                static_assert(sizeof(long) == 8, "If long is not 64 "
+                "bit then hashing bitween 64 bit integer and BigInt will "
+                "not be identical.");
+                return std::hash<long>()(y.get_si());
+            }
+
             const mpz_srcptr x = y.get_mpz_t();
 
             size_t hash = 0;

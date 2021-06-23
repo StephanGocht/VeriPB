@@ -354,7 +354,15 @@ struct Term {
         , lit(lit_)
         {}
 
-    bool operator==(const Term<T>& other) const {
+    template<typename TTermType>
+    Term<T>& operator=(const Term<TTermType>& other) {
+        coeff = other.coeff;
+        lit = other.lit;
+        return *this;
+    }
+
+    template<typename TTerm>
+    bool operator==(const TTerm& other) const {
         return (this->coeff == other.coeff) && (this->lit == other.lit);
     }
 
@@ -403,8 +411,9 @@ struct Term<void> {
     }
 
 
-    bool operator==(const Term<void>& other) const {
-        return (this->lit == other.lit);
+    template<typename TTerm>
+    bool operator==(const TTerm& other) const {
+        return (this->coeff == other.coeff) && (this->lit == other.lit);
     }
 };
 
@@ -440,6 +449,8 @@ inline State operator~(State s) {
     // most bit is flipped which changes true to false and vice versa
     return static_cast<State>(i);
 }
+
+
 
 class Assignment {
 public:
@@ -835,7 +846,6 @@ public:
     }
 
     virtual void propagate();
-
     virtual void cleanupWatches();
 };
 
@@ -850,6 +860,7 @@ private:
     friend std::ostream& operator<<(std::ostream& os, const Clause& v);
 
 public:
+    using TTerm = TElement;
     size_t propagationSearchStart = 2;
 
     // common constraint interface:
@@ -1060,15 +1071,16 @@ class FixedSizeInequality {
 private:
     uint32_t watchSize = 0;
 
-public:
-    T maxCoeff = 0;
-
     using TElement = Term<T>;
     using TVec = std::conditional_t<
             std::is_trivially_destructible<T>::value,
             InlineVec<TElement>,
             std::vector<TElement>
         >;
+public:
+    T maxCoeff = 0;
+
+    using TTerm = TElement;
 
     // common constraint interface:
     DBConstraintHeader header;
@@ -1100,6 +1112,14 @@ private:
         , terms(_terms.size())
     {
         std::copy(_terms.begin(),_terms.end(), this->terms.begin());
+    }
+
+    template<typename TermIter, typename TInt>
+    FixedSizeInequality(size_t size, TermIter begin, TermIter end, TInt _degree)
+        : degree(_degree)
+        , terms(size)
+    {
+        std::copy(begin, end, this->terms.begin());
     }
 
     // FixedSizeInequality(Clause& clause)
@@ -1341,14 +1361,6 @@ public:
         return keepWatch;
     }
 
-    void negate() {
-        this->degree = -this->degree + 1;
-        for (Term<T>& term:this->terms) {
-            this->degree += term.coeff;
-            term.lit = ~term.lit;
-        }
-    }
-
     bool implies(const FixedSizeInequality& other) const {
         std::unordered_map<size_t, Term<T>> lookup;
         for (const Term<T>& term:other.terms) {
@@ -1388,42 +1400,7 @@ public:
         }
         return slack >= 0;
     }
-
-    void substitute(Substitution& sub) {
-        // warning: after this operation the constraint is no longer
-        // normalized, load to FatInequality to normalize
-        for (Term<T>& term: this->terms) {
-            auto it = sub.map.find(term.lit);
-            if (it != sub.map.end()) {
-                term.lit = it->second;
-            }
-        }
-    }
-
-    size_t mem() const {
-        return sizeof(FixedSizeInequality<T>) + terms.size() * sizeof(Term<T>);
-    }
 };
-
-namespace std {
-    template <typename T>
-    struct hash<FixedSizeInequality<T>> {
-        std::size_t operator()(const FixedSizeInequality<T>& ineq) const {
-            std::vector<Term<T>> mine(ineq.terms.begin(), ineq.terms.end());
-            sort(mine.begin(), mine.end(), orderByVar<Term<T>>);
-
-            std::size_t seed = 0;
-
-            for (const Term<T>& term: mine) {
-                hash_combine(seed, term.coeff);
-                hash_combine(seed, term.lit);
-            }
-
-            hash_combine(seed, ineq.degree);
-            return seed;
-        }
-    };
-}
 
 template<typename T>
 inline std::ostream& operator<<(std::ostream& os, const FixedSizeInequality<T>& v) {
@@ -1485,6 +1462,12 @@ private:
         return std::malloc(memSize);
     }
 
+public:
+    using TStoredConstraint = TConstraint;
+
+    TConstraint* ineq = nullptr;
+    size_t capacity = 0;
+
     void free(){
         if (ineq != nullptr) {
             ineq->~TConstraint();
@@ -1493,9 +1476,10 @@ private:
         }
     }
 
-public:
-    TConstraint* ineq = nullptr;
-    size_t capacity = 0;
+    ConstraintHandler(size_t size) {
+        void* addr = malloc(size);
+        ineq = new (addr) TConstraint(size);
+    }
 
     ConstraintHandler(ConstraintHandler<TConstraint>&& other) noexcept {
         ineq = other.ineq;
@@ -1550,6 +1534,208 @@ public:
         free();
     }
 };
+
+namespace InplaceIneqOps {
+    struct saturate {
+        /* returns true if the resulting constraint is normalized */
+        template<typename TIneq>
+        bool operator()(TIneq& ineq) {
+            for (auto& term: ineq.terms) {
+                using namespace std;
+                term.coeff = min(term.coeff, ineq.degree);
+            }
+            return ineq.degree > 0 || ineq.terms.size() == 0;
+        }
+
+        template<>
+        bool operator()(Clause& ineq) {
+            return true;
+        }
+    };
+
+    struct divide {
+        template<typename TIneq, typename TInt>
+        void operator()(TIneq& ineq, TInt divisor) {
+            ineq.degree = divideAndRoundUp(ineq.degree, divisor);
+            for (auto& term: ineq.terms) {
+                term.coeff = divideAndRoundUp(term.coeff, divisor);
+            }
+        }
+
+        template<typename TInt>
+        void operator()(Clause& ineq, TInt divisor) {}
+    };
+
+    struct multiply {
+        template<typename TIneq, typename TInt>
+        void operator()(TIneq& ineq, TInt factor) {
+            // static_assert(!std::is_same<TIneq, Clause>(), "Can not do inplace negation with clauses!");
+            ineq.degree *= factor;
+            for (auto& term: ineq.terms) {
+                term.coeff *= factor;
+            }
+        }
+
+        template<typename TInt>
+        void operator()(Clause& ineq, TInt factor) {
+            assert(false);
+        }
+    };
+
+    struct negate {
+        template<typename TIneq>
+        void operator()(TIneq& ineq) {
+            // static_assert(!std::is_same<TIneq, Clause>(), "Can not do inplace negation with clauses!");
+
+            ineq.degree = -ineq.degree + 1;
+            for (auto& term:ineq.terms) {
+                ineq.degree += term.coeff;
+                term.lit = ~term.lit;
+            }
+        }
+
+        template<>
+        void operator()(Clause& ineq) {
+            assert(false);
+        }
+    };
+
+    struct isContradiction {
+        template<typename TIneq>
+        bool operator()(TIneq& ineq) {
+            using TInt = decltype(ineq.degree);
+            TInt slack = -ineq.degree;
+            for (auto& term: ineq.terms) {
+                slack += term.coeff;
+                if (slack > 0) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        template<>
+        bool operator()(Clause& ineq) {
+            return ineq.terms.size() == 0;
+        }
+    };
+
+
+    struct equals {
+        template<typename TIneqA, typename TIneqB>
+        bool operator()(TIneqA& ineqA, TIneqB& ineqB) {
+            using TermA = typename TIneqA::TTerm;
+            using TermB = typename TIneqB::TTerm;
+
+            if ((ineqA.terms.size() != ineqB.terms.size())
+                    || (ineqA.degree != ineqB.degree)) {
+                return false;
+            }
+
+            std::vector<TermA> mine(ineqA.terms.begin(), ineqA.terms.end());
+            sort(mine.begin(), mine.end(), orderByVar<TermA>);
+            std::vector<TermB> theirs(ineqB.terms.begin(), ineqB.terms.end());
+            sort(theirs.begin(), theirs.end(), orderByVar<TermB>);
+
+            return std::equal(mine.begin(), mine.end(), theirs.begin());
+        }
+    };
+
+    struct hash {
+        template<typename TIneq>
+        size_t operator()(TIneq& ineq) {
+            using TTerm = typename TIneq::TTerm;
+            std::vector<TTerm> mine(ineq.terms.begin(), ineq.terms.end());
+            sort(mine.begin(), mine.end(), orderByVar<TTerm>);
+
+            std::size_t seed = 0;
+
+            for (const TTerm& term: mine) {
+                hash_combine(seed, term.coeff);
+                hash_combine(seed, term.lit);
+            }
+
+            hash_combine(seed, ineq.degree);
+            return seed;
+        }
+    };
+
+    struct implies {
+        template<typename TIneqA, typename TIneqB>
+        bool operator()(TIneqA& a, TIneqB& b) {
+            // using IntTypeIterA = typename TIneqA::TTerm::coeff_type;
+            // using IntTypeIterB = typename TIneqB::TTerm::coeff_type;
+
+            // using Type1 = typename int_conversion<IntTypeIterA, IntTypeIterB>::stronger;
+            // using Type2 = typename int_conversion<Type1, IntTypeA>::stronger;
+            // using IntTypeStronger = typename int_conversion<Type2, IntTypeB>::stronger;
+            // using IntSumSafe = typename int_information<IntTypeStronger>::sum_safe;
+
+            using TTerm = typename TIneqB::TTerm;
+            std::unordered_map<size_t, TTerm> lookup;
+            for (auto& term: b.terms) {
+                lookup.insert(std::make_pair(term.lit.var(), term));
+            }
+
+            // IntSumSafe weakenCost = 0;
+            BigInt weakenCost = 0;
+            for (auto& term: a.terms) {
+                using namespace std;
+                size_t var = term.lit.var();
+
+                auto search = lookup.find(var);
+                if (search == lookup.end()) {
+                    weakenCost += term.coeff;
+                } else {
+                    auto theirs = search->second;
+                    if (term.lit != theirs.lit) {
+                        weakenCost += term.coeff;
+                    } else if (term.coeff > theirs.coeff) {
+                        if (theirs.coeff < b.degree) {
+                            // only weaken if target coeffient is not saturated
+                            weakenCost += term.coeff;
+                            weakenCost -= theirs.coeff;
+                        }
+                    }
+                }
+            }
+            weakenCost -= a.degree;
+            weakenCost += b.degree;
+
+            return weakenCost <= 0;
+        }
+    };
+
+    struct substitute {
+        template<typename TIneq>
+        void operator()(TIneq& ineq, Substitution& sub) {
+            // warning: after this operation the constraint is no longer
+            // normalized, load to FatInequality to normalize
+            for (auto& term: ineq.terms) {
+                auto it = sub.map.find(term.lit);
+                if (it != sub.map.end()) {
+                    term.lit = it->second;
+                }
+            }
+        }
+    };
+
+    struct print {
+        template<typename TIneq, typename Stream>
+        Stream& operator()(const TIneq& ineq, std::function<std::string(int)> varName, Stream& out) {
+            for (auto &term: ineq.terms) {
+                out << term.coeff << " ";
+                if (term.lit.isNegated()) {
+                    out << "~";
+                }
+                out << varName(term.lit.var()) << " ";
+            }
+            out << ">= " << ineq.degree;
+            return out;
+        }
+    };
+
+}
 
 template<typename T>
 class IneqPropagator: public Propagator {
@@ -1978,32 +2164,6 @@ public:
         return assignment;
     }
 
-    bool rupCheck(const FixedSizeInequality<T>& redundant) {
-        Timer timer(timeRUP);
-        initPropagation();
-        propagate();
-
-        FixedSizeInequalityHandler<T> negated(redundant);
-        {
-            AutoReset reset(this->propMaster);
-            negated->negate();
-
-            tmpPropagator.increaseNumVarsTo(nVars);
-            propMaster.propagators.push_back(&tmpPropagator);
-            negated->initWatch(tmpPropagator);
-
-            propagate();
-
-            negated->clearWatches(tmpPropagator);
-            propMaster.propagators.pop_back();
-            // for (Lit lit : this->trail) {
-            //     std::cout << lit << " ";
-            // }
-            // std::cout << std::endl;
-            return propMaster.isConflicting();
-        }
-    }
-
     long long estimateNumEffected(Substitution& sub) {
         long long estimate = 0;
         for (auto it: sub.map) {
@@ -2065,14 +2225,85 @@ public:
         }
     }
 
-    void addOccurence(Lit lit, Inequality<T>& w) {
-        occurs[lit].emplace(&w);
-    }
 
-    void rmOccurence(Lit lit, Inequality<T>& w) {
-        occurs[lit].erase(&w);
-    }
 
+
+    struct rupCheck {
+        template<typename TIneq>
+        bool operator()(const TIneq& redundant, PropEngine<T>& engine) {
+            Timer timer(engine.timeRUP);
+            engine.initPropagation();
+            engine.propagate();
+
+            FixedSizeInequalityHandler<T> negated(redundant.terms.size(), redundant.terms.size(), redundant.terms.begin(), redundant.terms.end(), redundant.degree);
+            {
+                AutoReset reset(engine.propMaster);
+                InplaceIneqOps::negate()(*negated.ineq);
+
+                engine.tmpPropagator.increaseNumVarsTo(engine.nVars);
+                engine.propMaster.propagators.push_back(&engine.tmpPropagator);
+                negated->initWatch(engine.tmpPropagator);
+
+                engine.propagate();
+
+                negated->clearWatches(engine.tmpPropagator);
+                engine.propMaster.propagators.pop_back();
+                // for (Lit lit : this->trail) {
+                //     std::cout << lit << " ";
+                // }
+                // std::cout << std::endl;
+                return engine.propMaster.isConflicting();
+            }
+        }
+    };
+
+    struct addOccurence {
+        template<typename TIneq>
+        void operator()(TIneq& ineq, PropEngine<T>& engine, Inequality<T>& w){
+            for (auto& term: ineq.terms) {
+                engine.occurs[term.lit].emplace(&w);
+            }
+        }
+    };
+
+    struct rmOccurence {
+        template<typename TIneq>
+        void operator()(TIneq& ineq, PropEngine<T>& engine, Inequality<T>& w){
+            for (auto& term: ineq.terms) {
+                engine.occurs[term.lit].erase(&w);
+            }
+        }
+    };
+
+    struct initWatch {
+        void operator()(FixedSizeInequality<T>& constraint, PropEngine<T>& engine) {
+            constraint.initWatch(engine.ineqPropagator);
+        }
+
+        void operator()(Clause& constraint, PropEngine<T>& engine) {
+            constraint.initWatch(engine.clausePropagator);
+        }
+    };
+
+    struct clearWatch {
+        void operator()(FixedSizeInequality<T>& constraint, PropEngine<T>& engine) {
+            constraint.clearWatches(engine.ineqPropagator);
+        }
+
+        void operator()(Clause& constraint, PropEngine<T>& engine) {
+            constraint.clearWatches(engine.clausePropagator);
+        }
+    };
+
+    struct updateWatches {
+        void operator()(FixedSizeInequality<T>& constraint, PropEngine<T>& engine) {
+            constraint.updateWatch(engine.ineqPropagator);
+        }
+
+        void operator()(Clause& constraint, PropEngine<T>& engine) {
+            constraint.updateWatch(engine.clausePropagator);
+        }
+    };
 };
 
 /**
@@ -2124,13 +2355,13 @@ public:
             if (term.coeff < 0) {
                 myTerm.lit = ~term.lit;
                 myTerm.coeff = term.coeff;
-                myTerm.coeff = -term.coeff;
+                myTerm.coeff = -myTerm.coeff;
                 this->degree += term.coeff;
             } else {
                 myTerm.lit = term.lit;
                 myTerm.coeff = std::move(term.coeff);
             }
-            addLhs(term);
+            addLhs(myTerm);
             // T coeff = cpsign(term.coeff, term.lit);
             // using namespace std;
 
@@ -2194,8 +2425,7 @@ public:
     template<typename IntType>
     void addLhs(const Term<IntType> &term) {
         using namespace std;
-        using OtherCoeffTyep = typename Term<IntType>::coeff_type;
-        OtherCoeffTyep b = cpsign(term.coeff, term.lit);
+        T b = cpsign(term.coeff, term.lit);
         Var var = term.lit.var();
         this->use(var);
         T a = this->coeffs[var];
@@ -2210,36 +2440,55 @@ public:
 
     template<typename TConstraint>
     void add(const TConstraint& other) {
-        for (const Term<T> &term:other.terms) {
+        for (const auto &term:other.terms) {
             addLhs(term);
         }
 
         this->degree += other.degree;
     }
+
+    struct callLoad {
+        template<typename TConstraint, typename Calee>
+        void operator()(TConstraint& constraint, Calee& callee){
+            callee.load(constraint);
+        }
+    };
+
+    struct callAdd {
+        template<typename TConstraint>
+        void operator()(TConstraint& constraint, FatInequality<T>& callee){
+            callee.add(constraint);
+        }
+    };
 };
 
-struct callLoad {
-    template<typename TConstraint, typename Calee>
-    void operator()(TConstraint& constraint, Calee& callee){
-        callee.load(constraint);
-    }
-};
-
-using IneqBig = FixedSizeInequality<CoefType>;
+using IneqLarge = FixedSizeInequality<CoefType>;
+using IneqBig = FixedSizeInequality<BigInt>;
 
 enum class TypeId {
-    Clause, IneqBig
+    Clause, IneqLarge, IneqBig
 };
 
 template<typename T>
-struct type_id {
-    static constexpr TypeId value = TypeId::IneqBig;
-};
+struct type_id;
 
 template<>
 struct type_id<Clause> {
     static constexpr TypeId value = TypeId::Clause;
 };
+
+template<>
+struct type_id<IneqLarge> {
+    static constexpr TypeId value = TypeId::IneqLarge;
+};
+
+template<>
+struct type_id<IneqBig> {
+    static constexpr TypeId value = TypeId::IneqBig;
+};
+
+class BaseHandle;
+using HandlePtr = std::unique_ptr<BaseHandle>;
 
 class BaseHandle {
 public:
@@ -2247,61 +2496,162 @@ public:
     BaseHandle(TypeId _typeId)
         : typeId(_typeId)
     {}
+    virtual HandlePtr copy() = 0;
+    virtual void toJunkyard() = 0;
+    virtual bool isReason() = 0;
+    virtual bool isPropagatingAt0() = 0;
+    virtual void markedForDeletion() = 0;
+    virtual size_t mem() = 0;
+    virtual ~BaseHandle() = default;
 };
-
-using HandlePtr = std::unique_ptr<BaseHandle>;
 
 template<typename TConstraint>
 struct Handle : public BaseHandle {
-    TConstraint& ref;
+    ConstraintHandler<TConstraint> manager;
 
-    Handle(TConstraint& _ref)
+    Handle(ConstraintHandler<TConstraint>&& _manager)
         : BaseHandle(type_id<TConstraint>::value)
-        , ref(_ref)
+        , manager(std::move(_manager))
     {}
+
+    virtual HandlePtr copy() {
+        return std::make_unique<Handle<TConstraint>>(ConstraintHandler<TConstraint>(manager));
+    };
+
+    TConstraint& get() {
+        assert(manager.ineq != nullptr);
+        return *manager.ineq;
+    }
+
+    virtual void toJunkyard() {
+        Junkyard<ConstraintHandler<TConstraint>>::get().add(std::move(manager));
+    }
+
+    virtual bool isReason() {
+        return get().header.isReason;
+    }
+
+    virtual void markedForDeletion() {
+        get().header.isMarkedForDeletion = true;
+    }
+
+    virtual bool isPropagatingAt0() {
+        return get().isPropagatingAt0();
+    }
+
+    virtual size_t mem() {
+        return sizeof(TConstraint) + get().terms.size() * sizeof(typename TConstraint::TTerm);
+    }
+
+    virtual ~Handle() = default;
 };
+
+template<typename TConstraintHandler>
+static HandlePtr make_handle(TConstraintHandler&& handler) {
+    using TConstraint = typename TConstraintHandler::TStoredConstraint;
+    return HandlePtr(new Handle<TConstraint>(std::move(handler)));
+}
 
 constexpr int8_t combineTypeId(TypeId idA, TypeId idB) {
     return static_cast<int8_t>(idA) << 4 | static_cast<int8_t>(idB);
 };
 
-template<typename method, typename ...Args>
-auto callUnpacked(method m, BaseHandle* a, Args && ...args) {
-    // we could totaly use virtual function calls here, but as we need
-    // the infrastructure anyway to call methods on pairs of
-    // inequalities, why not use it allways and save(?) some typing.
-    switch (a->typeId) {
-        case TypeId::Clause:
-            return m(static_cast<Handle<Clause>*>(a)->ref, std::forward<Args>(args)...);
-            break;
-        case TypeId::IneqBig:
-            return m(static_cast<Handle<IneqBig>*>(a)->ref, std::forward<Args>(args)...);
-            break;
-        default:
-            assert(false);
-    }
-}
 
-template<typename method>
-auto callUnpacked(method m, BaseHandle* a, BaseHandle* b) {
-    int8_t test = combineTypeId(a->typeId, b->typeId);
-    switch (test) {
-        case combineTypeId(TypeId::Clause, TypeId::Clause):
-            return m(static_cast<Handle<Clause>*>(a)->ref, static_cast<Handle<Clause>*>(b)->ref);
-            break;
-        case combineTypeId(TypeId::Clause, TypeId::IneqBig):
-            return m(static_cast<Handle<Clause>*>(a)->ref, static_cast<Handle<IneqBig>*>(b)->ref);
-            break;
-        case combineTypeId(TypeId::IneqBig, TypeId::Clause):
-            return m(static_cast<Handle<IneqBig>*>(a)->ref, static_cast<Handle<Clause>*>(b)->ref);
-            break;
-        case combineTypeId(TypeId::IneqBig, TypeId::IneqBig):
-            return m(static_cast<Handle<IneqBig>*>(a)->ref, static_cast<Handle<IneqBig>*>(b)->ref);
-            break;
-        default:
-            assert(false);
+template<typename used>
+struct unpacked;
+
+template<>
+struct unpacked<CoefType> {
+    template<typename method, typename ...Args>
+    static auto call(method m, BaseHandle* a, Args && ...args) {
+        // we could totaly use virtual function calls here, but as we need
+        // the infrastructure anyway to call methods on pairs of
+        // inequalities, why not use it allways and save(?) some typing.
+        switch (a->typeId) {
+            case TypeId::Clause:
+                return m(static_cast<Handle<Clause>*>(a)->get(), std::forward<Args>(args)...);
+                break;
+            case TypeId::IneqLarge:
+                return m(static_cast<Handle<IneqLarge>*>(a)->get(), std::forward<Args>(args)...);
+                break;
+            default:
+                assert(false);
+                throw "Cast error.";
+        }
     }
-}
+
+    struct doubleUnpack {
+        template<typename UnpackedB, typename method, typename ...Args>
+        auto operator()(UnpackedB& b, BaseHandle* a, method m, Args && ...args){
+            return call(m, a, b, std::forward<Args>(args)...);
+        }
+    };
+
+    template<typename method, typename ...Args>
+    static auto call2(method m, BaseHandle* a, BaseHandle* b, Args && ...args) {
+        return call(doubleUnpack(), b, a, m, std::forward<Args>(args)...);
+    }
+};
+
+template<>
+struct unpacked<BigInt> {
+    template<typename method, typename ...Args>
+    static auto call(method m, BaseHandle* a, Args && ...args) {
+        // we could totaly use virtual function calls here, but as we need
+        // the infrastructure anyway to call methods on pairs of
+        // inequalities, why not use it allways and save(?) some typing.
+        switch (a->typeId) {
+            case TypeId::Clause:
+                return m(static_cast<Handle<Clause>*>(a)->get(), std::forward<Args>(args)...);
+                break;
+            case TypeId::IneqBig:
+                return m(static_cast<Handle<IneqBig>*>(a)->get(), std::forward<Args>(args)...);
+                break;
+            default:
+                assert(false);
+                throw "Cast error.";
+        }
+    }
+
+    struct doubleUnpack {
+        template<typename UnpackedB, typename method, typename ...Args>
+        auto operator()(UnpackedB& b, BaseHandle* a, method m, Args && ...args){
+            return call(m, a, b, std::forward<Args>(args)...);
+        }
+    };
+
+    template<typename method, typename ...Args>
+    static auto call2(method m, BaseHandle* a, BaseHandle* b, Args && ...args) {
+        return call(doubleUnpack(), b, a, m, std::forward<Args>(args)...);
+    }
+};
+
+
+
+
+// template<typename method>
+// auto callUnpacked(method m, BaseHandle* a, BaseHandle* b) {
+//     int8_t test = combineTypeId(a->typeId, b->typeId);
+//     switch (test) {
+//         case combineTypeId(TypeId::Clause, TypeId::Clause):
+//             return m(static_cast<Handle<Clause>*>(a)->get(), static_cast<Handle<Clause>*>(b)->get());
+//             break;
+//         case combineTypeId(TypeId::Clause, TypeId::IneqLarge):
+//             return m(static_cast<Handle<Clause>*>(a)->get(), static_cast<Handle<IneqLarge>*>(b)->get());
+//             break;
+//         case combineTypeId(TypeId::IneqLarge, TypeId::Clause):
+//             return m(static_cast<Handle<IneqLarge>*>(a)->get(), static_cast<Handle<Clause>*>(b)->get());
+//             break;
+//         case combineTypeId(TypeId::IneqLarge, TypeId::IneqLarge):
+//             return m(static_cast<Handle<IneqLarge>*>(a)->get(), static_cast<Handle<IneqLarge>*>(b)->get());
+//             break;
+//         default:
+//             assert(false);
+//             throw "unreachable";
+//     }
+// }
+
+
 
 
 template<typename T>
@@ -2322,11 +2672,7 @@ private:
     bool frozen = false;
     FatInequalityPtr<T> expanded;
 
-    FixedSizeInequalityHandler<T> handler;
-    FixedSizeInequality<T>* &ineq = handler.ineq;
-    ClauseHandler clauseHandler;
-
-    HandlePtr handle = HandlePtr(new Handle<IneqBig>(*handler.ineq));
+    HandlePtr handle;
 
     static std::vector<FatInequalityPtr<T>> pool;
     const bool useClauses = true;
@@ -2340,29 +2686,27 @@ public:
     uint detachCount = 0;
 
     Inequality(Inequality& other)
-        : handler(other.handler)
+        : handle(other.handle->copy())
     {
         assert(other.loaded == false);
         this->minId = other.minId;
     }
 
-    size_t size() {
-        return ineq->terms.size();
+    Inequality(FixedSizeInequalityHandler<T>&& handler)
+        : handle(make_handle(std::move(handler)))
+    {
+        expand();
+        contract();
     }
+
 
     Inequality(std::vector<Term<T>>& terms_, T degree_)
-        : handler(terms_.size(), terms_, degree_)
-    {
-        expand();
-        contract();
-    }
+        : Inequality(FixedSizeInequalityHandler<T>(terms_.size(), terms_, degree_))
+    {}
 
     Inequality(std::vector<Term<T>>&& terms_, T degree_)
-        : handler(terms_.size(), terms_, degree_)
-    {
-        expand();
-        contract();
-    }
+        : Inequality(FixedSizeInequalityHandler<T>(terms_.size(), terms_, degree_))
+    {}
 
     Inequality(
             std::vector<T>& coeffs,
@@ -2384,86 +2728,51 @@ public:
         contract();
 
         if (wasAttached) {
-
-            if (clauseHandler.ineq) {
-                // assert(clauseHandler.ineq->header.isMarkedForDeletion);
-                Junkyard<ClauseHandler>::get().add(std::move(clauseHandler));
-            }
-            // assert(ineq->header.isMarkedForDeletion);
-            Junkyard<FixedSizeInequalityHandler<T>>::get().add(std::move(handler));
+            assert(handle);
+            handle->toJunkyard();
         }
     }
 
     bool isReason() {
-        return (ineq->header.isReason
-            || (clauseHandler.ineq && clauseHandler.ineq->header.isReason));
+        return handle->isReason();
     }
 
     void freeze(size_t numVars) {
         contract();
-
-        for (Term<T> term: ineq->terms) {
-            assert(term.lit.var() <= numVars);
-        }
-
-        // todo we are currently using twice the memory neccessary, we would want to
-        // switch computation of eq and so on to the fixed size inequality as well.
         frozen = true;
     }
 
     void clearWatches(PropEngine<T>& prop) {
         assert(frozen);
-        if (clauseHandler.ineq) {
-            clauseHandler.ineq->clearWatches(prop.clausePropagator);
-        } else {
-            ineq->clearWatches(prop.ineqPropagator);
-        }
+        unpacked<T>::call(typename PropEngine<T>::clearWatch(), handle.get(), prop);
     }
 
     void markedForDeletion() {
-        if (useClauses && ineq->degree == 1 && clauseHandler.ineq) {
-            clauseHandler.ineq->header.isMarkedForDeletion = true;
-        }
-        ineq->header.isMarkedForDeletion = true;
+        assert(frozen);
+        handle->markedForDeletion();
     }
 
     bool isPropagatingAt0() {
-        return ineq->isPropagatingAt0();
+        return handle->isPropagatingAt0();
     }
 
     void initWatch(PropEngine<T>& prop) {
         assert(frozen && "Call freeze() first.");
-
-        if (useClauses && ineq->degree == 1) {
-            assert(!clauseHandler.ineq);
-            clauseHandler = ClauseHandler(ineq->terms.size(), *ineq);
-            clauseHandler.ineq->initWatch(prop.clausePropagator);
-        } else {
-            ineq->initWatch(prop.ineqPropagator);
-        }
+        unpacked<T>::call(typename PropEngine<T>::initWatch(), handle.get(), prop);
     }
 
     void updateWatch(PropEngine<T>& prop) {
         assert(frozen && "Call freeze() first.");
-
-        if (useClauses && ineq->degree == 1) {
-            assert(clauseHandler.ineq);
-            clauseHandler.ineq->updateWatch(prop.clausePropagator);
-        } else {
-            ineq->updateWatch(prop.ineqPropagator);
-        }
+        unpacked<T>::call(typename PropEngine<T>::updateWatches(), handle.get(), prop);
     }
 
     Inequality* saturate(){
         assert(!frozen);
         contract();
 
-        for (Term<T>& term: ineq->terms) {
-            using namespace std;
-            term.coeff = min(term.coeff, ineq->degree);
-        }
+        bool isNormalized = unpacked<T>::call(InplaceIneqOps::saturate(), handle.get());
 
-        if (ineq->degree <= 0 && ineq->terms.size() > 0) {
+        if (!isNormalized) {
             // nasty hack to shrink the constraint as this should not
             // happen frequently anyway.
             expand();
@@ -2476,20 +2785,14 @@ public:
     Inequality* divide(T divisor){
         assert(!frozen);
         contract();
-        ineq->degree = divideAndRoundUp(ineq->degree, divisor);
-        for (Term<T>& term: ineq->terms) {
-            term.coeff = divideAndRoundUp(term.coeff, divisor);
-        }
+        unpacked<T>::call(InplaceIneqOps::divide(), handle.get(), divisor);
         return this;
     }
 
     Inequality* multiply(T factor){
         assert(!frozen);
         contract();
-        ineq->degree *= factor;
-        for (Term<T>& term: ineq->terms) {
-            term.coeff *= factor;
-        }
+        unpacked<T>::call(InplaceIneqOps::multiply(), handle.get(), factor);
         return this;
     }
 
@@ -2497,7 +2800,7 @@ public:
         assert(!frozen);
         expand();
         other->contract();
-        expanded->add(*other->ineq);
+        unpacked<T>::call(typename FatInequality<T>::callAdd(), handle.get(), *expanded);
         return this;
     }
 
@@ -2512,15 +2815,16 @@ public:
                 expanded = std::make_unique<FatInequality<T>>();
             }
 
-            callUnpacked(callLoad(), handle.get(), *expanded);
+            unpacked<T>::call(typename FatInequality<T>::callLoad(), handle.get(), *expanded);
         }
     }
 
     void contract() {
         if (loaded) {
             assert(!frozen);
-            handler.resize(expanded->size());
-            expanded->unload(*ineq);
+            FixedSizeInequalityHandler<T> manager(expanded->size());
+            expanded->unload(*manager.ineq);
+            handle = HandlePtr(new Handle<FixedSizeInequality<T>>(std::move(manager)));
             pool.push_back(std::move(expanded));
             expanded = nullptr;
             loaded = false;
@@ -2534,21 +2838,13 @@ public:
     bool operator==(Inequality<T>& other) {
         contract();
         other.contract();
-        std::vector<Term<T>> mine(ineq->terms.begin(), ineq->terms.end());
-        sort(mine.begin(), mine.end(), orderByVar<Term<T>>);
-        std::vector<Term<T>> theirs(other.ineq->terms.begin(), other.ineq->terms.end());
-        sort(theirs.begin(), theirs.end(), orderByVar<Term<T>>);
-        return (mine == theirs) && (ineq->degree == other.ineq->degree);
+        return unpacked<T>::call2(InplaceIneqOps::equals(), handle.get(), other.handle.get());
     }
 
     bool operator==(const Inequality<T>& other) const {
         assert(!this->loaded);
         assert(!other.loaded);
-        std::vector<Term<T>> mine(ineq->terms.begin(), ineq->terms.end());
-        sort(mine.begin(), mine.end(), orderByVar<Term<T>>);
-        std::vector<Term<T>> theirs(other.ineq->terms.begin(), other.ineq->terms.end());
-        sort(theirs.begin(), theirs.end(), orderByVar<Term<T>>);
-        return (mine == theirs) && (ineq->degree == other.ineq->degree);
+        return unpacked<T>::call2(InplaceIneqOps::equals(), handle.get(), other.handle.get());
     }
 
     bool operator!=(Inequality<T>& other) {
@@ -2558,15 +2854,7 @@ public:
     std::string toString(std::function<std::string(int)> varName) {
         contract();
         std::stringstream s;
-        for (Term<T> &term: ineq->terms) {
-            using namespace std;
-            s << term.coeff << " ";
-            if (term.lit.isNegated()) {
-                s << "~";
-            }
-            s << varName(term.lit.var()) << " ";
-        }
-        s << ">= " << ineq->degree;
+        // unpacked<T>::call(InplaceIneqOps::print(), handle.get(), varName, s);
         return s.str();
     }
 
@@ -2582,18 +2870,18 @@ public:
         this->contract();
         other->contract();
 
-        return ineq->implies(*other->ineq);
+        return unpacked<T>::call2(InplaceIneqOps::implies(), handle.get(), other->handle.get());
     }
 
     bool rupCheck(PropEngine<T>& propEngine) {
         this->contract();
-        return propEngine.rupCheck(*this->ineq);
+        return unpacked<T>::call(typename PropEngine<T>::rupCheck(), handle.get(), propEngine);
     }
 
     Inequality* substitute(Substitution& sub) {
         assert(!this->frozen);
         this->contract();
-        this->ineq->substitute(sub);
+        unpacked<T>::call(InplaceIneqOps::substitute(), handle.get(), sub);
         // need to normalize, we do so by expanding the constraint
         this->expand();
         return this;
@@ -2602,8 +2890,7 @@ public:
     Inequality* negated() {
         assert(!frozen);
         this->contract();
-        ineq->negate();
-
+        unpacked<T>::call(InplaceIneqOps::negate(), handle.get());
         return this;
     }
 
@@ -2613,6 +2900,7 @@ public:
     }
 
     Inequality* weaken(int _var) {
+        assert(!frozen);
         assert(_var >= 0);
         Var var(_var);
         expand();
@@ -2622,30 +2910,22 @@ public:
 
     bool isContradiction(){
         contract();
-        T slack = -ineq->degree;
-        for (Term<T> term: ineq->terms) {
-            slack += term.coeff;
-        }
-        return slack < 0;
+        return unpacked<T>::call(InplaceIneqOps::isContradiction(), handle.get());
     }
 
     size_t mem() {
         contract();
-        return ineq->mem();
+        return handle->mem();
     }
 
     void registerOccurence(PropEngine<T>& prop) {
         assert(frozen);
-        for (Term<T>& term: this->ineq->terms) {
-            prop.addOccurence(term.lit, *this);
-        }
+        return unpacked<T>::call(typename PropEngine<T>::addOccurence(), handle.get(), prop, *this);
     }
 
     void unRegisterOccurence(PropEngine<T>& prop) {
         assert(frozen);
-        for (Term<T>& term: this->ineq->terms) {
-            prop.rmOccurence(term.lit, *this);
-        }
+        return unpacked<T>::call(typename PropEngine<T>::rmOccurence(), handle.get(), prop, *this);
     }
 };
 
@@ -2653,7 +2933,7 @@ namespace std {
     template <typename T>
     struct hash<Inequality<T>> {
         std::size_t operator()(const Inequality<T>& ineq) const {
-            return std::hash<FixedSizeInequality<T>>()(*ineq.ineq);
+            return unpacked<T>::call(InplaceIneqOps::hash(), ineq.handle.get());
         }
     };
 }

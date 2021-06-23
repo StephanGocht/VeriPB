@@ -808,7 +808,7 @@ int main(int argc, char const *argv[])
                 std::cout << "Verification Failed." << std::endl;
                 return 1;
             };
-            nLits += c[0]->size();
+            // nLits += c[0]->size();
             Inequality<CoefType>* ineq = engine.attach(c[0].get(), ++id);
             if (ineq == c[0].get()) {
                 constraints.emplace_back(std::move(c[0]));

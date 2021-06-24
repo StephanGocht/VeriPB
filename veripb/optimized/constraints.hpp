@@ -35,6 +35,8 @@ using CoefType = int;
 // assert that is also triggered in release mode, i.e., when NDEBUG is set.
 #define _assert_(x) ((void)(!(x) && assert_handler(#x, __FILE__, __LINE__)))
 
+#define unreachible(x) ((void)(assert_handler(#x, __FILE__, __LINE__),throw ""))
+
 class assertion_error: public std::runtime_error {
 public:
     assertion_error(const std::string& what_arg):
@@ -1729,8 +1731,8 @@ namespace InplaceIneqOps {
     };
 
     struct print {
-        template<typename TIneq, typename Stream>
-        Stream& operator()(const TIneq& ineq, std::function<std::string(int)> varName, Stream& out) {
+        template<typename TIneq>
+        std::ostream& operator()(TIneq& ineq, std::function<std::string(int)> varName, std::ostream& out) {
             for (auto &term: ineq.terms) {
                 out << term.coeff << " ";
                 if (term.lit.isNegated()) {
@@ -2568,13 +2570,21 @@ constexpr int8_t combineTypeId(TypeId idA, TypeId idB) {
 template<typename used>
 struct unpacked;
 
+// we could totaly use virtual function calls here, but as we need
+// the infrastructure anyway to call methods on pairs of
+// inequalities, why not use it allways and save(?) some typing.
+using AnyIneq = Clause;
+
 template<>
 struct unpacked<CoefType> {
     template<typename method, typename ...Args>
-    static auto call(method m, BaseHandle* a, Args && ...args) {
-        // we could totaly use virtual function calls here, but as we need
-        // the infrastructure anyway to call methods on pairs of
-        // inequalities, why not use it allways and save(?) some typing.
+    static
+    // result_of_t requires full parameters, while we do not know if
+    // method will be called with a Clause, the return type should be
+    // identical, no matter which constraint is called, so lets just
+    // use the return type that is defined for a clause
+    std::result_of_t<method&&(AnyIneq&, Args&&...)>
+    call(method m, BaseHandle* a, Args && ...args) {
         switch (a->typeId) {
             case TypeId::Clause:
                 return m(static_cast<Handle<Clause>*>(a)->get(), std::forward<Args>(args)...);
@@ -2583,20 +2593,22 @@ struct unpacked<CoefType> {
                 return m(static_cast<Handle<IneqLarge>*>(a)->get(), std::forward<Args>(args)...);
                 break;
             default:
-                assert(false);
-                throw "Cast error.";
+                unreachible("Internal error.");
         }
     }
 
     struct doubleUnpack {
         template<typename UnpackedB, typename method, typename ...Args>
-        auto operator()(UnpackedB& b, BaseHandle* a, method m, Args && ...args){
+        std::result_of_t<method&&(AnyIneq&, AnyIneq&, Args && ...args)>
+        operator()(UnpackedB& b, BaseHandle* a, method m, Args && ...args){
             return call(m, a, b, std::forward<Args>(args)...);
         }
     };
 
     template<typename method, typename ...Args>
-    static auto call2(method m, BaseHandle* a, BaseHandle* b, Args && ...args) {
+    static
+    std::result_of_t<doubleUnpack&&(AnyIneq&, BaseHandle* a, method m, Args && ...args)>
+    call2(method m, BaseHandle* a, BaseHandle* b, Args && ...args) {
         return call(doubleUnpack(), b, a, m, std::forward<Args>(args)...);
     }
 };
@@ -2604,7 +2616,9 @@ struct unpacked<CoefType> {
 template<>
 struct unpacked<BigInt> {
     template<typename method, typename ...Args>
-    static auto call(method m, BaseHandle* a, Args && ...args) {
+    static
+    std::result_of_t<method&&(AnyIneq&, Args&&...)>
+    call(method m, BaseHandle* a, Args && ...args) {
         // we could totaly use virtual function calls here, but as we need
         // the infrastructure anyway to call methods on pairs of
         // inequalities, why not use it allways and save(?) some typing.
@@ -2616,20 +2630,22 @@ struct unpacked<BigInt> {
                 return m(static_cast<Handle<IneqBig>*>(a)->get(), std::forward<Args>(args)...);
                 break;
             default:
-                assert(false);
-                throw "Cast error.";
+                unreachible("Internal error.");
         }
     }
 
     struct doubleUnpack {
         template<typename UnpackedB, typename method, typename ...Args>
-        auto operator()(UnpackedB& b, BaseHandle* a, method m, Args && ...args){
+        std::result_of_t<method&&(AnyIneq&, AnyIneq&, Args && ...args)>
+        operator()(UnpackedB& b, BaseHandle* a, method m, Args && ...args){
             return call(m, a, b, std::forward<Args>(args)...);
         }
     };
 
     template<typename method, typename ...Args>
-    static auto call2(method m, BaseHandle* a, BaseHandle* b, Args && ...args) {
+    static
+    std::result_of_t<doubleUnpack&&(AnyIneq&, BaseHandle* a, method m, Args && ...args)>
+    call2(method m, BaseHandle* a, BaseHandle* b, Args && ...args) {
         return call(doubleUnpack(), b, a, m, std::forward<Args>(args)...);
     }
 };
@@ -2862,7 +2878,7 @@ public:
     std::string toString(std::function<std::string(int)> varName) {
         contract();
         std::stringstream s;
-        // unpacked<T>::call(InplaceIneqOps::print(), handle.get(), varName, s);
+        unpacked<T>::call(InplaceIneqOps::print(), handle.get(), varName, s);
         return s.str();
     }
 

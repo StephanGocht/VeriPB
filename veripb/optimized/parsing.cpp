@@ -773,6 +773,10 @@ std::unique_ptr<Formula<T>> parseCnf(std::string fileName, VariableNameManager& 
 int main(int argc, char const *argv[])
 {
 
+    std::chrono::duration<double> timeAttach;
+    std::chrono::duration<double> timeParse;
+    std::chrono::duration<double> timeDetach;
+
     std::cout << "start reading file..." << std::endl;
     std::string proofFileName(argv[2]);
     std::string instanceFileName(argv[1]);
@@ -809,7 +813,12 @@ int main(int argc, char const *argv[])
                 return 1;
             };
             // nLits += c[0]->size();
-            Inequality<CoefType>* ineq = engine.attach(c[0].get(), ++id);
+            Inequality<CoefType>* ineq;
+            {
+                Timer timer(timeAttach);
+                ineq = engine.attach(c[0].get(), ++id);
+            }
+
             if (ineq == c[0].get()) {
                 constraints.emplace_back(std::move(c[0]));
             } else {
@@ -834,8 +843,10 @@ int main(int argc, char const *argv[])
                     break;
                 }
             }
-
-            engine.detach(ineq, id);
+            {
+                Timer timer(timeDetach);
+                engine.detach(ineq, id);
+            }
             if (ineq->ids.size() == 0) {
                 assert(id <= formulaIds || constraints[id] != nullptr);
                 constraints[id] = nullptr;
@@ -858,6 +869,15 @@ int main(int argc, char const *argv[])
 
     std::cout << "rupSteps: " << rupSteps << std::endl;
     std::cout << "delSteps: " << delSteps << std::endl;
+
+    std::cout << "c statistic: time attach: "
+        << std::fixed << std::setprecision(2)
+        << timeAttach.count() << std::endl ;
+
+    std::cout << "c statistic: time detach: "
+        << std::fixed << std::setprecision(2)
+        << timeDetach.count() << std::endl ;
+
     engine.printStats();
     return 0;
 }

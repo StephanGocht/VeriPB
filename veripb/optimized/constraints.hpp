@@ -621,17 +621,17 @@ public:
     virtual ~Reason(){};
 };
 
-using ReasonPtr = std::unique_ptr<Reason>;
+using ReasonPtr = std::unique_ptr<Reason, std::function<void(Reason*)>>;
 
 template<typename TConstraint, typename TPropagator>
 class GenericDBReason: public Reason {
-    TConstraint& constraint;
-    TPropagator& propagator;
+    TConstraint* constraint;
+    TPropagator* propagator;
 
 public:
     GenericDBReason(TConstraint& _constraint, TPropagator& _propagator)
-        : constraint(_constraint)
-        , propagator(_propagator)
+        : constraint(&_constraint)
+        , propagator(&_propagator)
     {}
 
     virtual void rePropagate() {
@@ -640,19 +640,36 @@ public:
         // matter if there was an existing entry before, maybe we
         // should have something like initWatch, updateAllWatches,
         // updateSingleWatch.
-        constraint.updateWatch(propagator);
+        constraint->updateWatch(*propagator);
     }
 
     virtual bool isMarkedForDeletion() {
-        return constraint.header.isMarkedForDeletion;
+        return constraint->header.isMarkedForDeletion;
     }
 
     virtual void setIsReason() {
-        constraint.header.isReason = true;
+        constraint->header.isReason = true;
     }
 
     virtual void unsetIsReason() {
-        constraint.header.isReason = false;
+        constraint->header.isReason = false;
+    }
+
+    static ReasonPtr aquire(TConstraint& _constraint, TPropagator& _propagator) {
+        static std::vector<std::unique_ptr<GenericDBReason>> pool;
+        GenericDBReason* result;
+        if (!pool.empty()) {
+            result = pool.back().release();
+            pool.pop_back();
+            GenericDBReason tmp(_constraint, _propagator);
+            *result = tmp;
+        } else {
+            result = new GenericDBReason(_constraint, _propagator);
+        }
+        return ReasonPtr(result,
+            [](Reason* ptr) {
+                pool.emplace_back(static_cast<GenericDBReason*>(ptr));
+            });
     }
 
     virtual ~GenericDBReason() {}
@@ -1006,7 +1023,7 @@ public:
             if (assignment[lit] == State::Unassigned) {
                 prop.propMaster.enqueue(
                     lit,
-                    std::make_unique<ClauseReason>(*this, prop));
+                    ClauseReason::aquire(*this, prop));
             }
         }
 
@@ -1363,7 +1380,7 @@ public:
                 {
                     prop.propMaster.enqueue(
                         terms[i].lit,
-                        std::make_unique<IneqReason<T>>(*this, prop));
+                        IneqReason<T>::aquire(*this, prop));
                     // prop.visit_required += 1;
                 }
             }
@@ -1527,19 +1544,35 @@ public:
         ineq = new (addr) TConstraint(std::forward<Args>(args)...);
     }
 
+    template <typename ...Args>
+    void replace_new(size_t size, Args && ...args) {
+        void* addr;
+        if (capacity < size || ineq == nullptr) {
+            size = std::max(2 * capacity, size);
+            free();
+            addr = malloc(size);
+        } else {
+            ineq->~TConstraint();
+            addr = ineq;
+        }
+
+        ineq = new (addr) TConstraint(std::forward<Args>(args)...);
+    }
+
     // ConstraintHandler(std::vector<Term<T>>& terms, T degree) {
     //     void* addr = malloc(terms.size());
     //     ineq = new (addr) TConstraint(terms, degree);
     // }
 
-    void resize(size_t size) {
-        if (ineq != nullptr && size == capacity) {
-            return;
-        }
-        free();
-        void* addr = malloc(size);
-        ineq = new (addr) TConstraint(size);
-    }
+
+    // void resize(size_t size) {
+    //     if (ineq != nullptr && size == capacity) {
+    //         return;
+    //     }
+    //     free();
+    //     void* addr = malloc(size);
+    //     ineq = new (addr) TConstraint(size);
+    // }
 
     ~ConstraintHandler(){
         free();
@@ -1895,7 +1928,12 @@ private:
     size_t maxDbMem = 0;
 
     PropagationMaster propMaster;
+    // we want to keep an instance of the tmpPropagator to avoid rapid
+    // reallocation
     IneqPropagator<T> tmpPropagator;
+    // we want to keep an instance of the negated constraint to avoid
+    // rapid reallocation
+    FixedSizeInequalityHandler<T> negated;
     bool hasDetached = false;
 
 public:
@@ -2258,7 +2296,8 @@ public:
             engine.initPropagation();
             engine.propagate();
 
-            FixedSizeInequalityHandler<T> negated(redundant.terms.size(), redundant.terms.size(),
+            FixedSizeInequalityHandler<T>& negated = engine.negated;
+            negated.replace_new(redundant.terms.size(), redundant.terms.size(),
                 redundant.terms.begin(), redundant.terms.end(), redundant.degree);
             {
                 AutoReset reset(engine.propMaster);

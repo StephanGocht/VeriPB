@@ -921,6 +921,13 @@ private:
         }
     }
 
+    template<typename TermIter>
+    Clause(size_t size, TermIter begin, TermIter end)
+        : terms(size)
+    {
+        std::copy(begin, end, terms.begin());
+    }
+
     void checkPosition(size_t pos, int &numFound, size_t (&watcher)[2], const Assignment& assignment) {
         Lit& lit = this->terms[pos].lit;
         switch(assignment[lit]) {
@@ -2801,21 +2808,24 @@ public:
         this->minId = other.minId;
     }
 
-    Inequality(FixedSizeInequalityHandler<T>&& handler)
+    template<typename TIneq>
+    Inequality(ConstraintHandler<TIneq>&& handler)
         : handle(make_handle(std::move(handler)))
     {
-        expand();
-        contract();
     }
 
 
     Inequality(std::vector<Term<T>>& terms_, T degree_)
         : Inequality(FixedSizeInequalityHandler<T>(terms_.size(), terms_, degree_))
-    {}
+    {
+        normalize();
+    }
 
     Inequality(std::vector<Term<T>>&& terms_, T degree_)
         : Inequality(FixedSizeInequalityHandler<T>(terms_.size(), terms_, degree_))
-    {}
+    {
+        normalize();
+    }
 
     Inequality(
             std::vector<T>& coeffs,
@@ -2831,8 +2841,6 @@ public:
         : Inequality(Term<T>::toTerms(coeffs, lits), degree_)
     {}
 
-
-
     ~Inequality(){
         contract();
 
@@ -2840,6 +2848,11 @@ public:
             assert(handle);
             handle->toJunkyard();
         }
+    }
+
+    void normalize() {
+        expand();
+        contract();
     }
 
     bool isReason() {
@@ -2850,13 +2863,15 @@ public:
         contract();
         assert(!frozen);
 
-        CoeffBound termBound = handle->getBoundTerms();
-        CoeffBound degreeBound = handle->getBoundDegree();
-        if (termBound == CoeffBound::one && degreeBound == CoeffBound::one) {
-            ClauseHandler clauseManager = unpacked<T>::call(
-                InplaceIneqOps::makeHandler<Clause>(), handle.get());
-            HandlePtr clauseHandle = make_handle(std::move(clauseManager));
-            std::swap(clauseHandle, handle);
+        if (handle->typeId != TypeId::Clause) {
+            CoeffBound termBound = handle->getBoundTerms();
+            CoeffBound degreeBound = handle->getBoundDegree();
+            if (termBound == CoeffBound::one && degreeBound == CoeffBound::one) {
+                ClauseHandler clauseManager = unpacked<T>::call(
+                    InplaceIneqOps::makeHandler<Clause>(), handle.get());
+                HandlePtr clauseHandle = make_handle(std::move(clauseManager));
+                std::swap(clauseHandle, handle);
+            }
         }
 
         frozen = true;
@@ -2911,6 +2926,8 @@ public:
 
     Inequality* multiply(T factor){
         assert(!frozen);
+        // todo this is lazy for making sure we don't have a clause.
+        expand();
         contract();
         unpacked<T>::call(InplaceIneqOps::multiply(), handle.get(), factor);
         return this;
@@ -2936,6 +2953,7 @@ public:
             }
 
             unpacked<T>::call(typename FatInequality<T>::callLoad(), handle.get(), *expanded);
+            handle = nullptr;
         }
     }
 
@@ -3009,7 +3027,9 @@ public:
 
     Inequality* negated() {
         assert(!frozen);
-        this->contract();
+        // todo this is lazy for making sure we don't have a clause.
+        expand();
+        contract();
         unpacked<T>::call(InplaceIneqOps::negate(), handle.get());
         return this;
     }

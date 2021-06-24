@@ -559,6 +559,9 @@ public:
     std::array<std::unique_ptr<Inequality<T>>, 2> parseConstraint(WordIter& it, bool geqOnly = false) {
         terms.clear();
 
+        bool isClause = true;
+        bool hasDuplicates = false;
+
         T degreeOffset = 0;
         while (it != WordIter::end) {
             const string_view& word = *it;
@@ -566,6 +569,7 @@ public:
                 break;
             }
             T coeff = parseCoeff<T>(it, 0, it->size());
+            isClause &= (coeff == 1);
             ++it;
             Lit lit = parseLit(it, variableNameManager);
             if (formula) {
@@ -573,6 +577,7 @@ public:
             }
             if (duplicateDetection.add(lit.var())) {
                 std::cout << lit.var() << std::endl;
+                hasDuplicates = true;
                 throw ParseError(it, "Douplicated variables are not supported in constraints.");
             }
 
@@ -613,13 +618,21 @@ public:
             it.expect(";");
             ++it;
         }
+        isClause &= (degree == 1);
+        isClause &= !hasDuplicates;
 
         T normalizedDegree = degree + degreeOffset;
         if (degree > normalizedDegree) {
             throw ParseError(it, "Overflow due to normalization.");
         }
 
-        std::unique_ptr<Inequality<T>> geq = std::make_unique<Inequality<T>>(terms, normalizedDegree);
+        std::unique_ptr<Inequality<T>> geq;
+        if (isClause) {
+            geq = std::make_unique<Inequality<T>>(
+                ClauseHandler(terms.size(), terms.size(), terms.begin(), terms.end()));
+        } else {
+            geq = std::make_unique<Inequality<T>>(terms, normalizedDegree);
+        }
         std::unique_ptr<Inequality<T>> leq = nullptr;
         if (isEq) {
             normalizedDegree = -normalizedDegree;
@@ -695,6 +708,7 @@ public:
         char* bufferEnd = buffer + 12;
         char* bufferStart;
 
+        bool hasDuplicates = false;
         while (it != WordIter::end && *it != "0") {
             // parse int to give nice error messages if input is not
             // an integer, out put is not used because we construct
@@ -722,6 +736,10 @@ public:
 
             terms.emplace_back(1, lit);
 
+            if (duplicateDetection.add(lit.var())) {
+                hasDuplicates = true;
+            }
+
             // Note that douplicate variables will be handled during
             // construction of the Inequality that is if a literal
             // appears twice it will get coefficient 2, if a variable
@@ -742,7 +760,12 @@ public:
             throw ParseError(it, "Expected end line after constraint.");
         }
 
-        return std::make_unique<Inequality<T>>(terms, 1);
+        if (hasDuplicates) {
+            return std::make_unique<Inequality<T>>(terms, 1);
+        } else {
+            return std::make_unique<Inequality<T>>(
+                ClauseHandler(terms.size(), terms.size(), terms.begin(), terms.end()));
+        }
     }
 };
 

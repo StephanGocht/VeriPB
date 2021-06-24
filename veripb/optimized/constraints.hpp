@@ -32,6 +32,9 @@ using CoefType = int;
 #define assert(x) ((void)(!(x) && assert_handler(#x, __FILE__, __LINE__)))
 #endif
 
+// assert that is also triggered in release mode, i.e., when NDEBUG is set.
+#define _assert_(x) ((void)(!(x) && assert_handler(#x, __FILE__, __LINE__)))
+
 class assertion_error: public std::runtime_error {
 public:
     assertion_error(const std::string& what_arg):
@@ -1536,7 +1539,19 @@ public:
 };
 
 namespace InplaceIneqOps {
+    /* This contains a set of methods that can operate on classes that have a
+    member term of any Term<> type and a member degree of an integer type.
+
+    When adding special treatment for some types try to use
+    overloading instead of template specialization as g++ does not
+    allow partial function specialization.
+    */
+
     struct saturate {
+        bool operator()(Clause& ineq) {
+            return true;
+        }
+
         /* returns true if the resulting constraint is normalized */
         template<typename TIneq>
         bool operator()(TIneq& ineq) {
@@ -1546,14 +1561,12 @@ namespace InplaceIneqOps {
             }
             return ineq.degree > 0 || ineq.terms.size() == 0;
         }
-
-        template<>
-        bool operator()(Clause& ineq) {
-            return true;
-        }
     };
 
     struct divide {
+        template<typename TInt>
+        void operator()(Clause& ineq, TInt divisor) {}
+
         template<typename TIneq, typename TInt>
         void operator()(TIneq& ineq, TInt divisor) {
             ineq.degree = divideAndRoundUp(ineq.degree, divisor);
@@ -1561,12 +1574,14 @@ namespace InplaceIneqOps {
                 term.coeff = divideAndRoundUp(term.coeff, divisor);
             }
         }
-
-        template<typename TInt>
-        void operator()(Clause& ineq, TInt divisor) {}
     };
 
     struct multiply {
+        template<typename TInt>
+        void operator()(Clause& ineq, TInt factor) {
+            _assert_(false && "Clause can not be multiplied inplace.");
+        }
+
         template<typename TIneq, typename TInt>
         void operator()(TIneq& ineq, TInt factor) {
             // static_assert(!std::is_same<TIneq, Clause>(), "Can not do inplace negation with clauses!");
@@ -1575,14 +1590,13 @@ namespace InplaceIneqOps {
                 term.coeff *= factor;
             }
         }
-
-        template<typename TInt>
-        void operator()(Clause& ineq, TInt factor) {
-            assert(false);
-        }
     };
 
     struct negate {
+        void operator()(Clause& ineq) {
+            _assert_(false && "Clause can not be negated inplace.");
+        }
+
         template<typename TIneq>
         void operator()(TIneq& ineq) {
             // static_assert(!std::is_same<TIneq, Clause>(), "Can not do inplace negation with clauses!");
@@ -1593,14 +1607,13 @@ namespace InplaceIneqOps {
                 term.lit = ~term.lit;
             }
         }
-
-        template<>
-        void operator()(Clause& ineq) {
-            assert(false);
-        }
     };
 
     struct isContradiction {
+        bool operator()(Clause& ineq) {
+            return ineq.terms.size() == 0;
+        }
+
         template<typename TIneq>
         bool operator()(TIneq& ineq) {
             using TInt = decltype(ineq.degree);
@@ -1612,11 +1625,6 @@ namespace InplaceIneqOps {
                 }
             }
             return true;
-        }
-
-        template<>
-        bool operator()(Clause& ineq) {
-            return ineq.terms.size() == 0;
         }
     };
 

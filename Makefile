@@ -47,7 +47,10 @@ PYBINDINCLUDE:=`python3 -m pybind11 --includes`
 #all: install
 all: dev
 
-dev: veripb/optimized/parsing.o
+dev: testparser
+
+testparser: ${CPP_FILES} ${HPP_FILES}
+	clang++ --std=c++17 ${CPP_FILES} -o testparser -lgmp -O3 -DNDEBUG -fno-omit-frame-pointer -g
 
 test: cpp
 	python3 -m pytest ${ROOT_DIR}

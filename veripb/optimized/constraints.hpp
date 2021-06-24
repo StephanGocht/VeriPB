@@ -1622,7 +1622,7 @@ namespace InplaceIneqOps {
             TInt slack = -ineq.degree;
             for (auto& term: ineq.terms) {
                 slack += term.coeff;
-                if (slack > 0) {
+                if (slack >= 0) {
                     return false;
                 }
             }
@@ -2245,7 +2245,8 @@ public:
             engine.initPropagation();
             engine.propagate();
 
-            FixedSizeInequalityHandler<T> negated(redundant.terms.size(), redundant.terms.size(), redundant.terms.begin(), redundant.terms.end(), redundant.degree);
+            FixedSizeInequalityHandler<T> negated(redundant.terms.size(), redundant.terms.size(),
+                redundant.terms.begin(), redundant.terms.end(), redundant.degree);
             {
                 AutoReset reset(engine.propMaster);
                 InplaceIneqOps::negate()(*negated.ineq);

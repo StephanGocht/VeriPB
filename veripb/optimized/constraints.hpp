@@ -943,6 +943,10 @@ public:
         }
     }
 
+    bool isPropagatingAt0() {
+        return terms.size() == 1;
+    }
+
     void initWatch(ClausePropagator& prop) {
         for (Term<void> term: terms) {
             assert(static_cast<size_t>(term.lit.var()) < prop.propMaster.getAssignment().value.size());
@@ -1143,6 +1147,8 @@ private:
     // }
 
     void computeMaxCoeff(){
+        // We sort here, because we will need a sorted list for
+        // computing the watchsize.
         std::sort(terms.begin(), terms.end(), orderByCoeff<Term<T>>);
         maxCoeff = terms[terms.size() - 1].coeff;
     }
@@ -1492,7 +1498,7 @@ public:
     }
 
     ConstraintHandler(const TConstraint& copyFrom) {
-        void* addr = malloc(copyFrom.size());
+        void* addr = malloc(copyFrom.terms.size());
         ineq = new (addr) TConstraint(copyFrom);
     }
 
@@ -1745,6 +1751,13 @@ namespace InplaceIneqOps {
         }
     };
 
+    template<typename TargetTIneq>
+    struct makeHandler {
+        template<typename TIneq>
+        ConstraintHandler<TargetTIneq> operator()(TIneq& ineq) {
+            return ConstraintHandler<TargetTIneq>(ineq.terms.size(), ineq);
+        }
+    };
 }
 
 template<typename T>
@@ -2500,6 +2513,10 @@ struct type_id<IneqBig> {
 class BaseHandle;
 using HandlePtr = std::unique_ptr<BaseHandle>;
 
+enum class CoeffBound {
+    one, int32, int64, unbounded
+};
+
 class BaseHandle {
 public:
     const TypeId typeId;
@@ -2509,6 +2526,8 @@ public:
     virtual HandlePtr copy() = 0;
     virtual void toJunkyard() = 0;
     virtual bool isReason() = 0;
+    virtual CoeffBound getBoundTerms() = 0;
+    virtual CoeffBound getBoundDegree() = 0;
     virtual bool isPropagatingAt0() = 0;
     virtual void markedForDeletion() = 0;
     virtual size_t mem() = 0;
@@ -2541,6 +2560,36 @@ struct Handle : public BaseHandle {
         return get().header.isReason;
     }
 
+    virtual CoeffBound getBoundTerms() {
+        if (std::is_same<TConstraint, Clause>::value) {
+            return CoeffBound::one;
+        }
+
+        std::array<CoeffBound,4> bitGroups = {CoeffBound::one, CoeffBound::int32, CoeffBound::int64, CoeffBound::unbounded};
+        std::array<int64_t,3> bound = {1,std::numeric_limits<int32_t>::max(),std::numeric_limits<int64_t>::max()};
+
+        int group = 0;
+        for (auto& term: get().terms) {
+            while (group < 4 && term.coeff > bound[group]) {
+                group += 1;
+            }
+            if (group == 4) break;
+        }
+
+        return bitGroups[group];
+    }
+
+    virtual CoeffBound getBoundDegree() {
+        std::array<CoeffBound,4> bitGroups = {CoeffBound::one, CoeffBound::int32, CoeffBound::int64, CoeffBound::unbounded};
+        std::array<int64_t,3> bound = {1,std::numeric_limits<int32_t>::max(),std::numeric_limits<int64_t>::max()};
+        int group = 0;
+        while (group < 4 && get().degree > bound[group]) {
+            group += 1;
+        }
+        return bitGroups[group];
+    }
+
+
     virtual void markedForDeletion() {
         get().header.isMarkedForDeletion = true;
     }
@@ -2570,19 +2619,16 @@ constexpr int8_t combineTypeId(TypeId idA, TypeId idB) {
 template<typename used>
 struct unpacked;
 
-// we could totaly use virtual function calls here, but as we need
-// the infrastructure anyway to call methods on pairs of
-// inequalities, why not use it allways and save(?) some typing.
+// result_of_t requires full parameters, while we do not know if
+// method will be called with a Clause, the return type should be
+// identical, no matter which constraint is called, so lets just
+// use the return type that is defined for a clause
 using AnyIneq = Clause;
 
 template<>
 struct unpacked<CoefType> {
     template<typename method, typename ...Args>
     static
-    // result_of_t requires full parameters, while we do not know if
-    // method will be called with a Clause, the return type should be
-    // identical, no matter which constraint is called, so lets just
-    // use the return type that is defined for a clause
     std::result_of_t<method&&(AnyIneq&, Args&&...)>
     call(method m, BaseHandle* a, Args && ...args) {
         switch (a->typeId) {
@@ -2763,6 +2809,17 @@ public:
 
     void freeze(size_t numVars) {
         contract();
+        assert(!frozen);
+
+        CoeffBound termBound = handle->getBoundTerms();
+        CoeffBound degreeBound = handle->getBoundDegree();
+        if (termBound == CoeffBound::one && degreeBound == CoeffBound::one) {
+            ClauseHandler clauseManager = unpacked<T>::call(
+                InplaceIneqOps::makeHandler<Clause>(), handle.get());
+            HandlePtr clauseHandle = make_handle(std::move(clauseManager));
+            std::swap(clauseHandle, handle);
+        }
+
         frozen = true;
     }
 

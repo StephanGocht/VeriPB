@@ -2824,7 +2824,7 @@ public:
         assert(!frozen);
         expand();
         other->contract();
-        unpacked<T>::call(typename FatInequality<T>::callAdd(), handle.get(), *expanded);
+        unpacked<T>::call(typename FatInequality<T>::callAdd(), other->handle.get(), *expanded);
         return this;
     }
 

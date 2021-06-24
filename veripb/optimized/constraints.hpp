@@ -2364,9 +2364,8 @@ public:
         for (auto& term: ineq.terms) {
             if (term.coeff < 0) {
                 myTerm.lit = ~term.lit;
-                myTerm.coeff = term.coeff;
-                myTerm.coeff = -myTerm.coeff;
-                this->degree += term.coeff;
+                myTerm.coeff = -term.coeff;
+                this->degree += myTerm.coeff;
             } else {
                 myTerm.lit = term.lit;
                 myTerm.coeff = std::move(term.coeff);

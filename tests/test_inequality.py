@@ -31,6 +31,21 @@ class TestInequality(unittest.TestCase):
         b = geq([(3,2), (4, -1)], 3)
         assert a == b
 
+    def test_normalization_1(self):
+        a = geq([(-1, 1), (1, 2)], 0)
+        b = geq([(1, -1), (1, 2)], 1)
+        assert a == b
+
+    def test_normalization_1(self):
+        a = geq([(1, 1), (1, 2), (1,1), (1,3)], 2)
+        b = geq([(2, 1), (1, 2), (1,3)], 2)
+        assert a == b
+
+    def test_normalization_1(self):
+        a = geq([(-1, 1), (1, 2), (1,1), (1,3)], 2)
+        b = geq([(1, 2), (1,3)], 2)
+        assert a == b
+
     def test_implies_1(self):
         a = geq([(4, -1), (3,2)], 3)
         b = geq([(3,2), (4, -1), (3, 3)], 3)

@@ -389,10 +389,10 @@ struct Term {
 
 template<>
 struct Term<void> {
-    using coeff_type = int8_t;
+    using coeff_type = int32_t;
 
     Lit lit;
-    static constexpr int8_t coeff = 1;
+    static constexpr int32_t coeff = 1;
 
     Term() = default;
 
@@ -887,7 +887,7 @@ public:
 
     // common constraint interface:
     DBConstraintHeader header;
-    static constexpr int8_t degree = 1;
+    static constexpr int32_t degree = 1;
     TVec terms;
 
 private:
@@ -2090,6 +2090,7 @@ public:
 
     Inequality<T>* attach(Inequality<T>* toAttach, uint64_t id) {
         Inequality<T>* ineq;
+        toAttach->contract();
         {
             Timer timer(timeFind);
             ineq = *constraintLookup.insert(toAttach).first;
@@ -2560,7 +2561,17 @@ class BaseHandle;
 using HandlePtr = std::unique_ptr<BaseHandle>;
 
 enum class CoeffBound {
-    one, int32, int64, unbounded
+    trivial = 0, one = 1, int32 = 2, int64 = 3, unbounded = 4
+};
+
+template<typename TInt>
+static CoeffBound getBound(TInt i, CoeffBound base = CoeffBound::trivial) {
+    std::array<int64_t,4> bound = {0,1,std::numeric_limits<int32_t>::max(),std::numeric_limits<int64_t>::max()};
+    uint group = static_cast<uint>(base);
+    while (i > bound[group]) {
+        group += 1;
+    }
+    return static_cast<CoeffBound>(group);
 };
 
 class BaseHandle {
@@ -2611,28 +2622,17 @@ struct Handle : public BaseHandle {
             return CoeffBound::one;
         }
 
-        std::array<CoeffBound,4> bitGroups = {CoeffBound::one, CoeffBound::int32, CoeffBound::int64, CoeffBound::unbounded};
-        std::array<int64_t,3> bound = {1,std::numeric_limits<int32_t>::max(),std::numeric_limits<int64_t>::max()};
-
-        int group = 0;
+        CoeffBound bound = CoeffBound::trivial;
         for (auto& term: get().terms) {
-            while (group < 4 && term.coeff > bound[group]) {
-                group += 1;
-            }
-            if (group == 4) break;
+            assert(term.coeff >= 0);
+            bound = getBound(term.coeff, bound);
+            if (bound == CoeffBound::unbounded) break;
         }
-
-        return bitGroups[group];
+        return bound;
     }
 
     virtual CoeffBound getBoundDegree() {
-        std::array<CoeffBound,4> bitGroups = {CoeffBound::one, CoeffBound::int32, CoeffBound::int64, CoeffBound::unbounded};
-        std::array<int64_t,3> bound = {1,std::numeric_limits<int32_t>::max(),std::numeric_limits<int64_t>::max()};
-        int group = 0;
-        while (group < 4 && get().degree > bound[group]) {
-            group += 1;
-        }
-        return bitGroups[group];
+        return getBound(get().degree);
     }
 
 

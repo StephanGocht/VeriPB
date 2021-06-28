@@ -126,18 +126,18 @@ public:
     }
 
     void expect(std::string word) {
-        std::stringstream s;
-
         if (*this == WordIter::end) {
+            std::stringstream s;
             s << "Expected '" << word << "'.";
             throw ParseError(*this, s.str());
         } else if (this->get() != word) {
+            std::stringstream s;
             s << "Expected '" << word << "', but found '" << this->get() << "'.";
             throw ParseError(*this, s.str());
         }
     }
 
-    void expectOneOf(std::vector<std::string> words) {
+    std::stringstream getExpectedSS(std::vector<std::string>& words) {
         std::stringstream s;
         s << "Expected one of ";
         bool first = true;
@@ -149,8 +149,12 @@ public:
             }
             s << "'" << word << "'";
         }
+        return s;
+    }
 
+    void expectOneOf(std::vector<std::string>& words) {
         if (*this == WordIter::end) {
+            std::stringstream s = getExpectedSS(words);
             s << "'.";
             throw ParseError(*this, s.str());
         }
@@ -162,6 +166,7 @@ public:
             }
         }
         if (!found) {
+            std::stringstream s = getExpectedSS(words);
             s << ", but found '" << this->get() << "'.";
             throw ParseError(*this, s.str());
         }
@@ -596,7 +601,8 @@ public:
 
         duplicateDetection.clear();
 
-        it.expectOneOf({">=", "="});
+        std::vector<std::string> ops = {">=", "="};
+        it.expectOneOf(ops);
         bool isEq = (*it == "=");
         if (isEq && geqOnly) {
             throw ParseError(it, "Equality not allowed, only >= is allowed here.");

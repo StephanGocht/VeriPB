@@ -705,6 +705,13 @@ private:
 
     bool trailUnchanged = true;
 
+    // it seems that marking constraints with setIsReason,
+    // unsetIsReason in enque and undoOne are quite expensive. If we
+    // now that the current propagation is temporary (because it is in
+    // an AutoReset block) there is no need to setIsReason because it
+    // will be unset eventually.
+    bool isTemporary = false;
+
     friend class AutoReset;
 
 public:
@@ -745,7 +752,7 @@ public:
         phase.assign(lit);
         trail.push_back(lit);
         reasons.emplace_back(std::move(reason));
-        if (reasons.back().get() != nullptr) {
+        if (!isTemporary && reasons.back().get() != nullptr) {
             reasons.back()->setIsReason();
         }
 
@@ -821,7 +828,7 @@ public:
     void undoOne() {
         assignment.unassign(trail.back());
         trail.pop_back();
-        if (reasons.back().get() != nullptr) {
+        if (!isTemporary && reasons.back().get() != nullptr) {
             reasons.back()->unsetIsReason();
         }
         reasons.pop_back();
@@ -1910,12 +1917,14 @@ private:
 public:
     AutoReset(PropagationMaster& engine_)
         : engine(engine_)
-        , base(engine.current) {
-
+        , base(engine.current)
+    {
+        engine.isTemporary = true;
     }
 
     ~AutoReset(){
         engine.reset(base);
+        engine.isTemporary = false;
     }
 };
 

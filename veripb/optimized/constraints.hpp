@@ -2278,9 +2278,9 @@ public:
 
         for (Inequality<T>* ineq: unique) {
             if (ineq->minId <= includeIds) {
-                InequalityPtr<T> rhs(ineq->copy());
+                InequalityPtr<T> rhs = ineq->copy();
                 rhs->substitute(sub);
-                if (!ineq->implies(rhs.get()) && !find(rhs.get())
+                if (!ineq->implies(*rhs) && !find(rhs.get())
                     ) {
                     result.emplace_back(std::move(rhs));
                 }
@@ -2910,7 +2910,7 @@ public:
         unpacked<T>::call(typename PropEngine<T>::updateWatches(), handle.get(), prop);
     }
 
-    Inequality* saturate(){
+    Inequality& saturate(){
         assert(!frozen);
         contract();
 
@@ -2923,31 +2923,31 @@ public:
             contract();
         }
 
-        return this;
+        return *this;
     }
 
-    Inequality* divide(T divisor){
+    Inequality& divide(T divisor){
         assert(!frozen);
         contract();
         unpacked<T>::call(InplaceIneqOps::divide(), handle.get(), divisor);
-        return this;
+        return *this;
     }
 
-    Inequality* multiply(T factor){
+    Inequality& multiply(T factor){
         assert(!frozen);
         // todo this is lazy for making sure we don't have a clause.
         expand();
         contract();
         unpacked<T>::call(InplaceIneqOps::multiply(), handle.get(), factor);
-        return this;
+        return *this;
     }
 
-    Inequality* add(Inequality* other){
+    Inequality& add(Inequality& other){
         assert(!frozen);
         expand();
-        other->contract();
-        unpacked<T>::call(typename FatInequality<T>::callAdd(), other->handle.get(), *expanded);
-        return this;
+        other.contract();
+        unpacked<T>::call(typename FatInequality<T>::callAdd(), other.handle.get(), *expanded);
+        return *this;
     }
 
     void expand() {
@@ -2978,8 +2978,8 @@ public:
         }
     }
 
-    bool eq(Inequality* other) {
-        return *this == *other;
+    bool eq(Inequality& other) {
+        return *this == other;
     }
 
     bool operator==(Inequality<T>& other) {
@@ -3013,11 +3013,11 @@ public:
         });
     }
 
-    bool implies(Inequality* other) {
+    bool implies(Inequality& other) {
         this->contract();
-        other->contract();
+        other.contract();
 
-        return unpacked<T>::call2(InplaceIneqOps::implies(), handle.get(), other->handle.get());
+        return unpacked<T>::call2(InplaceIneqOps::implies(), handle.get(), other.handle.get());
     }
 
     bool rupCheck(PropEngine<T>& propEngine) {
@@ -3025,36 +3025,36 @@ public:
         return unpacked<T>::call(typename PropEngine<T>::rupCheck(), handle.get(), propEngine);
     }
 
-    Inequality* substitute(Substitution& sub) {
+    Inequality& substitute(Substitution& sub) {
         assert(!this->frozen);
         this->contract();
         unpacked<T>::call(InplaceIneqOps::substitute(), handle.get(), sub);
         // need to normalize, we do so by expanding the constraint
         this->expand();
-        return this;
+        return *this;
     }
 
-    Inequality* negated() {
+    Inequality& negated() {
         assert(!frozen);
         // todo this is lazy for making sure we don't have a clause.
         expand();
         contract();
         unpacked<T>::call(InplaceIneqOps::negate(), handle.get());
-        return this;
+        return *this;
     }
 
-    Inequality* copy(){
+    InequalityPtr<T> copy(){
         contract();
-        return new Inequality(*this);
+        return std::make_unique<Inequality>(*this);
     }
 
-    Inequality* weaken(int _var) {
+    Inequality& weaken(int _var) {
         assert(!frozen);
         assert(_var >= 0);
         Var var(_var);
         expand();
         expanded->weaken(var);
-        return this;
+        return *this;
     }
 
     bool isContradiction(){

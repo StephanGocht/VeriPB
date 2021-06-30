@@ -1,5 +1,5 @@
-from veripb.optimized.constraints import CppInequality, CppInequalityBigInt
-from veripb.optimized.parsing import VariableNameManager, parseConstraintOpbBigInt, parseConstraintOpb
+from veripb.optimized.constraints import CppInequality
+from veripb.optimized.parsing import VariableNameManager, parseConstraintOpb
 from veripb.exceptions import ParseError
 
 
@@ -418,25 +418,25 @@ class CppIneqFactory(IneqFactory):
             return result[0]
 
 
-class BigIntIneqFactory(IneqFactory):
-    def __init__(self, enableFreeNames = True):
-        super().__init__(enableFreeNames)
+# class BigIntIneqFactory(IneqFactory):
+#     def __init__(self, enableFreeNames = True):
+#         super().__init__(enableFreeNames)
 
-    def litAxiom(self, lit):
-        return CppInequalityBigInt([1], [lit], 0)
+#     def litAxiom(self, lit):
+#         return CppInequalityBigInt([1], [lit], 0)
 
-    def fromTerms(self, terms, degree):
-        coefs, lits = terms2lists(terms)
-        coefs = list(coefs)
-        lits  = list(lits)
-        return CppInequalityBigInt(coefs, lits, degree)
+#     def fromTerms(self, terms, degree):
+#         coefs, lits = terms2lists(terms)
+#         coefs = list(coefs)
+#         lits  = list(lits)
+#         return CppInequalityBigInt(coefs, lits, degree)
 
-    def parse(self, wordIter, allowMultiple = False):
-        result = parseConstraintOpbBigInt(self.varNameMgr, wordIter)
-        if allowMultiple:
-            return result
-        else:
-            if (result[1] != None):
-                raise ParseError("Equality not allowed here.")
-            return result[0]
+#     def parse(self, wordIter, allowMultiple = False):
+#         result = parseConstraintOpbBigInt(self.varNameMgr, wordIter)
+#         if allowMultiple:
+#             return result
+#         else:
+#             if (result[1] != None):
+#                 raise ParseError("Equality not allowed here.")
+#             return result[0]
 

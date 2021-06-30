@@ -915,12 +915,12 @@ int main(int argc, char const *argv[])
 void init_parsing(py::module &m){
     m.doc() = "Efficient implementation for parsing opb and pbp files.";
     m.def("parseOpb", &parseOpb<CoefType>, "Parse opb file with fixed precision.");
-    m.def("parseOpbBigInt", &parseOpb<BigInt>, "Parse opb file with arbitrary precision.");
+    // m.def("parseOpbBigInt", &parseOpb<BigInt>, "Parse opb file with arbitrary precision.");
     m.def("parseCnf", &parseCnf<CoefType>, "Parse cnf file with fixed precision.");
-    m.def("parseCnfBigInt", &parseCnf<BigInt>, "Parse cnf file with arbitrary precision.");
+    // m.def("parseCnfBigInt", &parseCnf<BigInt>, "Parse cnf file with arbitrary precision.");
 
     m.def("parseConstraintOpb", &parseOpbConstraint<CoefType>, "Parse opb consraint with fixed precision.");
-    m.def("parseConstraintOpbBigInt", &parseOpbConstraint<BigInt>, "Parse opb constraint with arbitrary precision.");
+    // m.def("parseConstraintOpbBigInt", &parseOpbConstraint<BigInt>, "Parse opb constraint with arbitrary precision.");
 
     py::register_exception_translator([](std::exception_ptr p) {
         try {
@@ -971,15 +971,15 @@ void init_parsing(py::module &m){
         .def_readonly("objectiveVars", &Formula<CoefType>::objectiveVars)
         .def_readonly("objectiveCoeffs", &Formula<CoefType>::objectiveCoeffs);
 
-    py::class_<Formula<BigInt>>(m, "FormulaBigInt")
-        .def(py::init<>())
-        .def("getConstraints", &Formula<BigInt>::getConstraints,
-            py::return_value_policy::reference_internal)
-        .def_readonly("maxVar", &Formula<BigInt>::maxVar)
-        .def_readonly("claimedNumC", &Formula<BigInt>::claimedNumC)
-        .def_readonly("claimedNumVar", &Formula<BigInt>::claimedNumVar)
-        .def_readonly("hasObjective", &Formula<BigInt>::hasObjective)
-        .def_readonly("objectiveVars", &Formula<BigInt>::objectiveVars)
-        .def_readonly("objectiveCoeffs", &Formula<BigInt>::objectiveCoeffs);
+    // py::class_<Formula<BigInt>>(m, "FormulaBigInt")
+    //     .def(py::init<>())
+    //     .def("getConstraints", &Formula<BigInt>::getConstraints,
+    //         py::return_value_policy::reference_internal)
+    //     .def_readonly("maxVar", &Formula<BigInt>::maxVar)
+    //     .def_readonly("claimedNumC", &Formula<BigInt>::claimedNumC)
+    //     .def_readonly("claimedNumVar", &Formula<BigInt>::claimedNumVar)
+    //     .def_readonly("hasObjective", &Formula<BigInt>::hasObjective)
+    //     .def_readonly("objectiveVars", &Formula<BigInt>::objectiveVars)
+    //     .def_readonly("objectiveCoeffs", &Formula<BigInt>::objectiveCoeffs);
 }
 #endif

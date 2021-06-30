@@ -16,9 +16,9 @@ from veripb.rules_register import get_registered_rules
 from veripb.timed_function import TimedFunction
 from veripb.parser import RuleParser
 from veripb.exceptions import ParseError
-from veripb.optimized.constraints import PropEngine as CppPropEngine,PropEngineBigInt
-from veripb.optimized.parsing import parseOpb,parseOpbBigInt,parseCnf,parseCnfBigInt
-from veripb.constraints import PropEngine,CppIneqFactory,BigIntIneqFactory
+from veripb.optimized.constraints import PropEngine as CppPropEngine
+from veripb.optimized.parsing import parseOpb,parseCnf
+from veripb.constraints import PropEngine,CppIneqFactory
 from time import perf_counter
 
 from veripb.rules_dominance import stats as dominance_stats
@@ -148,21 +148,13 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
     rules = list(get_registered_rules())
 
     context = Context()
-    if miscSettings.arbitraryPrecision:
-        context.ineqFactory = BigIntIneqFactory(miscSettings.enableFreeNames)
-    else:
-        context.ineqFactory = CppIneqFactory(miscSettings.enableFreeNames)
+
+    context.ineqFactory = CppIneqFactory(miscSettings.enableFreeNames)
 
     if miscSettings.drat or miscSettings.cnf:
-        if miscSettings.arbitraryPrecision:
-            parser = parseCnfBigInt
-        else:
-            parser = parseCnf
+        parser = parseCnf
     else:
-        if miscSettings.arbitraryPrecision:
-            parser = parseOpbBigInt
-        else:
-            parser = parseOpb
+        parser = parseOpb
 
     try:
         formula = loadFormula(formulaFile.name, parser, context.ineqFactory.varNameMgr)
@@ -174,10 +166,7 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
     context.objective = formula["objective"]
 
     def newPropEngine():
-        if miscSettings.arbitraryPrecision:
-            return PropEngineBigInt(formula["numVariables"])
-        else:
-            return CppPropEngine(formula["numVariables"])
+        return CppPropEngine(formula["numVariables"])
 
     context.propEngine = newPropEngine()
     context.newPropEngine = newPropEngine

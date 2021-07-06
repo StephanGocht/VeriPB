@@ -287,6 +287,14 @@ class Redundancy(Rule):
 
             w = parseSubstitution(words, context.ineqFactory)
 
+            if getattr(context, "foundLoadFormula", False) == False:
+                raise ValueError("You are not allowed to use redundancy checks"\
+                    "before the formula is loaded.")
+
+            if getattr(context, "objective", None) is not None:
+                raise ValueError("You are not allowed to use redundancy checks"\
+                    "in optimization problems.")
+
         return ReverseUnitPropagation(ineq[0], w, context.ineqFactory.numVars())
 
 class CompareToConstraint(Rule):

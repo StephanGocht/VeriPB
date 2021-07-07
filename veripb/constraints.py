@@ -1,5 +1,5 @@
 from veripb.optimized.constraints import CppInequality
-from veripb.optimized.parsing import VariableNameManager, parseConstraintOpb
+from veripb.optimized.parsing import VariableNameManager, parseConstraintOpb, WordIter
 from veripb.exceptions import ParseError
 
 
@@ -413,7 +413,16 @@ class CppIneqFactory(IneqFactory):
     def parse(self, wordIter, allowMultiple = False):
         result = parseConstraintOpb(self.varNameMgr, wordIter)
         if allowMultiple:
-            return result
+            return [i for i in result if i is not None]
+        else:
+            return result[0]
+
+    def parseString(self, string, allowMultiple = False):
+        wordIter = WordIter("")
+        wordIter.setLineText(string)
+        result = self.parse(wordIter, allowMultiple)
+        if allowMultiple:
+            return [i for i in result if i is not None]
         else:
             return result[0]
 

@@ -11,9 +11,32 @@ from veripb.constraints import CppIneqFactory as IneqFactory
 class DummyContext:
     pass
 
+def lit2str(lit):
+    if lit < 0:
+        return "~x%i"%(-lit)
+    else:
+        return "x%i"%(lit)
+
 class TestParsing(unittest.TestCase):
+
+    def checkParsing(self, terms, degree, eq = False):
+        termString = " ".join(["%i %s" % (coeff, lit2str(lit)) for coeff, lit in terms])
+        op = "=" if eq else ">="
+        string = "%s %s %i ;" % (termString, op, degree)
+        terms = [Term(coeff, lit) for coeff, lit in terms]
+        expect = []
+        expect.append(self.ineqFactory.fromTerms(terms, degree))
+        if eq:
+            for term in terms:
+                term.coefficient = -term.coefficient
+            degree = -degree
+            expect.append(self.ineqFactory.fromTerms(terms, degree))
+
+        res = self.ineqFactory.parseString(string, allowMultiple = True)
+        assert res == expect
+
     def setUp(self):
-        self.ineqFactory = IneqFactory()
+        self.ineqFactory = IneqFactory(False)
         self.context = DummyContext()
         self.context.ineqFactory = self.ineqFactory
 
@@ -22,7 +45,7 @@ class TestParsing(unittest.TestCase):
         print(parser.parse(get_registered_rules(), ["pseudo-Boolean proof version 1.0"]))
 
     def test_OPB_line_1(self):
-        res = OPBParser(self.ineqFactory).parseOPB("3 x1 >= 2;".split())
+        res = self.ineqFactory.parseString("3 x1 >= 2 ;", allowMultiple = True)
         assert res == [self.ineqFactory.fromTerms([Term(3,1)], 2)]
 
     def test_OPB_line_2(self):
@@ -58,6 +81,68 @@ class TestParsing(unittest.TestCase):
     def test_contradiction(self):
         rule = IsContradiction.parse("42 0", self.context)
         assert rule == IsContradiction(42)
+
+    def test_clause_1(self):
+        self.checkParsing([(1, 1)], 1)
+        self.checkParsing([(1, 1)], 1, eq = True)
+
+    def test_clause_2(self):
+        self.checkParsing([(1, 1), (1, 2)], 1)
+        self.checkParsing([(1, 1), (1, 2)], 1, eq = True)
+
+    def test_clause_3(self):
+        self.checkParsing([(1, 1), (1, -2) ], 1)
+        self.checkParsing([(1, 1), (1, -2) ], 1, eq = True)
+
+    def test_clause_4(self):
+        self.checkParsing([(1, 1), (-1, -2)], 0)
+        self.checkParsing([(1, 1), (-1, -2)], 0, eq = True)
+
+    def test_ineq_1(self):
+        val = 214748364
+        self.checkParsing([(val, 1)], val)
+        self.checkParsing([(val, 1)], val, eq = True)
+
+    def test_ineq_1(self):
+        val = 214748364
+        self.checkParsing([(-val, 1)], val)
+        self.checkParsing([(-val, 1)], val, eq = True)
+
+    def test_ineq_1(self):
+        val = 214748364
+        self.checkParsing([(-val, -1)], val)
+        self.checkParsing([(-val, -1)], val, eq = True)
+
+    def test_int32_max_almost(self):
+        val = 2147483647 - 1
+        self.checkParsing([(val, 1)], val)
+        self.checkParsing([(val, 1)], val, eq = True)
+
+    def test_int32_max(self):
+        val = 2147483647
+        self.checkParsing([(val, 1)], val)
+        self.checkParsing([(val, 1)], val, eq = True)
+
+    def test_int32_max_more(self):
+        val = 2147483647 + 1
+        self.checkParsing([(val, 1)], val)
+        self.checkParsing([(val, 1)], val, eq = True)
+
+    def test_small_large_coeff(self):
+        val = 2147483647 + 1
+        self.checkParsing([(1, 2), (val, 1)], val)
+        self.checkParsing([(1, 2), (val, 1)], val, eq = True)
+
+    def test_small_large_degree(self):
+        val = 2147483647 + 1
+        self.checkParsing([(1, 2), (1, 1)], val)
+        self.checkParsing([(1, 2), (1, 1)], val, eq = True)
+
+    def test_degree_overflow(self):
+        val = 2147483647
+        self.checkParsing([(-val//2, 1), (-val//2, 2), (-val//2, 3), (-val//2, 4)], 0)
+        self.checkParsing([(-val//2, 1), (-val//2, 2), (-val//2, 3), (-val//2, 4)], 0, eq = True)
+
 
 class TestWordParser(unittest.TestCase):
     def test_working_1(self):

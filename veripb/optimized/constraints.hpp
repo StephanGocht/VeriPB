@@ -362,6 +362,12 @@ struct Term {
         {}
 
     template<typename TTermType>
+    Term(const Term<TTermType>& other)
+        : coeff(other.coeff)
+        , lit(other.lit)
+    {}
+
+    template<typename TTermType>
     Term<T>& operator=(const Term<TTermType>& other) {
         coeff = other.coeff;
         lit = other.lit;
@@ -403,6 +409,13 @@ struct Term<void> {
         : lit(_lit)
     {
         assert(_coeff == 1);
+    }
+
+    template<typename TTermType>
+    Term(const Term<TTermType>& other)
+        : lit(other.lit)
+    {
+        assert(other.coeff == 1);
     }
 
     Term<void>& operator=(const Lit& _lit) {

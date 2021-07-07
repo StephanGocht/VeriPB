@@ -219,6 +219,11 @@ public:
         return this->line;
     }
 
+    void setLineText(std::string _line) {
+        line = _line;
+        init();
+    }
+
     std::string getFileName() const {
         return this->fileInfo.fileName;
     }
@@ -477,11 +482,11 @@ public:
     }
 };
 
-
 template<typename T>
 class OPBParser {
     VariableNameManager& variableNameManager;
     std::vector<Term<T>> terms;
+    std::vector<Term<int32_t>> smallTerms;
     VarDouplicateDetection duplicateDetection;
 
     std::unique_ptr<Formula<T>> formula;
@@ -563,18 +568,29 @@ public:
 
     std::array<std::unique_ptr<Inequality<T>>, 2> parseConstraint(WordIter& it, bool geqOnly = false) {
         terms.clear();
+        smallTerms.clear();
 
         bool isClause = true;
+        bool isSmall = true;
         bool hasDuplicates = false;
 
         T degreeOffset = 0;
+        T coeff;
+        int32_t smallCoeff;
         while (it != WordIter::end) {
             const string_view& word = *it;
             if (word == ">=" || word == "=") {
                 break;
             }
-            T coeff = parseCoeff<T>(it, 0, it->size());
-            isClause &= (coeff == 1);
+            isSmall &= word.size() < 10;
+            if (!isSmall) {
+                coeff = parseCoeff<T>(it, 0, it->size());
+                isClause = false;
+            } else {
+                smallCoeff = parseCoeff<int32_t>(it, 0, it->size());
+                isClause &= (smallCoeff == 1);
+            }
+
             ++it;
             Lit lit = parseLit(it, variableNameManager);
             if (formula) {
@@ -586,16 +602,35 @@ public:
                 throw ParseError(it, "Douplicated variables are not supported in constraints.");
             }
 
-            if (coeff < 0) {
-                coeff = -coeff;
-                degreeOffset += coeff;
-                if (degreeOffset < 0) {
-                    throw ParseError(it, "Overflow due to normalization.");
+            if (!isSmall) {
+                if (coeff < 0) {
+                    coeff = -coeff;
+                    degreeOffset += coeff;
+                    if (degreeOffset < 0) {
+                        throw ParseError(it, "Overflow due to normalization.");
+                    }
+                    lit = ~lit;
                 }
-                lit = ~lit;
-            }
 
-            terms.emplace_back(coeff, lit);
+                if (!smallTerms.empty()) {
+                    assert(terms.empty());
+                    std::copy(smallTerms.begin(), smallTerms.end(), std::back_inserter(terms));
+                    smallTerms.clear();
+                }
+
+                terms.emplace_back(coeff, lit);
+            } else {
+                if (smallCoeff < 0) {
+                    smallCoeff = -smallCoeff;
+                    degreeOffset += smallCoeff;
+                    if (degreeOffset < 0) {
+                        throw ParseError(it, "Overflow due to normalization.");
+                    }
+                    lit = ~lit;
+                }
+
+                smallTerms.emplace_back(smallCoeff, lit);
+            }
             ++it;
         }
 
@@ -624,19 +659,31 @@ public:
             it.expect(";");
             ++it;
         }
-        isClause &= (degree == 1);
-        isClause &= !hasDuplicates;
+        isSmall  &= !hasDuplicates & !isEq;
+        isClause &= (degree == 1) & isSmall;
+
 
         T normalizedDegree = degree + degreeOffset;
         if (degree > normalizedDegree) {
             throw ParseError(it, "Overflow due to normalization.");
         }
 
+        int32_t smallNormalizedDegree = 0;
         std::unique_ptr<Inequality<T>> geq;
         if (isClause) {
             geq = std::make_unique<Inequality<T>>(
-                ClauseHandler(terms.size(), terms.size(), terms.begin(), terms.end()));
+                ClauseHandler(smallTerms.size(), smallTerms.size(), smallTerms.begin(), smallTerms.end()));
+        } else if (isSmall && normalizedDegree < std::numeric_limits<int32_t>::max()) {
+            smallNormalizedDegree = convertInt<int32_t>(normalizedDegree);
+            geq = std::make_unique<Inequality<T>>(
+                FixedSizeInequalityHandler<int32_t>(smallTerms.size(), smallTerms, smallNormalizedDegree));
         } else {
+            isSmall = false;
+            if (!smallTerms.empty()) {
+                assert(terms.empty());
+                std::copy(smallTerms.begin(), smallTerms.end(), std::back_inserter(terms));
+                smallTerms.clear();
+            }
             geq = std::make_unique<Inequality<T>>(terms, normalizedDegree);
         }
         std::unique_ptr<Inequality<T>> leq = nullptr;
@@ -958,6 +1005,7 @@ void init_parsing(py::module &m){
         .def("getFileName", &WordIter::getFileName)
         .def("getLine", &WordIter::getLine)
         .def("getLineText", &WordIter::getLineText)
+        .def("setLineText", &WordIter::setLineText)
         .def("getColumn", &WordIter::getColumn);
 
     py::class_<Formula<CoefType>>(m, "Formula")

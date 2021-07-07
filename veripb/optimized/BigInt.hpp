@@ -31,6 +31,17 @@ inline void hash_combine(std::size_t& seed, const T& v)
 
 #include <gmpxx.h>
 using BigInt = mpz_class;
+
+template<typename Out, typename In>
+Out convertInt(In value) {
+    return value;
+}
+
+template<>
+inline int32_t convertInt(mpz_class value) {
+    return value.get_si();
+}
+
 namespace std {
     inline BigInt abs(BigInt& num) {
         return ::abs(num);

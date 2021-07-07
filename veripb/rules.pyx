@@ -175,9 +175,7 @@ class ReverseUnitPropagation(Rule):
             w = list()
 
             if peek == "w":
-                if getattr(context, "foundLoadFormula", False) == False:
-                    raise ValueError("You are not allowed to use redundancy checks"\
-                        "before the formula is loaded.")
+                context.canLoadFormula = False
 
                 if getattr(context, "objective", None) is not None:
                     raise ValueError("You are not allowed to use redundancy checks"\
@@ -287,9 +285,7 @@ class Redundancy(Rule):
 
             w = parseSubstitution(words, context.ineqFactory)
 
-            if getattr(context, "foundLoadFormula", False) == False:
-                raise ValueError("You are not allowed to use redundancy checks"\
-                    "before the formula is loaded.")
+            context.canLoadFormula = False
 
             if getattr(context, "objective", None) is not None:
                 raise ValueError("You are not allowed to use redundancy checks"\
@@ -671,6 +667,9 @@ class LoadFormula(Rule):
     @classmethod
     def parse(cls, line, context):
         context.foundLoadFormula = True
+        if getattr(context, "canLoadFormula", True) == False:
+            raise ValueError("You are not allowed to load the formula"\
+                "after using redundancy checks")
         numConstraints = len(context.formula)
         with WordParser(line) as words:
             try:
@@ -708,6 +707,10 @@ class LoadAxiom(Rule):
 
     @classmethod
     def parse(cls, line, context):
+        if getattr(context, "canLoadFormula", True) == False:
+            raise ValueError("You are not allowed to load the formula"\
+                "after using redundancy checks")
+
         with WordParser(line) as words:
             num = words.nextInt()
             words.expectEnd()

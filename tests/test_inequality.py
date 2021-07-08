@@ -427,6 +427,22 @@ class TestInequality(unittest.TestCase):
         a = a.substitute(CppSubstitution([], [1,2], [2,1]))
         assert(a == b)
 
+    def test_contradiction_1(self):
+        a = geq([], 0)
+        assert not a.isContradiction()
+
+    def test_contradiction_2(self):
+        a = geq([], 1)
+        assert a.isContradiction()
+
+    def test_contradiction_3(self):
+        a = geq([(1,1)], 2)
+        assert a.isContradiction()
+
+    def test_contradiction_4(self):
+        a = geq([(1,1)], 1)
+        assert not a.isContradiction()
+
 
     if not isinstance(ineqFactory, veripb.constraints.CppIneqFactory):
         def test_resolve_1(self):

@@ -59,8 +59,6 @@ class Order:
         self.goalCache = defaultdict(GoalCache)
 
     def check(self):
-        if not self.irreflexivityProven:
-            raise InvalidProof("Proof did not show irreflexivity of order.")
         if not self.transitivity.isProven:
             raise InvalidProof("Proof did not show transitivity of order.")
 
@@ -69,49 +67,84 @@ class Order:
         self.firstDomInvisible = None
         self.vars = None
 
+    def getOrderCondition(self, witnessDict):
+        res = []
+        zippedVars = zip(
+            self.leftVars,
+            self.rightVars,
+            self.vars)
+
+        substitution = Substitution()
+        for leftVar, rightVar, var in zippedVars:
+            try:
+                substitution.map(leftVar, witnessDict[var])
+            except KeyError:
+                substitution.map(leftVar, var)
+            substitution.map(rightVar, var)
+
+        for aux in self.auxVars:
+            try:
+                substitution.map(aux, witnessDict[aux])
+            except KeyError:
+                pass
+
+        # # todo: we need to check that the auxVars are still fresh
+        sub = substitution.get()
+
+        # for ineq in self.order.auxDefinition:
+        #     ineq = self.constraint.copy()
+        #     ineq.substitute(sub)
+        #     self.addAvailable(ineq)
+
+        for ineq in self.definition:
+            ineq = ineq.copy()
+            ineq.substitute(sub)
+            res.append(ineq)
+        return res
+
+
+    def getOrderConditionFlipped(self, witnessDict):
+        res = []
+        zippedVars = zip(
+            self.leftVars,
+            self.rightVars,
+            self.vars)
+
+        substitution = Substitution()
+        for leftVar, rightVar, var in zippedVars:
+            try:
+                substitution.map(rightVar, witnessDict[var])
+            except KeyError:
+                substitution.map(rightVar, var)
+            substitution.map(leftVar, var)
+
+        # todo: aux vars????
+
+        sub = substitution.get()
+
+        for ineq in self.definition:
+            ineq = ineq.copy()
+            ineq.substitute(sub)
+            res.append(ineq)
+        return res
+
     def getCachedGoals(self, context, witness):
         cache = self.goalCache[witness]
         if cache.goals is None:
-            cache.goals = computeEffected(context, witness.get(), self.firstDomInvisible)
+            cache.goals = [SubGoal(ineq)
+                for ineq in computeEffected(context, witness.get(), self.firstDomInvisible)]
 
             witnessDict = witness.asDict()
 
-            zippedVars = zip(
-                self.leftVars,
-                self.rightVars,
-                self.vars)
+            cache.goals.extend((SubGoal(ineq)
+                for ineq in self.getOrderCondition(witnessDict)))
 
-            substitution = Substitution()
-            for leftVar, rightVar, var in zippedVars:
-                try:
-                    substitution.map(leftVar, witnessDict[var])
-                except KeyError:
-                    substitution.map(leftVar, var)
-                substitution.map(rightVar, var)
+            cache.goals.append(NegatedSubGoals(self.getOrderConditionFlipped(witnessDict)))
 
-            for aux in self.auxVars:
-                try:
-                    substitution.map(aux, witnessDict[aux])
-                except KeyError:
-                    pass
-
-            # # todo: we need to check that the auxVars are still fresh
-            sub = substitution.get()
-
-            # for ineq in self.order.auxDefinition:
-            #     ineq = self.constraint.copy()
-            #     ineq.substitute(sub)
-            #     self.addAvailable(ineq)
-
-            for ineq in self.definition:
-                ineq = ineq.copy()
-                ineq.substitute(sub)
-                cache.goals.append(ineq)
-
-            obj = objectiveCondition(context, witnessDict)
+            obj = objectiveCondition(context, witness.asDict())
             if obj is not None:
-                cache.goals.append(obj)
-
+                if not (obj.copy().negated().isContradiction()):
+                    cache.goals.append(SubGoal(obj))
         return cache.goals
 
 class OrderContext:
@@ -328,7 +361,7 @@ class Irreflexivity(MultiGoalRule):
             self.addAvailable(ineq)
 
         contradiction = context.ineqFactory.fromTerms([], 1)
-        self.addSubgoal(contradiction)
+        self.addSubgoal(SubGoal(contradiction))
 
 
 class TransitivityFreshRight(OrderVarsBase):
@@ -418,7 +451,7 @@ class TransitivityProof(MultiGoalRule):
 
             ineq.substitute(sub)
 
-            self.addSubgoal(ineq)
+            self.addSubgoal(SubGoal(ineq))
 
 class Transitivity(EmptyRule):
     Ids = ["transitivity"]
@@ -526,8 +559,8 @@ class SubVerifier(EmptyRule):
 
 @register_rule
 class StrictOrder(SubVerifier):
-    Ids = ["strict_order"]
-    subRules = [OrderVars, OrderDefinitions, Irreflexivity, Transitivity]
+    Ids = ["pre_order"]
+    subRules = [OrderVars, OrderDefinitions, Transitivity]
 
     @classmethod
     def parse(cls, line, context):
@@ -601,9 +634,6 @@ class AddRedundant(MultiGoalRule):
 
     @classmethod
     def parse(cls, words, context):
-        orderContext = OrderContext.setup(context)
-        order = orderContext.activeOrder
-
         cppWordIter = words.wordIter.getNative()
         ineq = context.ineqFactory.parse(cppWordIter, allowMultiple = False)
 
@@ -614,8 +644,7 @@ class AddRedundant(MultiGoalRule):
 
         substitution = Substitution.parse(
             words = words,
-            ineqFactory = context.ineqFactory,
-            forbidden = order.vars)
+            ineqFactory = context.ineqFactory)
 
         context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
 
@@ -638,24 +667,13 @@ class AddRedundant(MultiGoalRule):
 
     @TimedFunction.time("Redundant.compute")
     def compute(self, antecedents, context):
-        ineq = self.constraint
         witness = self.witness.get()
 
-        if self.autoProveAll:
-            estimateNumEffected = context.propEngine.estimateNumEffected(witness)
-            # rup check would be expensive if we only derive a new
-            # reification, so only do rup check first if there are
-            # many effected constraints, otherwise it will be cheap to
-            # compute the effected constraitns anyway.
-            if estimateNumEffected > 2:
-                if ineq.rupCheck(context.propEngine) or \
-                        context.propEngine.find(ineq) is not None:
-                    self.autoProof(context, antecedents)
-                    return super().compute(antecedents, context)
-
-        negated = ineq.copy().negated()
+        negated = self.constraint.copy().negated()
         self.addAvailable(negated)
 
+        if context.verifierSettings.trace:
+            print("  ** proofgoals from formula **")
 
         effected = computeEffected(context, witness)
         for ineq in effected:
@@ -663,18 +681,29 @@ class AddRedundant(MultiGoalRule):
             if not negated.implies(ineq):
                 stats.numSubgoals += 1
                 assert(ineq.minId != 0)
-                self.addSubgoal(ineq, ineq.minId)
+                self.addSubgoal(SubGoal(ineq), ineq.minId)
 
+
+        if context.verifierSettings.trace:
+            print("  ** proofgoal from satisfying added constraint **")
         ineq = self.constraint.copy()
         ineq.substitute(witness)
-        if not (ineq.copy().negated().isContradiction()):
-            self.addSubgoal(ineq)
+        self.addSubgoal(SubGoal(ineq))
 
+        if context.verifierSettings.trace:
+            print("  ** proofgoals from order **")
+        orderContext = OrderContext.setup(context)
+        order = orderContext.activeOrder
+        orderConditions = order.getOrderCondition(self.witness.asDict())
+        for goal in orderConditions:
+            self.addSubgoal(SubGoal(goal))
 
+        if context.verifierSettings.trace:
+            print("  ** proofgoals from objective **")
         obj = objectiveCondition(context, self.witness.asDict())
         if obj is not None:
             if not (obj.copy().negated().isContradiction()):
-                self.addSubgoal(obj)
+                self.addSubgoal(SubGoal(obj))
 
         if self.autoProveAll:
             self.autoProof(context, antecedents)
@@ -728,10 +757,14 @@ class DominanceRule(MultiGoalRule):
 
         effected = self.order.getCachedGoals(context, self.witness)
 
-        for ineq in effected:
-            assert(ineq.minId != 0)
-            if not negated.implies(ineq):
-                self.addSubgoal(ineq, ineq.minId)
+        for goal in effected:
+            asRhs = goal.getAsRightHand()
+            if asRhs is not None:
+                assert(asRhs.minId != 0)
+                if asRhs.minId == constraintMaxId or not negated.implies(asRhs):
+                    self.addSubgoal(goal, asRhs.minId)
+            else:
+                self.addSubgoal(goal)
 
         if self.autoProveAll:
             self.autoProof(context, antecedents)

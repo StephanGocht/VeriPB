@@ -6,7 +6,7 @@ f
 *	 (most significant variable first; we will encode lex-minimality)
 *	 (negative literal means inverse order -- I THINK)
 * 5 6 7 8 9 10 11 12 17 18 19 20 13 14 15 16 1 2 3 4 
-strict_order exp45
+pre_order exp45
 	vars
 		left u1 u2 u3 u4 u5 u6 u7 u8 u9 u10 u11 u12 u13 u14 u15 u16 u17 u18 u19 u20 
 		right v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17 v18 v19 v20 
@@ -14,14 +14,9 @@ strict_order exp45
 	end
 
 	def
-		-1 u20 1 v20 -2 u19 2 v19 -4 u18 4 v18 -8 u17 8 v17 -16 u16 16 v16 -32 u15 32 v15 -64 u14 64 v14 -128 u13 128 v13 -256 u12 256 v12 -512 u11 512 v11 -1024 u10 1024 v10 -2048 u9 2048 v9 -4096 u8 4096 v8 -8192 u7 8192 v7 -16384 u6 16384 v6 -32768 u5 32768 v5 -65536 u4 65536 v4 -131072 u3 131072 v3 -262144 u2 262144 v2 -524288 u1 524288 v1 >= 1;
+		-1 u20 1 v20 -2 u19 2 v19 -4 u18 4 v18 -8 u17 8 v17 -16 u16 16 v16 -32 u15 32 v15 -64 u14 64 v14 -128 u13 128 v13 -256 u12 256 v12 -512 u11 512 v11 -1024 u10 1024 v10 -2048 u9 2048 v9 -4096 u8 4096 v8 -8192 u7 8192 v7 -16384 u6 16384 v6 -32768 u5 32768 v5 -65536 u4 65536 v4 -131072 u3 131072 v3 -262144 u2 262144 v2 -524288 u1 524288 v1 >= 0;
 	end
 
-	irreflexive
-		proofgoal #1
-			c 1 
-		qed
-	qed
 
 	transitivity
 		vars
@@ -29,8 +24,8 @@ strict_order exp45
 		end
 		proof
 			proofgoal #1
-				p 3 4 + 5 +
-				c 6
+				p 1 2 + 3 +
+				c -1
 			qed
 		qed
 	end
@@ -71,6 +66,12 @@ dom 1 ~x21 1 ~x6 1 x10  >= 1 ;  x1 -> x16 x2 -> x14 x3 -> x15 x4 -> x13 x5 -> x1
 		p 52  50 524288 * +  ; 
 	u >= 1 ; 
 	c 54
+	qed
+
+	proofgoal #2
+		p 55  50 524288 * +
+		u >= 1 ;
+		c -1
 	qed
 qed
 

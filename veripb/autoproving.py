@@ -208,19 +208,35 @@ class Autoprover():
             # if self.selfImplication(nxtGoalId, nxtGoal):
             #     continue
 
-            nxtGoal = nxtGoal.copy().substitute(sub)
+            asRhs = nxtGoal.getAsRightHand()
+            if asRhs is None:
+                asLhs = nxtGoal.getAsLeftHand()
+                for c in asLhs:
+                    if c is not None:
+                        self.propEngine.attach(c, 0)
+                try:
+                    if self.rupImplication(nxtGoalId, self.context.ineqFactory.fromTerms([], 1)):
+                        continue
+                finally:
+                    for c in asLhs:
+                        if c is not None:
+                            self.propEngine.detach(c, 0)
 
-            if self.rupImplication(nxtGoalId, nxtGoal):
-                continue
 
-            # this is already checked when the effected constraints
-            # are computed. However, due to caching it could be that
-            # new constraints were added since then.
-            if self.inDB(nxtGoalId, nxtGoal):
-                continue
+            else:
+                nxtGoal = asRhs.copy().substitute(sub)
 
-            if self.dbImplication(nxtGoalId, nxtGoal):
-                continue
+                if self.rupImplication(nxtGoalId, nxtGoal):
+                    continue
+
+                # this is already checked when the effected constraints
+                # are computed. However, due to caching it could be that
+                # new constraints were added since then.
+                if self.inDB(nxtGoalId, nxtGoal):
+                    continue
+
+                if self.dbImplication(nxtGoalId, nxtGoal):
+                    continue
 
             raise InvalidProof("Could not proof proof goal %s automatically." % (str(nxtGoalId)))
 

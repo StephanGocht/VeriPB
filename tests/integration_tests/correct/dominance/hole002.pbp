@@ -1,7 +1,7 @@
 pseudo-Boolean proof version 1.2
 * load formula
 
-strict_order exp
+pre_order exp
     vars
         left u1 u2 u3 u4 u5 u6
         right v1 v2 v3 v4 v5 v6
@@ -9,10 +9,7 @@ strict_order exp
     qed
 
     def
-       -32 u1 -16 u2 -8 u3 -4 u4 -2 u5 -1 u6 32 v1 16 v2 8 v3 4 v4 2 v5 1 v6 >= 1 ;
-    qed
-
-    irreflexive
+       -32 u1 -16 u2 -8 u3 -4 u4 -2 u5 -1 u6 32 v1 16 v2 8 v3 4 v4 2 v5 1 v6 >= 0 ;
     qed
 
     transitivity
@@ -21,7 +18,7 @@ strict_order exp
         qed
         proof
             proofgoal #1
-                p 2 3 + 4 +
+                p 1 2 + 3 +
                 c -1
             qed
         qed

@@ -107,6 +107,34 @@ class EndOfProof(EmptyRule):
     def numConstraints(self):
         return len(self.subcontext.toAdd)
 
+class NegatedSubGoals:
+    def __init__(self, constraints):
+        self.constraints = constraints
+
+    def getAsLeftHand(self):
+        return self.constraints
+
+    def getAsRightHand(self):
+        return None
+
+    def toString(self, ineqFactory):
+        constraintsString = " ".join([ineqFactory.toString(constraint) for constraint in self.constraints])
+        return "not [%s]" % constraintsString
+
+class SubGoal:
+    def __init__(self, constraint):
+        self.constraint = constraint
+
+    def getAsLeftHand(self):
+        return [self.constraint.copy().negated()]
+
+    def getAsRightHand(self):
+        return self.constraint
+
+    def toString(self, ineqFactory):
+        return ineqFactory.toString(self.constraint)
+
+
 class SubProof(EmptyRule):
     Ids = ["proofgoal"]
 
@@ -142,10 +170,10 @@ class SubProof(EmptyRule):
         f = lambda context, subContext: self.check(context)
         self.subContext.callbacks.append(f)
 
-        constraint = self.subgoals[self.myGoal]
+        subgoal = self.subgoals[self.myGoal]
         del self.subgoals[self.myGoal]
 
-        return [constraint.copy().negated()]
+        return subgoal.getAsLeftHand()
 
     def antecedentIDs(self):
         return []
@@ -186,16 +214,16 @@ class MultiGoalRule(EmptyRule):
         self.nextId = 1
         self.autoProoved = False
 
-    def addSubgoal(self, ineq, Id = None):
+    def addSubgoal(self, goal, Id = None):
         if Id is None or Id == constraintMaxId:
             # the goal does not relate to an existing constraint
             Id = "#%i" % (self.nextId)
             self.nextId += 1
 
         assert(Id not in self.subContext.subgoals)
-        self.subContext.subgoals[Id] = ineq
+        self.subContext.subgoals[Id] = goal
         if self.displayGoals:
-            ineqStr = self.ineqFactory.toString(ineq)
+            ineqStr = goal.toString(self.ineqFactory)
             if isinstance(Id, int):
                 Id = "%03i" % (Id)
             print("  proofgoal %s: %s"%(Id, ineqStr))

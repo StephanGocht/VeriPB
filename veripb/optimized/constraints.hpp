@@ -1648,7 +1648,7 @@ namespace InplaceIneqOps {
                     return false;
                 }
             }
-            return true;
+            return (slack < 0);
         }
     };
 

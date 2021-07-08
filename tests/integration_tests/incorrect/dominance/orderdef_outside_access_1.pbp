@@ -1,8 +1,8 @@
 pseudo-Boolean proof version 1.2
 
-f 2
+f 4
 
-strict_order simple
+pre_order simple
     vars
         left u1
         right v1
@@ -13,19 +13,14 @@ strict_order simple
         -1 u1 1 v1 >= 0 ;
     qed
 
-    irreflexive
-        u >= 1 ;
-        c 2
-    qed
-
     transitivity
         vars
             fresh_right w1
         qed
         proof
-            proofgoal 5
-                p 3 4 + 6 +
-                c 7
+            proofgoal #1
+                p 1 2 + 3 + 4 +
+                c 4
             qed
         qed
     qed

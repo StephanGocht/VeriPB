@@ -94,11 +94,11 @@ class Settings():
         group.add_argument("--arbitraryPrecision",
             action="store_true",
             default=defaults["arbitraryPrecision"],
-            help="Turn on arbitrary precision. Slows down proof checking.",
+            help="(deprecated) Has no effect, arbitraryPrecision is always used.",
             dest=name+".arbitraryPrecision")
         group.add_argument("--no-arbitraryPrecision",
             action="store_false",
-            help="Turn off arbitrary precision.",
+            help="(deprecated) Has no effect, arbitraryPrecision is always used.",
             dest=name+".arbitraryPrecision")
 
         group.add_argument("--freeNames",

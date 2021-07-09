@@ -2568,7 +2568,7 @@ template<typename TInt>
 static CoeffBound getBound(TInt i, CoeffBound base = CoeffBound::trivial) {
     std::array<int64_t,4> bound = {0,1,std::numeric_limits<int32_t>::max(),std::numeric_limits<int64_t>::max()};
     uint group = static_cast<uint>(base);
-    while (i > bound[group]) {
+    while (group < bound.size() && i > bound[group]) {
         group += 1;
     }
     return static_cast<CoeffBound>(group);

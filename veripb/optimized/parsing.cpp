@@ -599,7 +599,7 @@ public:
             if (duplicateDetection.add(lit.var())) {
                 std::cout << lit.var() << std::endl;
                 hasDuplicates = true;
-                throw ParseError(it, "Douplicated variables are not supported in constraints.");
+                // throw ParseError(it, "Douplicated variables are not supported in constraints.");
             }
 
             if (!isSmall) {

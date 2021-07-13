@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <type_traits>
+#include <numeric>
 
 #include "BigInt.hpp"
 
@@ -165,6 +166,84 @@ public:
 
     operator size_t() const {
         return value;
+    }
+};
+
+/* lexicographic order respecting numeric values, i.e. "x2" < "x10" */
+struct numLexOrder {
+    bool operator() (std::string& a, std::string& b) {
+        auto itA = a.begin();
+        auto itB = b.begin();
+
+        bool numMode = false;
+        size_t nZeroA = 0;
+        size_t nZeroB = 0;
+        while (itA != a.end() && itB != b.end()) {
+            if (std::isdigit(*itA) && std::isdigit(*itB)) {
+                if (!numMode) {
+                    nZeroA = 0;
+                    while (itA != a.end() && *itA == '0') {
+                        ++itA; ++nZeroA;
+                    };
+                    nZeroB = 0;
+                    while (itB != b.end() && *itB == '0') {
+                        ++itB; ++nZeroB;
+                    };
+
+                    if (itA == a.end() || itB == b.end()) continue;
+
+                    if (!std::isdigit(*itA) && !std::isdigit(*itB) && nZeroA != nZeroB) {
+                        return nZeroA < nZeroB;
+                    }
+
+                    size_t posA = std::distance(a.begin(), itA);
+                    size_t numEndA = a.find_first_not_of("0123456789",
+                        posA);
+                    numEndA = (numEndA == std::string::npos) ? a.size() : numEndA;
+                    size_t posB = std::distance(b.begin(), itB);
+                    size_t numEndB = b.find_first_not_of("0123456789",
+                        posB);
+                    numEndB = (numEndB == std::string::npos) ? b.size() : numEndB;
+
+                    if (numEndA - posA < numEndB - posB) {
+                        return true;
+                    } else if (numEndA - posA > numEndB - posB) {
+                        return false;
+                    }
+                    numMode = true;
+                    continue;
+                }
+            } else if (numMode) {
+                if (nZeroA < nZeroB) {
+                    return true;
+                } else if (nZeroB < nZeroA) {
+                    return false;
+                }
+                numMode = false;
+            }
+
+            if (*itA < *itB) {
+                return true;
+            } else if (*itA > *itB) {
+                return false;
+            }
+
+            numMode = std::isdigit(*itA);
+            ++itA;
+            ++itB;
+        }
+
+        if (nZeroA < nZeroB) {
+            return true;
+        } else if (nZeroB < nZeroA) {
+            return false;
+        }
+
+        if (itA == a.end() && itB == b.end()) {
+            return false;
+        } else {
+            return itA == a.end();
+        }
     }
 };
 
@@ -1755,12 +1834,27 @@ namespace InplaceIneqOps {
     struct print {
         template<typename TIneq>
         std::ostream& operator()(TIneq& ineq, std::function<std::string(int)> varName, std::ostream& out) {
+            std::vector<size_t> idx(ineq.terms.size());
+            std::iota(idx.begin(), idx.end(), 0);
+
+            std::vector<std::string> names;
+            names.reserve(ineq.terms.size());
+
             for (auto &term: ineq.terms) {
+                names.push_back(varName(term.lit.var()));
+            }
+
+            std::sort(idx.begin(), idx.end(),
+                [&names](size_t i1, size_t i2) {return numLexOrder()(names[i1], names[i2]);});
+
+            for (size_t i = 0; i < idx.size(); ++i) {
+                auto &term = ineq.terms[idx[i]];
                 out << term.coeff << " ";
                 if (term.lit.isNegated()) {
                     out << "~";
                 }
-                out << varName(term.lit.var()) << " ";
+                assert(names[idx[i]] == varName(term.lit.var()));
+                out << names[idx[i]] << " ";
             }
             out << ">= " << ineq.degree;
             return out;

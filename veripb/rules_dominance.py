@@ -277,8 +277,6 @@ class AuxVars(OrderVarsBase):
         order.auxVars.extend(lits)
 
 class OrderVars(EmptyRule):
-    # todo: add check that number of variables matches
-
     Ids = ["vars"]
     subRules = [LeftVars, RightVars, AuxVars, EndOfProof]
 
@@ -291,10 +289,24 @@ class OrderVars(EmptyRule):
 
     def __init__(self, subContext):
         self.subContext = subContext
+        f = lambda context, subContext: self.check(context)
+        subContext.callbacks.append(f)
 
     def allowedRules(self, context, currentRules):
         self.subContext.previousRules = currentRules
         return rules_to_dict(self.subRules)
+
+    def check(self, context):
+        order = OrderContext.setup(context).activeDefinition
+
+        leftSet = set(order.leftVars)
+        rightSet = set(order.rightVars)
+
+        sizes = {len(leftSet), len(rightSet), len(order.leftVars), len(order.rightVars)}
+        if len(sizes) != 1:
+            raise InvalidProof("Number of variables specified in left and right did not match.")
+        if not leftSet.isdisjoint(rightSet):
+            raise InvalidProof("Variables specified in left and right are not disjoint.")
 
 class OrderDefinition(EmptyRule):
     Ids = [""]
@@ -388,8 +400,6 @@ class TransitivityFreshAux2(OrderVarsBase):
 
 
 class TransitivityVars(EmptyRule):
-    # todo: add check that number of variables matches
-
     Ids = ["vars"]
     subRules = [TransitivityFreshRight,TransitivityFreshAux1,TransitivityFreshAux2, EndOfProof]
 
@@ -402,10 +412,26 @@ class TransitivityVars(EmptyRule):
 
     def __init__(self, subContext):
         self.subContext = subContext
+        f = lambda context, subContext: self.check(context)
+        subContext.callbacks.append(f)
 
     def allowedRules(self, context, currentRules):
         self.subContext.previousRules = currentRules
         return rules_to_dict(self.subRules)
+
+    def check(self, context):
+        order = OrderContext.setup(context).activeDefinition
+
+        leftSet = set(order.leftVars)
+        rightSet = set(order.rightVars)
+        freshSet = set(order.transitivity.fresh_right)
+
+        sizes = {len(leftSet), len(rightSet), len(order.leftVars),
+            len(order.rightVars), len(freshSet), len(order.transitivity.fresh_right)}
+        if len(sizes) != 1:
+            raise InvalidProof("Number of variables specified in left and right did not match.")
+        if not leftSet.isdisjoint(freshSet) or not rightSet.isdisjoint(freshSet):
+            raise InvalidProof("Variables specified in left and right are not disjoint.")
 
 class TransitivityProof(MultiGoalRule):
     Ids = ["proof"]

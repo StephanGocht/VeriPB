@@ -693,9 +693,22 @@ class AddRedundant(MultiGoalRule):
 
     @TimedFunction.time("Redundant.compute")
     def compute(self, antecedents, context):
+        ineq = self.constraint
         witness = self.witness.get()
 
-        negated = self.constraint.copy().negated()
+        if self.autoProveAll:
+            estimateNumEffected = context.propEngine.estimateNumEffected(witness)
+            # rup check would be expensive if we only derive a new
+            # reification, so only do rup check first if there are
+            # many effected constraints, otherwise it will be cheap to
+            # compute the effected constraitns anyway.
+            if estimateNumEffected > 2:
+                if ineq.rupCheck(context.propEngine) or \
+                        context.propEngine.find(ineq) is not None:
+                    self.autoProof(context, antecedents)
+                    return super().compute(antecedents, context)
+
+        negated = ineq.copy().negated()
         self.addAvailable(negated)
 
         if context.verifierSettings.trace:

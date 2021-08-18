@@ -13,15 +13,9 @@ HPP_FILES:=\
 	./veripb/optimized/BigInt.hpp \
 	./veripb/optimized/constraints.hpp
 
-CYTHON:=\
-	./veripb/rules.py \
-	./veripb/rules_dominance.py \
-	./veripb/parser.py \
-	./veripb/autoproving.py \
-	./veripb/rules_multigoal.py \
-	./veripb/constraints.py
+PYTHON:=$(shell find veripb -name "*.py")
 
-CYTHON_COMPILED_C=$(CYTHON:.py=.c)
+PYTHON_COMPILED_C=$(PYTHON:.py=.c)
 
 # if you want to use asan you need prepend the following
 # when running veripb, if compiled with gcc
@@ -86,4 +80,4 @@ dist:
 clean:
 	find . -name "*.so" -delete
 	find . -name "*.o" -delete
-	rm $(CYTHON_COMPILED_C) -f
+	rm $(PYTHON_COMPILED_C) -f

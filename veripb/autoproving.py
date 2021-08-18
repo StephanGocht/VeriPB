@@ -200,7 +200,7 @@ class Autoprover():
             sub = self.assignment.get()
 
         while self.subgoals:
-            nxtGoalId, nxtGoal = self.subgoals.popitem()
+            nxtGoalId, nxtGoal = self.subgoals.popleft()
 
             ## for performance reasons the following two checks are
             ## done directly when the effected constraints are computed
@@ -242,8 +242,11 @@ class Autoprover():
 
 
 def autoProof(context, db, subgoals):
-    if not subgoals:
+    goals = deque( ((nxtGoalId, nxtGoal) for nxtGoalId, nxtGoal in subgoals.items() if not nxtGoal.isProven) )
+    subgoals.clear()
+
+    if not goals:
         return
 
-    prover = Autoprover(context, db, subgoals)
+    prover = Autoprover(context, db, goals)
     prover()

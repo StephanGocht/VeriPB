@@ -718,10 +718,13 @@ class AddRedundant(MultiGoalRule):
         effected = computeEffected(context, witness)
         for ineq in effected:
             stats.numGoalCandidates += 1
-            if not negated.implies(ineq):
+            goal = SubGoal(ineq)
+            if negated.implies(ineq):
+                goal.isProven = True
+            else:
                 stats.numSubgoals += 1
-                assert(ineq.minId != 0)
-                self.addSubgoal(SubGoal(ineq), ineq.minId)
+            assert(ineq.minId != 0)
+            self.addSubgoal(goal, ineq.minId)
 
 
         if context.verifierSettings.trace:
@@ -738,15 +741,20 @@ class AddRedundant(MultiGoalRule):
         witnessDict = self.witness.asDict()
         if not order.varsSet.isdisjoint(witnessDict):
             orderConditions = order.getOrderCondition(self.witness.asDict())
-            for goal in orderConditions:
-                self.addSubgoal(SubGoal(goal))
+            for ineq in orderConditions:
+                subgoal = SubGoal(ineq)
+                if negated.implies(ineq):
+                    goal.isProven = True
+                self.addSubgoal(subgoal)
 
         if context.verifierSettings.trace:
             print("  ** proofgoals from objective **")
         obj = objectiveCondition(context, self.witness.asDict())
         if obj is not None:
-            if not (obj.copy().negated().isContradiction()):
-                self.addSubgoal(SubGoal(obj))
+            subgoal = SubGoal(obj)
+            if obj.copy().negated().isContradiction() or negated.implies(obj):
+                subgoal.isProven = True
+            self.addSubgoal(subgoal)
 
         if self.autoProveAll:
             self.autoProof(context, antecedents)
@@ -804,8 +812,9 @@ class DominanceRule(MultiGoalRule):
             asRhs = goal.getAsRightHand()
             if asRhs is not None:
                 assert(asRhs.minId != 0)
-                if asRhs.minId == constraintMaxId or not negated.implies(asRhs):
-                    self.addSubgoal(goal, asRhs.minId)
+                if negated.implies(asRhs):
+                    goal.isProven = True
+                self.addSubgoal(goal, asRhs.minId)
             else:
                 self.addSubgoal(goal)
 

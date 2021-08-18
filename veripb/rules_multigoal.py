@@ -62,9 +62,8 @@ class SubContext():
             callback(self.context, oldContext)
 
         if checkSubgoals and len(oldContext.subgoals) > 0:
-            for Id, ineq in oldContext.subgoals.items():
-                ineq = self.context.ineqFactory.toString(ineq)
-                raise InvalidProof("Open subgoal not proven: %s:, %s"%(str(Id), ineq))
+            for Id, subgoal in oldContext.subgoals.items():
+                raise InvalidProof("Open subgoal not proven: %s: %s"%(str(Id), subgoal.toString(self.context.ineqFactory)))
 
         return oldContext
 
@@ -110,6 +109,7 @@ class EndOfProof(EmptyRule):
 class NegatedSubGoals:
     def __init__(self, constraints):
         self.constraints = constraints
+        self.isProven = False
 
     def getAsLeftHand(self):
         return self.constraints
@@ -121,9 +121,13 @@ class NegatedSubGoals:
         constraintsString = " ".join([ineqFactory.toString(constraint) for constraint in self.constraints])
         return "not [%s]" % constraintsString
 
+    def isProven():
+        return False
+
 class SubGoal:
     def __init__(self, constraint):
         self.constraint = constraint
+        self.isProven = False
 
     def getAsLeftHand(self):
         return [self.constraint.copy().negated()]

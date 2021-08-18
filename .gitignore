@@ -15,9 +15,7 @@ veripb/autoproving.c
 veripb/parser.c
 veripb/rules_dominance.c
 veripb/verifier.c
-veripb/exceptions.c
 veripb/rules_multigoal.c
-veripb/timed_function.c
 veripb/optimized/.rendered.*.cpp
 veripb/optimized/.rendered.constraints
 veripb/optimized/constraints

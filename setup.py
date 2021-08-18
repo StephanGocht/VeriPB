@@ -32,10 +32,8 @@ ext_modules = [
     Extension('veripb.rules_dominance', sources=['veripb/rules_dominance.py']),
     Extension('veripb.parser', sources=['veripb/parser.py']),
     Extension('veripb.autoproving', sources=['veripb/autoproving.py']),
-    Extension('veripb.exceptions', sources=['veripb/exceptions.py']),
     Extension('veripb.constraints', sources=['veripb/constraints.py']),
     Extension('veripb.rules_multigoal', sources=['veripb/rules_multigoal.py']),
-    Extension('veripb.timed_function', sources=['veripb/timed_function.py']),
 ]
 
 for e in ext_modules:

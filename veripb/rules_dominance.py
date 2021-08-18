@@ -175,6 +175,7 @@ class OrderContext:
             self.activeOrder.reset()
 
         order.vars = lits
+        order.varsSet = set(lits)
         order.firstDomInvisible = firstDomInvisible
         self.activeOrder = order
 
@@ -733,9 +734,12 @@ class AddRedundant(MultiGoalRule):
             print("  ** proofgoals from order **")
         orderContext = OrderContext.setup(context)
         order = orderContext.activeOrder
-        orderConditions = order.getOrderCondition(self.witness.asDict())
-        for goal in orderConditions:
-            self.addSubgoal(SubGoal(goal))
+
+        witnessDict = self.witness.asDict()
+        if not order.varsSet.isdisjoint(witnessDict):
+            orderConditions = order.getOrderCondition(self.witness.asDict())
+            for goal in orderConditions:
+                self.addSubgoal(SubGoal(goal))
 
         if context.verifierSettings.trace:
             print("  ** proofgoals from objective **")

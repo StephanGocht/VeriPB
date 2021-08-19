@@ -833,6 +833,7 @@ public:
 
     void conflict() {
         current.conflict = true;
+        trailUnchanged = false;
     }
 
     bool isConflicting() {
@@ -905,7 +906,8 @@ public:
     }
 
     void propagate() {
-        while (current.qhead < trail.size()) {
+        trailUnchanged = false;
+        while (!trailUnchanged && !isConflicting()) {
             trailUnchanged = true;
             for (Propagator* propagator: propagators) {
                 propagator->propagate();
@@ -913,10 +915,8 @@ public:
                     break;
                 }
             }
-            if (trailUnchanged) {
-                current.qhead = trail.size();
-            }
         }
+        current.qhead = trail.size();
     }
 
     void undoOne() {
@@ -1901,7 +1901,7 @@ public:
         const auto& trail = propMaster.getTrail();
         // std::cout << "IneqPropagator: propagating from: " << qhead << std::endl;
         // std::cout << *this << std::endl;
-        while (qhead < trail.size() and !propMaster.isConflicting()) {
+        while (qhead < trail.size() && !propMaster.isConflicting()) {
             Lit falsifiedLit = ~trail[qhead];
             // std::cout << "propagating: " << trail[qhead] << std::endl;
 

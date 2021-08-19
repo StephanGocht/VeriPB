@@ -793,6 +793,7 @@ private:
     Assignment phase;
     std::vector<Lit> trail;
     std::vector<ReasonPtr> reasons;
+    ReasonPtr conflictReason;
 
 
     PropState current;
@@ -810,7 +811,7 @@ private:
 
 public:
     std::vector<Propagator*> propagators;
-    std::chrono::duration<double> timeCleanupTrail;
+    std::chrono::duration<double> timeCleanupTrail = std::chrono::seconds(1);
 
     const Assignment& getAssignment() {return assignment;}
     const Assignment& getPhase() {return phase;}
@@ -831,9 +832,20 @@ public:
         }
     }
 
-    void conflict() {
-        current.conflict = true;
-        trailUnchanged = false;
+    void conflict(ReasonPtr&& reason) {
+        if (!current.conflict) {
+            assert(conflictReason == nullptr);
+            current.conflict = true;
+            trailUnchanged = false;
+            // if a conflict is already set we can not overwrite the
+            // previous conflict reason, because otherwise rup and sat
+            // checks can cause to overwrite the conflict reason, and
+            // will not reset it, so that isTrailClean() will fail and
+            // the verifyier might get stuck in an unsatisfiable state
+            // causing incorectly accepted proofs.
+            conflictReason = std::move(reason);
+            conflictReason->setIsReason();
+        }
     }
 
     bool isConflicting() {
@@ -854,8 +866,12 @@ public:
     }
 
     bool isTrailClean() {
+        if (conflictReason && conflictReason->isMarkedForDeletion()) {
+            return false;
+        }
+
         for (ReasonPtr& reason: reasons) {
-            if (reason->isMarkedForDeletion()) {
+            if (reason && reason->isMarkedForDeletion()) {
                 return false;
             }
         }
@@ -865,9 +881,6 @@ public:
 
     void cleanupTrail() {
         Timer timer(timeCleanupTrail);
-        if (isTrailClean()) {
-            return;
-        }
 
         std::vector<ReasonPtr> oldReasons;
         std::swap(oldReasons, reasons);
@@ -936,6 +949,10 @@ public:
 
         while (trail.size() > resetState.qhead) {
             undoOne();
+        }
+
+        if (!resetState.conflict) {
+            conflictReason = nullptr;
         }
 
         current = resetState;
@@ -1136,7 +1153,7 @@ public:
         }
 
         if (numFound == 0) {
-            prop.propMaster.conflict();
+            prop.propMaster.conflict(ClauseReason::aquire(*this, prop));
         }
 
         if (this->terms.size() >= 2) {
@@ -1479,7 +1496,7 @@ public:
         // }
 
         if (slack < 0) {
-            prop.propMaster.conflict();
+            prop.propMaster.conflict(IneqReason<T>::aquire(*this, prop));
             // prop.visit_required += 1;
         } else if (slack < maxCoeff) {
             for (size_t i = 0; i < this->watchSize; i++) {
@@ -2023,11 +2040,11 @@ public:
     LitIndexedVec<OccursList> occurs;
     std::vector<Inequality<T>*> unattached;
     std::vector<Inequality<T>*> propagatingAt0;
-    std::chrono::duration<double> timeEffected;
-    std::chrono::duration<double> timeFind;
-    std::chrono::duration<double> timeInitProp;
-    std::chrono::duration<double> timePropagate;
-    std::chrono::duration<double> timeRUP;
+    std::chrono::duration<double> timeEffected = std::chrono::seconds(1);
+    std::chrono::duration<double> timeFind = std::chrono::seconds(1);
+    std::chrono::duration<double> timeInitProp = std::chrono::seconds(1);
+    std::chrono::duration<double> timePropagate = std::chrono::seconds(1);
+    std::chrono::duration<double> timeRUP = std::chrono::seconds(1);
 
 
     long long visit = 0;
@@ -2124,7 +2141,7 @@ public:
             if (val == State::Unassigned) {
                 propMaster.enqueue(l, nullptr);
             } else if (val == State::False) {
-                propMaster.conflict();
+                propMaster.conflict(nullptr);
                 break;
             }
         }
@@ -2263,9 +2280,6 @@ public:
                     assert(unattached.back() == ineq);
                     unattached.pop_back();
                 } else {
-                    if (ineq->isReason()) {
-                        hasDetached = true;
-                    }
                     if (ineq->isPropagatingAt0()) {
                         auto& propagating = propagatingAt0;
                         propagating.erase(
@@ -2280,8 +2294,10 @@ public:
                         );
                     }
 
+                    if (ineq->isReason()) {
+                        hasDetached = true;
+                    }
                     ineq->clearWatches(*this);
-
                     ineq->markedForDeletion();
                 }
             }
@@ -2378,6 +2394,10 @@ public:
             Timer timer(engine.timeRUP);
             engine.initPropagation();
             engine.propagate();
+
+            if (engine.propMaster.isConflicting()) {
+                return true;
+            }
 
             FixedSizeInequalityHandler<T>& negated = engine.negated;
             negated.replace_new(redundant.terms.size(), redundant.terms.size(),
@@ -2919,21 +2939,22 @@ public:
     }
 
     void freeze(size_t numVars) {
-        contract();
-        assert(!frozen);
+        if (!frozen) {
+            contract();
 
-        if (handle->typeId != TypeId::Clause) {
-            CoeffBound termBound = handle->getBoundTerms();
-            CoeffBound degreeBound = handle->getBoundDegree();
-            if (termBound == CoeffBound::one && degreeBound == CoeffBound::one) {
-                ClauseHandler clauseManager = unpacked::call(
-                    InplaceIneqOps::makeHandler<Clause>(), handle.get());
-                HandlePtr clauseHandle = make_handle(std::move(clauseManager));
-                std::swap(clauseHandle, handle);
+            if (handle->typeId != TypeId::Clause) {
+                CoeffBound termBound = handle->getBoundTerms();
+                CoeffBound degreeBound = handle->getBoundDegree();
+                if (termBound == CoeffBound::one && degreeBound == CoeffBound::one) {
+                    ClauseHandler clauseManager = unpacked::call(
+                        InplaceIneqOps::makeHandler<Clause>(), handle.get());
+                    HandlePtr clauseHandle = make_handle(std::move(clauseManager));
+                    std::swap(clauseHandle, handle);
+                }
             }
-        }
 
-        frozen = true;
+            frozen = true;
+        }
     }
 
     void clearWatches(PropEngine<T>& prop) {

@@ -137,6 +137,7 @@ class Autoprover():
         self.db = db
         self.dbSubstituted = None
         self.dbSet = None
+        self.assignment = None
 
     # @TimedFunction.time("Autoprover::propagate")
     def propagate(self):
@@ -170,7 +171,8 @@ class Autoprover():
     def dbImplication(self, nxtGoalId, nxtGoal):
         success = False
         if self.dbSubstituted is None:
-            self.dbSubstituted = [(Id, ineq.copy().substitute(self.assignment.get())) for Id, ineq in self.db]
+            asmnt = self.getPropagatedAssignment().get()
+            self.dbSubstituted = [(Id, ineq.copy().substitute(asmnt)) for Id, ineq in self.db]
 
         for ineqId, ineq in self.dbSubstituted:
             if ineq.implies(nxtGoal):
@@ -192,13 +194,15 @@ class Autoprover():
             return True
         return False
 
-    @TimedFunction.time("Autoprover")
-    def __call__(self):
-        if self.subgoals:
+
+    def getPropagatedAssignment(self):
+        if self.assignment is None:
             self.propagate()
 
-            sub = self.assignment.get()
+        return self.assignment
 
+    @TimedFunction.time("Autoprover")
+    def __call__(self):
         while self.subgoals:
             nxtGoalId, nxtGoal = self.subgoals.popleft()
 
@@ -224,10 +228,14 @@ class Autoprover():
 
 
             else:
-                nxtGoal = asRhs.copy().substitute(sub)
+                nxtGoal = asRhs.copy()
 
                 if self.rupImplication(nxtGoalId, nxtGoal):
                     continue
+
+                # implication checks are stronger if we plug in propagated literals
+                asmnt = self.getPropagatedAssignment().get()
+                nxtGoal = nxtGoal.substitute(asmnt)
 
                 # this is already checked when the effected constraints
                 # are computed. However, due to caching it could be that

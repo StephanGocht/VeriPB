@@ -605,7 +605,10 @@ template<typename T>
 class PropEngine;
 
 struct PropState {
+    // qhead is the point in the trail until which propagations were
+    // performed exhaustively
     size_t qhead = 0;
+    size_t trailSize = 0;
     bool conflict = false;
 };
 
@@ -858,6 +861,7 @@ public:
         assignment.assign(lit);
         phase.assign(lit);
         trail.push_back(lit);
+        current.trailSize = trail.size();
         reasons.emplace_back(std::move(reason));
         if (!isTemporary && reasons.back().get() != nullptr) {
             reasons.back()->setIsReason();
@@ -947,7 +951,7 @@ public:
             propagator->undo_trail_till(resetState.qhead);
         }
 
-        while (trail.size() > resetState.qhead) {
+        while (trail.size() > resetState.trailSize) {
             undoOne();
         }
 
@@ -2416,7 +2420,12 @@ public:
         bool operator()(const TIneq& redundant, PropEngine<T>& engine) {
             Timer timer(engine.timeRUP);
             engine.initPropagation();
-            engine.propagate();
+            static size_t magic = 0;
+            magic += 1;
+            if (magic > 10) {
+                engine.propagate();
+                magic = 0;
+            }
 
             if (engine.propMaster.isConflicting()) {
                 return true;

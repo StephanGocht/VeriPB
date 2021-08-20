@@ -1426,6 +1426,12 @@ public:
         // use statick variable to avoid reinizialisation for BigInts,
         // prevents prallel or recursive execution!
         static T slack;
+        // We will only compute slack if a propagation / conflict can
+        // potentially occur, that is if we do not have enough
+        // watches, or at least one watch is falsified and can not be
+        // replaced. This is intended to improve performance on large
+        // coefficients, where computing the slack can be time
+        // consuming.
         bool computeSlack = !enoughWatches;
         if (computeSlack) {
             slack = -this->degree;
@@ -2420,6 +2426,19 @@ public:
         bool operator()(const TIneq& redundant, PropEngine<T>& engine) {
             Timer timer(engine.timeRUP);
             engine.initPropagation();
+
+            // Fully propagating is too time consuming in some cases
+            // in connection with redundancy checks. Consider that we
+            // want to check F, \neg C, \neg D |- \bot in a redundancy
+            // check. Propagating F, \neg C might take quite some time
+            // but together with \neg D we arrive at conflict quickly.
+            // This can happen especially if F contains constraints
+            // with huge coefficients. However, never doing the
+            // propagation as a pre step would mean that a pure RUP
+            // proof is never reusing a trail and is instead
+            // propagating all units in every step. By propagating
+            // every 10th time we should achieve reasonable
+            // performance for both cases.
             static size_t magic = 0;
             magic += 1;
             if (magic > 10) {

@@ -1221,6 +1221,7 @@ template<typename T>
 class FixedSizeInequality {
 private:
     uint32_t watchSize = 0;
+    bool enoughWatches = false;
 
     using TElement = Term<T>;
     using TVec = std::conditional_t<
@@ -1318,6 +1319,9 @@ private:
         }
 
         watchSize = i;
+        if (value >= maxCoeff) {
+            enoughWatches = true;
+        }
     }
 
 public:
@@ -1418,7 +1422,10 @@ public:
         // use statick variable to avoid reinizialisation for BigInts,
         // prevents prallel or recursive execution!
         static T slack;
-        slack = -this->degree;
+        bool computeSlack = !enoughWatches;
+        if (computeSlack) {
+            slack = -this->degree;
+        }
 
         size_t j = this->watchSize;
         size_t k = this->watchSize;
@@ -1453,7 +1460,9 @@ public:
                 if (init) {for (;k < terms.size(); k++) {
                     if (prop.propMaster.getPhase()[terms[k].lit] == State::True) {
                         swapWatch(prop,i,k,keepWatch,blockingLiteral,falsifiedLit,init);
-                        slack += terms[i].coeff;
+                        if (computeSlack) {
+                            slack += terms[i].coeff;
+                        }
                         k++;
                         goto found_new_watch;
                     }
@@ -1461,16 +1470,28 @@ public:
                 for (;j < terms.size(); j++) {
                     if (value[terms[j].lit] != State::False) {
                         swapWatch(prop,i,j,keepWatch,blockingLiteral,falsifiedLit,init);
-                        slack += terms[i].coeff;
+                        if (computeSlack) {
+                            slack += terms[i].coeff;
+                        }
                         j++;
                         goto found_new_watch;
+                    }
+                }
+
+                if (!computeSlack) {
+                    computeSlack = true;
+                    slack = -this->degree;
+                    for (size_t l = 0; l < i; ++l) {
+                        slack += terms[l].coeff;
                     }
                 }
 
                 found_new_watch:
                 ;
             } else {
-                slack += terms[i].coeff;
+                if (computeSlack) {
+                    slack += terms[i].coeff;
+                }
 
                 if (init) {
                     WatchInfo<FixedSizeInequality<T>> w;
@@ -1479,7 +1500,7 @@ public:
                 }
             }
 
-            if (std::abs(terms[i].coeff) >= degree) {
+            if (blockingLiteral == Lit::Undef() && std::abs(terms[i].coeff) >= degree) {
                 blockingLiteral = terms[i].lit;
             }
         }
@@ -1495,18 +1516,20 @@ public:
         //     prop.visit_sat += 1;
         // }
 
-        if (slack < 0) {
-            prop.propMaster.conflict(IneqReason<T>::aquire(*this, prop));
-            // prop.visit_required += 1;
-        } else if (slack < maxCoeff) {
-            for (size_t i = 0; i < this->watchSize; i++) {
-                if (terms[i].coeff > slack
-                    && value[terms[i].lit] == State::Unassigned)
-                {
-                    prop.propMaster.enqueue(
-                        terms[i].lit,
-                        IneqReason<T>::aquire(*this, prop));
-                    // prop.visit_required += 1;
+        if (computeSlack) {
+            if (slack < 0) {
+                prop.propMaster.conflict(IneqReason<T>::aquire(*this, prop));
+                // prop.visit_required += 1;
+            } else if (slack < maxCoeff) {
+                for (size_t i = 0; i < this->watchSize; i++) {
+                    if (terms[i].coeff > slack
+                        && value[terms[i].lit] == State::Unassigned)
+                    {
+                        prop.propMaster.enqueue(
+                            terms[i].lit,
+                            IneqReason<T>::aquire(*this, prop));
+                        // prop.visit_required += 1;
+                    }
                 }
             }
         }

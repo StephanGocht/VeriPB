@@ -773,15 +773,21 @@ public:
 };
 
 
+class PropagationMaster;
+
 class Propagator {
 protected:
     size_t qhead = 0;
 
 public:
+    PropagationMaster& propMaster;
+
+    Propagator(PropagationMaster& _propMaster);
+
     virtual void propagate() = 0;
     virtual void cleanupWatches() = 0;
     virtual void increaseNumVarsTo(size_t) = 0;
-    virtual void undo_trail_till(size_t pos) {
+    virtual void reset(size_t pos) {
         if (qhead > pos)
             qhead = pos;
     };
@@ -812,8 +818,9 @@ private:
 
     friend class AutoReset;
 
+    std::vector<Propagator*> knownPropagators;
+    std::vector<Propagator*> activePropagators;
 public:
-    std::vector<Propagator*> propagators;
     std::chrono::duration<double> timeCleanupTrail = std::chrono::seconds(1);
 
     const Assignment& getAssignment() {return assignment;}
@@ -827,10 +834,24 @@ public:
         trail.reserve(nVars);
     }
 
+    void addPropagator(Propagator& propagator) {
+        knownPropagators.push_back(&propagator);
+    }
+
+    void activatePropagator(Propagator& propagator) {
+        activePropagators.push_back(&propagator);
+    }
+
+    void deactivatePropagator(Propagator& propagator) {
+        activePropagators.erase(
+            std::find(activePropagators.begin(), activePropagators.end(), &propagator)
+        );
+    }
+
     void increaseNumVarsTo(size_t _nVars) {
         assignment.resize(_nVars);
         phase.resize(_nVars);
-        for (Propagator* propagator: propagators) {
+        for (Propagator* propagator: knownPropagators) {
             propagator->increaseNumVarsTo(_nVars);
         }
     }
@@ -917,7 +938,7 @@ public:
     }
 
     void cleanupWatches() {
-        for (Propagator* propagator: propagators) {
+        for (Propagator* propagator: knownPropagators) {
             propagator->cleanupWatches();
         }
     }
@@ -926,7 +947,7 @@ public:
         trailUnchanged = false;
         while (!trailUnchanged && !isConflicting()) {
             trailUnchanged = true;
-            for (Propagator* propagator: propagators) {
+            for (Propagator* propagator: activePropagators) {
                 propagator->propagate();
                 if (!trailUnchanged) {
                     break;
@@ -947,8 +968,8 @@ public:
 
     void reset(PropState resetState) {
         // std::cout << "Reset to trail pos " << resetState.qhead << std::endl;
-        for (Propagator* propagator: propagators) {
-            propagator->undo_trail_till(resetState.qhead);
+        for (Propagator* propagator: knownPropagators) {
+            propagator->reset(resetState.qhead);
         }
 
         while (trail.size() > resetState.trailSize) {
@@ -970,11 +991,10 @@ public:
     using WatchedType = WatchInfo<Clause>;
     using WatchList = std::vector<WatchedType>;
 
-    PropagationMaster& propMaster;
     LitIndexedVec<WatchList> watchlist;
 
     ClausePropagator(PropagationMaster& _propMaster, size_t nVars)
-        : propMaster(_propMaster)
+        : Propagator(_propMaster)
         , watchlist(2 * (nVars + 1))
     {
 
@@ -1933,11 +1953,10 @@ public:
     typedef WatchInfo<FixedSizeInequality<T>> WatchedType;
     typedef std::vector<WatchedType> WatchList;
 
-    PropagationMaster& propMaster;
     LitIndexedVec<WatchList> watchlist;
 
     IneqPropagator(PropagationMaster& _propMaster, size_t _nVars)
-        : propMaster(_propMaster)
+        : Propagator(_propMaster)
         , watchlist(2 * (_nVars + 1))
     {
         // for (auto& ws: watchlist) {
@@ -2048,6 +2067,113 @@ public:
     }
 };
 
+template<typename T>
+class PropagatorGroup {
+public:
+    PropagationMaster& propMaster;
+    std::vector<Inequality<T>*> propagatingAt0;
+
+    IneqPropagator<T> ineqPropagator;
+    IneqPropagator<int32_t> ineq32Propagator;
+    ClausePropagator clausePropagator;
+
+    PropagatorGroup(PropagationMaster& _propMaster, size_t _nVars)
+        : propMaster(_propMaster)
+        , ineqPropagator(_propMaster, _nVars)
+        , ineq32Propagator(_propMaster, _nVars)
+        , clausePropagator(_propMaster, _nVars)
+
+    {}
+
+    void activatePropagators() {
+        propMaster.activatePropagator(clausePropagator);
+        propMaster.activatePropagator(ineq32Propagator);
+        propMaster.activatePropagator(ineqPropagator);
+    }
+
+    void deactivatePropagators() {
+        propMaster.deactivatePropagator(clausePropagator);
+        propMaster.deactivatePropagator(ineq32Propagator);
+        propMaster.deactivatePropagator(ineqPropagator);
+    }
+
+    void doPropagationsAt0() {
+        for (Inequality<T>* ineq: this->propagatingAt0) {
+            ineq->updateWatch(*this);
+        }
+    }
+
+    void add(Inequality<T>& ineq) {
+        if (ineq.isPropagatingAt0()) {
+            this->propagatingAt0.push_back(&ineq);
+        }
+
+        ineq.initWatch(*this);
+    }
+
+    void remove(Inequality<T>& ineq) {
+        if (ineq.isPropagatingAt0()) {
+            propagatingAt0.erase(
+                std::remove_if(
+                    propagatingAt0.begin(),
+                    propagatingAt0.end(),
+                    [&ineq](auto& other){
+                        return other == &ineq;
+                    }
+                ),
+                propagatingAt0.end()
+            );
+        }
+
+        // we need to clear the watches now, a lazy removal is not
+        // possible, because the constraint is not necessarily
+        // deleted, but may be reattached to a different set.
+        ineq.clearWatches(*this);
+    }
+
+    struct initWatch {
+        void operator()(FixedSizeInequality<T>& constraint, PropagatorGroup<T>& engine) {
+            constraint.initWatch(engine.ineqPropagator);
+        }
+
+        void operator()(FixedSizeInequality<int32_t>& constraint, PropagatorGroup<T>& engine) {
+            constraint.initWatch(engine.ineq32Propagator);
+        }
+
+        void operator()(Clause& constraint, PropagatorGroup<T>& engine) {
+            constraint.initWatch(engine.clausePropagator);
+        }
+    };
+
+    struct clearWatch {
+        void operator()(FixedSizeInequality<T>& constraint, PropagatorGroup<T>& engine) {
+            constraint.clearWatches(engine.ineqPropagator);
+        }
+
+        void operator()(FixedSizeInequality<int32_t>& constraint, PropagatorGroup<T>& engine) {
+            constraint.clearWatches(engine.ineq32Propagator);
+        }
+
+        void operator()(Clause& constraint, PropagatorGroup<T>& engine) {
+            constraint.clearWatches(engine.clausePropagator);
+        }
+    };
+
+    struct updateWatches {
+        void operator()(FixedSizeInequality<T>& constraint, PropagatorGroup<T>& engine) {
+            constraint.updateWatch(engine.ineqPropagator);
+        }
+
+        void operator()(FixedSizeInequality<int32_t>& constraint, PropagatorGroup<T>& engine) {
+            constraint.updateWatch(engine.ineq32Propagator);
+        }
+
+        void operator()(Clause& constraint, PropagatorGroup<T>& engine) {
+            constraint.updateWatch(engine.clausePropagator);
+        }
+    };
+};
+
 
 template<typename T>
 class PropEngine {
@@ -2073,13 +2199,10 @@ private:
     bool hasDetached = false;
 
 public:
-    IneqPropagator<T> ineqPropagator;
-    IneqPropagator<int32_t> ineq32Propagator;
-    ClausePropagator clausePropagator;
+    PropagatorGroup<T> core;
 
     LitIndexedVec<OccursList> occurs;
     std::vector<Inequality<T>*> unattached;
-    std::vector<Inequality<T>*> propagatingAt0;
     std::chrono::duration<double> timeEffected = std::chrono::seconds(1);
     std::chrono::duration<double> timeFind = std::chrono::seconds(1);
     std::chrono::duration<double> timeInitProp = std::chrono::seconds(1);
@@ -2097,18 +2220,14 @@ public:
         : nVars(_nVars)
         , propMaster(_nVars)
         , tmpPropagator(propMaster, _nVars)
-        , ineqPropagator(propMaster, _nVars)
-        , ineq32Propagator(propMaster, _nVars)
-        , clausePropagator(propMaster, _nVars)
+        , core(propMaster, _nVars)
         , occurs(2 * (_nVars + 1))
         , timeEffected(0)
         , timeFind(0)
         , timeInitProp(0)
         , timeRUP(0)
     {
-        propMaster.propagators.push_back(&clausePropagator);
-        propMaster.propagators.push_back(&ineq32Propagator);
-        propMaster.propagators.push_back(&ineqPropagator);
+        core.activatePropagators();
     }
 
     void printStats() {
@@ -2210,14 +2329,9 @@ public:
         return propagate4sat(lits);
     }
 
-    void _attach(Inequality<T>* ineq) {
-        ineq->wasAttached = true;
-
-        if (ineq->isPropagatingAt0()) {
-            this->propagatingAt0.push_back(ineq);
-        }
-
-        ineq->initWatch(*this);
+    void _attach(Inequality<T>& ineq) {
+        ineq.wasAttached = true;
+        core.add(ineq);
     }
 
     Inequality<T>* attach(Inequality<T>* toAttach, uint64_t id) {
@@ -2250,9 +2364,7 @@ public:
         if (hasDetached) {
             if (!propMaster.isTrailClean()) {
                 propMaster.cleanupTrail();
-                for (Inequality<T>* ineq: this->propagatingAt0) {
-                    ineq->updateWatch(*this);
-                }
+                core.doPropagationsAt0();
             }
             // either cleanupWatches here or when detached, currently
             // watches should be cleaned while detached
@@ -2270,7 +2382,7 @@ public:
     void attachUnattached() {
         for (Inequality<T>* ineq: unattached) {
             if (ineq != nullptr) {
-                _attach(ineq);
+                _attach(*ineq);
             }
         }
         unattached.clear();
@@ -2320,24 +2432,11 @@ public:
                     assert(unattached.back() == ineq);
                     unattached.pop_back();
                 } else {
-                    if (ineq->isPropagatingAt0()) {
-                        auto& propagating = propagatingAt0;
-                        propagating.erase(
-                            std::remove_if(
-                                propagating.begin(),
-                                propagating.end(),
-                                [ineq](auto& other){
-                                    return other == ineq;
-                                }
-                            ),
-                            propagating.end()
-                        );
-                    }
+                    core.remove(*ineq);
 
                     if (ineq->isReason()) {
                         hasDetached = true;
                     }
-                    ineq->clearWatches(*this);
                     ineq->markedForDeletion();
                 }
             }
@@ -2464,14 +2563,13 @@ public:
                 AutoReset reset(engine.propMaster);
                 InplaceIneqOps::negate()(*negated.ineq);
 
-                engine.tmpPropagator.increaseNumVarsTo(engine.nVars);
-                engine.propMaster.propagators.push_back(&engine.tmpPropagator);
+                engine.propMaster.activatePropagator(engine.tmpPropagator);
                 negated->initWatch(engine.tmpPropagator);
 
                 engine.propagate();
 
                 negated->clearWatches(engine.tmpPropagator);
-                engine.propMaster.propagators.pop_back();
+                engine.propMaster.deactivatePropagator(engine.tmpPropagator);
                 // for (Lit lit : this->trail) {
                 //     std::cout << lit << " ";
                 // }
@@ -2499,47 +2597,7 @@ public:
         }
     };
 
-    struct initWatch {
-        void operator()(FixedSizeInequality<T>& constraint, PropEngine<T>& engine) {
-            constraint.initWatch(engine.ineqPropagator);
-        }
 
-        void operator()(FixedSizeInequality<int32_t>& constraint, PropEngine<T>& engine) {
-            constraint.initWatch(engine.ineq32Propagator);
-        }
-
-        void operator()(Clause& constraint, PropEngine<T>& engine) {
-            constraint.initWatch(engine.clausePropagator);
-        }
-    };
-
-    struct clearWatch {
-        void operator()(FixedSizeInequality<T>& constraint, PropEngine<T>& engine) {
-            constraint.clearWatches(engine.ineqPropagator);
-        }
-
-        void operator()(FixedSizeInequality<int32_t>& constraint, PropEngine<T>& engine) {
-            constraint.clearWatches(engine.ineq32Propagator);
-        }
-
-        void operator()(Clause& constraint, PropEngine<T>& engine) {
-            constraint.clearWatches(engine.clausePropagator);
-        }
-    };
-
-    struct updateWatches {
-        void operator()(FixedSizeInequality<T>& constraint, PropEngine<T>& engine) {
-            constraint.updateWatch(engine.ineqPropagator);
-        }
-
-        void operator()(FixedSizeInequality<int32_t>& constraint, PropEngine<T>& engine) {
-            constraint.updateWatch(engine.ineq32Propagator);
-        }
-
-        void operator()(Clause& constraint, PropEngine<T>& engine) {
-            constraint.updateWatch(engine.clausePropagator);
-        }
-    };
 };
 
 /**
@@ -3015,9 +3073,9 @@ public:
         }
     }
 
-    void clearWatches(PropEngine<T>& prop) {
+    void clearWatches(PropagatorGroup<T>& prop) {
         assert(frozen);
-        unpacked::call(typename PropEngine<T>::clearWatch(), handle.get(), prop);
+        unpacked::call(typename PropagatorGroup<T>::clearWatch(), handle.get(), prop);
     }
 
     void markedForDeletion() {
@@ -3029,14 +3087,14 @@ public:
         return handle->isPropagatingAt0();
     }
 
-    void initWatch(PropEngine<T>& prop) {
+    void initWatch(PropagatorGroup<T>& prop) {
         assert(frozen && "Call freeze() first.");
-        unpacked::call(typename PropEngine<T>::initWatch(), handle.get(), prop);
+        unpacked::call(typename PropagatorGroup<T>::initWatch(), handle.get(), prop);
     }
 
-    void updateWatch(PropEngine<T>& prop) {
+    void updateWatch(PropagatorGroup<T>& prop) {
         assert(frozen && "Call freeze() first.");
-        unpacked::call(typename PropEngine<T>::updateWatches(), handle.get(), prop);
+        unpacked::call(typename PropagatorGroup<T>::updateWatches(), handle.get(), prop);
     }
 
     Inequality& saturate(){

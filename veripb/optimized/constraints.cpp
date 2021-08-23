@@ -8,6 +8,13 @@
 
 #include "constraints.hpp"
 
+
+Propagator::Propagator(PropagationMaster& _propMaster)
+    : propMaster(_propMaster)
+{
+    propMaster.addPropagator(*this);
+}
+
 long divideAndRoundUp(long value, BigInt divisor) {
     BigInt result = ((value + divisor - 1) / divisor);
     return result.get_si();

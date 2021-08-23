@@ -143,8 +143,7 @@ class Order:
 
             obj = objectiveCondition(context, witness.asDict())
             if obj is not None:
-                if not (obj.copy().negated().isContradiction()):
-                    cache.goals.append(SubGoal(obj))
+                cache.goals.append(SubGoal(obj))
         return cache.goals
 
 class OrderContext:
@@ -752,7 +751,7 @@ class AddRedundant(MultiGoalRule):
         obj = objectiveCondition(context, self.witness.asDict())
         if obj is not None:
             subgoal = SubGoal(obj)
-            if obj.copy().negated().isContradiction() or negated.implies(obj):
+            if negated.implies(obj):
                 subgoal.isProven = True
             self.addSubgoal(subgoal)
 

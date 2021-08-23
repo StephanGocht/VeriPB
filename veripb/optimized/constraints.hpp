@@ -1781,6 +1781,13 @@ namespace InplaceIneqOps {
         }
     };
 
+    struct isTrivial {
+        template<typename TIneq>
+        bool operator()(TIneq& ineq) {
+            return ineq.degree <= 0;
+        }
+    };
+
 
     struct equals {
         template<typename TIneqA, typename TIneqB>
@@ -3181,6 +3188,11 @@ public:
     bool isContradiction(){
         contract();
         return unpacked::call(InplaceIneqOps::isContradiction(), handle.get());
+    }
+
+    bool isTrivial(){
+        contract();
+        return unpacked::call(InplaceIneqOps::isTrivial(), handle.get());
     }
 
     size_t mem() {

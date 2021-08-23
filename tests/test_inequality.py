@@ -427,6 +427,27 @@ class TestInequality(unittest.TestCase):
         a = a.substitute(CppSubstitution([], [1,2], [2,1]))
         assert(a == b)
 
+    def test_isTrivial_1(self):
+        a = geq([], 0)
+        print(a)
+        assert a.isTrivial()
+
+    def test_isTrivial_2(self):
+        a = geq([(1,1)], 0)
+        assert a.isTrivial()
+
+    def test_isTrivial_2(self):
+        a = geq([(1,1)], 1)
+        assert not a.isTrivial()
+
+    def test_isTrivial_3(self):
+        a = geq([(-1,1)], 0)
+        assert not a.isTrivial()
+
+    def test_isTrivial_4(self):
+        a = geq([], 1)
+        assert not a.isTrivial()
+
     def test_contradiction_1(self):
         a = geq([], 0)
         assert not a.isContradiction()

@@ -229,6 +229,10 @@ class Autoprover():
 
             else:
                 nxtGoal = asRhs.copy()
+                if nxtGoal.isTrivial():
+                    if self.verbose:
+                        print("    automatically proved %s, constraint is trivial." % (str(nxtGoalId)))
+                    continue
 
                 if self.rupImplication(nxtGoalId, nxtGoal):
                     continue

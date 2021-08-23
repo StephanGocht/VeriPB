@@ -150,6 +150,7 @@ int hashColision = 0;
             .def("toString", &Inequality<CoefType>::toString)
             .def("toOPB", &Inequality<CoefType>::repr)
             .def("isContradiction", &Inequality<CoefType>::isContradiction)
+            .def("isTrivial", &Inequality<CoefType>::isTrivial)
             .def("substitute", &Inequality<CoefType>::substitute)
             .def("weaken", &Inequality<CoefType>::weaken);
         cppIneq.attr("__hash__") = py::none();

@@ -1000,6 +1000,13 @@ public:
 
     }
 
+    void clear() {
+        reset(0);
+        for (WatchList& wl:watchlist) {
+            wl.clear();
+        }
+    }
+
     void watch(Lit lit, WatchedType& w) {
         // std::cout << "adding watch  " << lit << std::endl;
         watchlist[lit].push_back(w);
@@ -1964,6 +1971,12 @@ public:
         // }
     }
 
+    void clear() {
+        reset(0);
+        for (WatchList& wl:watchlist) {
+            wl.clear();
+        }
+    }
 
     void watch(Lit lit, WatchedType& w) {
         watchlist[lit].push_back(w);
@@ -2072,6 +2085,7 @@ class PropagatorGroup {
 public:
     PropagationMaster& propMaster;
     std::vector<Inequality<T>*> propagatingAt0;
+    std::unordered_set<Inequality<T>*> all;
 
     IneqPropagator<T> ineqPropagator;
     IneqPropagator<int32_t> ineq32Propagator;
@@ -2084,6 +2098,28 @@ public:
         , clausePropagator(_propMaster, _nVars)
 
     {}
+
+    void clear() {
+        clausePropagator.clear();
+        ineq32Propagator.clear();
+        ineqPropagator.clear();
+        propagatingAt0.clear();
+        all.clear();
+    }
+
+    void transferFrom(PropagatorGroup& other) {
+        for (Inequality<T>* ineq: other.all) {
+            ineq.initWatch(*this);
+        }
+
+        all.insert(other.begin(), other.end());
+        std::copy(
+            other.propagatingAt0.begin(),
+            other.propagatingAt0.end(),
+            std::back_inserter(propagatingAt0));
+
+        other.clear();
+    }
 
     void activatePropagators() {
         propMaster.activatePropagator(clausePropagator);
@@ -2104,6 +2140,8 @@ public:
     }
 
     void add(Inequality<T>& ineq) {
+        all.insert(&ineq);
+
         if (ineq.isPropagatingAt0()) {
             this->propagatingAt0.push_back(&ineq);
         }
@@ -2112,6 +2150,8 @@ public:
     }
 
     void remove(Inequality<T>& ineq) {
+        all.erase(&ineq);
+
         if (ineq.isPropagatingAt0()) {
             propagatingAt0.erase(
                 std::remove_if(
@@ -2365,10 +2405,26 @@ public:
         return ineq;
     }
 
+    void moveAllToCore() {
+        for (Inequality<T>* ineq: derived.all) {
+            ineq.isCoreConstraint = true;
+        }
+        core.transferFrom(derived);
+    }
+
+    void moveMultipleToCore(std::vector<Inequality<T>*> ineqs) {
+        for (Inequality<T>* ineq: ineqs) {
+            if (ineq != nullptr) {
+                moveToCore(*ineq);
+            }
+        }
+    }
+
     void moveToCore(Inequality<T>& ineq) {
         assert(ineq.isCoreConstraint == false);
         derived.remove(ineq);
         core.add(ineq);
+        ineq.isCoreConstraint = true;
     }
 
     void initPropagation() {

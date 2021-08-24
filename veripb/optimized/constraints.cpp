@@ -137,7 +137,13 @@ int hashColision = 0;
             .def("printStats", &PropEngine<CoefType>::printStats)
             .def("computeEffected", &PropEngine<CoefType>::computeEffected)
             .def("estimateNumEffected", &PropEngine<CoefType>::estimateNumEffected)
-            .def("find", &PropEngine<CoefType>::find);
+            .def("find", &PropEngine<CoefType>::find)
+            .def("moveToCore", &PropEngine<CoefType>::computeEffected)
+            .def("moveMultipleToCore", &PropEngine<CoefType>::computeEffected)
+            .def("moveAllToCore", &PropEngine<CoefType>::computeEffected);
+
+
+
 
         auto cppIneq = py::class_<Inequality<CoefType>>(m, "CppInequality")
             .def(py::init<std::vector<CoefType>&, std::vector<int>&, CoefType>())

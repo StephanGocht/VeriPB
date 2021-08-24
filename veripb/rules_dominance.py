@@ -21,8 +21,8 @@ from collections import defaultdict
 
 
 #@TimedFunction.time("computeEffected")
-def computeEffected(context, substitution, maxId = constraintMaxId):
-    return context.propEngine.computeEffected(substitution, maxId)
+def computeEffected(context, substitution, onlyCore = False):
+    return context.propEngine.computeEffected(substitution, onlyCore)
 
 class TransitivityInfo:
     def __init__(self):
@@ -49,10 +49,6 @@ class Order:
         # when order is loaded.
         self.vars = None
 
-        # Id of the first auxiliary constraint that do not need to be
-        # checked during dominance breaking.
-        self.firstDomInvisible = None
-
         self.transitivity = TransitivityInfo()
         self.irreflexivityProven = False
 
@@ -64,7 +60,6 @@ class Order:
 
     def reset(self):
         self.goalCache = defaultdict(GoalCache)
-        self.firstDomInvisible = None
         self.vars = None
 
     def getOrderCondition(self, witnessDict):
@@ -132,7 +127,7 @@ class Order:
         cache = self.goalCache[witness]
         if cache.goals is None:
             cache.goals = [SubGoal(ineq)
-                for ineq in computeEffected(context, witness.get(), self.firstDomInvisible)]
+                for ineq in computeEffected(context, witness.get(), True)]
 
             witnessDict = witness.asDict()
 
@@ -167,15 +162,14 @@ class OrderContext:
         self.activeDefinition = None
 
     def resetToEmptyOrder(self):
-        self.activateOrder(self.emptyOrder, [], 1)
+        self.activateOrder(self.emptyOrder, [])
 
-    def activateOrder(self, order, lits, firstDomInvisible):
+    def activateOrder(self, order, lits):
         if self.activeOrder is not None:
             self.activeOrder.reset()
 
         order.vars = lits
         order.varsSet = set(lits)
-        order.firstDomInvisible = firstDomInvisible
         self.activeOrder = order
 
     def newOrder(self, name):
@@ -214,11 +208,6 @@ class LoadOrder(EmptyRule):
             lits = []
             for nxt in words:
                 lit = context.ineqFactory.lit2int(nxt)
-
-                if lit < 0:
-                    raise ValueError("The order variables"
-                        "may not be negated variables.")
-
                 lits.append(lit)
 
             try:
@@ -232,9 +221,13 @@ class LoadOrder(EmptyRule):
                 "variables. Expected: %i, Got: %i"
                 % (len(order.vars), len(order.leftVars)))
 
-        orderContext.activateOrder(order, lits, context.firstFreeId)
+        orderContext.activateOrder(order, lits)
 
         return cls()
+
+    def compute(self, antecedents, context):
+        context.propEngine.moveAllToCore()
+        return []
 
 class OrderVarsBase(EmptyRule):
     @classmethod

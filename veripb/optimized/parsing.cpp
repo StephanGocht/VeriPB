@@ -458,7 +458,7 @@ template<typename T>
 class Formula {
 private:
     std::vector<std::unique_ptr<Inequality<T>>> constraints;
-    bool isCoreSet = false;
+    bool needToSetCore = true;
 
 public:
     bool hasObjective = false;
@@ -473,12 +473,12 @@ public:
         std::vector<Inequality<T>*> result;
         result.reserve(constraints.size());
         for (auto& ptr: constraints) {
-            if (isCoreSet) {
+            if (needToSetCore) {
                 ptr->isCoreConstraint = true;
             }
             result.push_back(ptr.get());
         }
-        isCoreSet = true;
+        needToSetCore = false;
         return result;
     }
 

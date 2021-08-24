@@ -39,7 +39,7 @@ PYBINDINCLUDE:=`python3 -m pybind11 --includes`
 .PHONY: install test all
 
 #all: install
-all: dev
+all: cpp
 
 dev: testparser
 

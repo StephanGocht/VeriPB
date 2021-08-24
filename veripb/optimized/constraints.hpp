@@ -2086,6 +2086,11 @@ public:
     PropagationMaster& propMaster;
     std::vector<Inequality<T>*> propagatingAt0;
     std::unordered_set<Inequality<T>*> all;
+    std::unordered_set<Inequality<T>*> unattached;
+    std::unordered_set<Inequality<T>*> unregisteredOccurences;
+
+    typedef std::unordered_set<Inequality<T>*>  OccursList;
+    LitIndexedVec<OccursList> occurs;
 
     IneqPropagator<T> ineqPropagator;
     IneqPropagator<int32_t> ineq32Propagator;
@@ -2093,6 +2098,7 @@ public:
 
     PropagatorGroup(PropagationMaster& _propMaster, size_t _nVars)
         : propMaster(_propMaster)
+        , occurs(2 * (_nVars + 1))
         , ineqPropagator(_propMaster, _nVars)
         , ineq32Propagator(_propMaster, _nVars)
         , clausePropagator(_propMaster, _nVars)
@@ -2100,23 +2106,28 @@ public:
     {}
 
     void clear() {
+        propagatingAt0.clear();
+        all.clear();
+        unattached.clear();
+        unregisteredOccurences.clear();
+
+        for (OccursList& ol:occurs) {
+            ol.clear();
+        }
+
         clausePropagator.clear();
         ineq32Propagator.clear();
         ineqPropagator.clear();
-        propagatingAt0.clear();
-        all.clear();
+    }
+
+    void increaseNumVarsTo(size_t nVars) {
+        occurs.resize(2 * (nVars + 1));
     }
 
     void transferFrom(PropagatorGroup& other) {
         for (Inequality<T>* ineq: other.all) {
-            ineq.initWatch(*this);
+            add(*ineq);
         }
-
-        all.insert(other.begin(), other.end());
-        std::copy(
-            other.propagatingAt0.begin(),
-            other.propagatingAt0.end(),
-            std::back_inserter(propagatingAt0));
 
         other.clear();
     }
@@ -2139,19 +2150,32 @@ public:
         }
     }
 
+    void attachUnattached() {
+        for (Inequality<T>* ineq: this->unattached) {
+            ineq->wasAttached = true;
+            ineq->initWatch(*this);
+        }
+        this->unattached.clear();
+    }
+
+    void registerOccurences() {
+        for (Inequality<T>* ineq: this->unregisteredOccurences) {
+            ineq->registerOccurence(*this);
+        }
+        this->unregisteredOccurences.clear();
+    }
+
     void add(Inequality<T>& ineq) {
         all.insert(&ineq);
+        unattached.insert(&ineq);
+        unregisteredOccurences.insert(&ineq);
 
         if (ineq.isPropagatingAt0()) {
             this->propagatingAt0.push_back(&ineq);
         }
-
-        ineq.initWatch(*this);
     }
 
     void remove(Inequality<T>& ineq) {
-        all.erase(&ineq);
-
         if (ineq.isPropagatingAt0()) {
             propagatingAt0.erase(
                 std::remove_if(
@@ -2165,10 +2189,55 @@ public:
             );
         }
 
-        // we need to clear the watches now, a lazy removal is not
-        // possible, because the constraint is not necessarily
-        // deleted, but may be reattached to a different set.
-        ineq.clearWatches(*this);
+        all.erase(&ineq);
+
+        size_t size;
+
+        size = unattached.size();
+        unattached.erase(&ineq);
+        if (size == unattached.size()) {
+            // we need to clear the watches now, a lazy removal is not
+            // possible, because the constraint is not necessarily
+            // deleted, but may be reattached to a different set.
+            ineq.clearWatches(*this);
+        }
+
+        size = unregisteredOccurences.size();
+        unregisteredOccurences.erase(&ineq);
+        if (size == unregisteredOccurences.size()) {
+            ineq.unRegisterOccurence(*this);
+        }
+    }
+
+    long long estimateNumEffected(Substitution& sub) {
+        long long estimate = 0;
+        for (auto it: sub.map) {
+            Lit from = it.first;
+            Lit to   = it.second;
+
+            if (to != Substitution::one()) {
+                estimate += occurs[from].size();
+            }
+        }
+        return estimate;
+    }
+
+    std::unordered_set<Inequality<T>*> computeEffected(Substitution& sub) {
+        registerOccurences();
+        std::unordered_set<Inequality<T>*> unique;
+        for (auto it: sub.map) {
+            Lit from = it.first;
+            Lit to   = it.second;
+
+            // constraints are normalized, if a literal is set to
+            // one then this is the same as weakening, hence we do
+            // not need to add it to the set of effected
+            // constraints
+            if (to != Substitution::one()) {
+                unique.insert(occurs[from].begin(), occurs[to].end());
+            }
+        }
+        return unique;
     }
 
     struct initWatch {
@@ -2212,13 +2281,32 @@ public:
             constraint.updateWatch(engine.clausePropagator);
         }
     };
+
+
+    struct addOccurence {
+        template<typename TIneq>
+        void operator()(TIneq& ineq, PropagatorGroup<T>& engine, Inequality<T>& w){
+            for (auto& term: ineq.terms) {
+                engine.occurs[term.lit].emplace(&w);
+            }
+        }
+    };
+
+    struct rmOccurence {
+        template<typename TIneq>
+        void operator()(TIneq& ineq, PropagatorGroup<T>& engine, Inequality<T>& w){
+            for (auto& term: ineq.terms) {
+                engine.occurs[term.lit].erase(&w);
+            }
+        }
+    };
 };
 
 
 template<typename T>
 class PropEngine {
 private:
-    typedef std::unordered_set<Inequality<T>*>  OccursList;
+
 
     typedef Inequality<T> Ineq;
     std::unordered_set<Ineq*, PointedHash<Ineq>, PointedEq<Ineq>> constraintLookup;
@@ -2242,7 +2330,7 @@ public:
     PropagatorGroup<T> core;
     PropagatorGroup<T> derived;
 
-    LitIndexedVec<OccursList> occurs;
+
     std::vector<Inequality<T>*> unattached;
     std::chrono::duration<double> timeEffected = std::chrono::seconds(1);
     std::chrono::duration<double> timeFind = std::chrono::seconds(1);
@@ -2263,7 +2351,6 @@ public:
         , tmpPropagator(propMaster, _nVars)
         , core(propMaster, _nVars)
         , derived(propMaster, _nVars)
-        , occurs(2 * (_nVars + 1))
         , timeEffected(0)
         , timeFind(0)
         , timeInitProp(0)
@@ -2324,7 +2411,8 @@ public:
         if (nVars < _nVars) {
             this->nVars = _nVars;
             propMaster.increaseNumVarsTo(_nVars);
-            occurs.resize(2 * (_nVars + 1));
+            core.increaseNumVarsTo(_nVars);
+            derived.increaseNumVarsTo(_nVars);
         }
     }
 
@@ -2372,15 +2460,6 @@ public:
         return propagate4sat(lits);
     }
 
-    void _attach(Inequality<T>& ineq) {
-        ineq.wasAttached = true;
-        if (ineq.isCoreConstraint) {
-            core.add(ineq);
-        } else {
-            derived.add(ineq);
-        }
-    }
-
     Inequality<T>* attach(Inequality<T>* toAttach, uint64_t id) {
         Inequality<T>* ineq;
         toAttach->contract();
@@ -2396,18 +2475,22 @@ public:
         if (!ineq->isAttached) {
             ineq->isAttached = true;
             ineq->freeze(this->nVars);
-            ineq->registerOccurence(*this);
             dbMem += ineq->mem();
             cumDbMem += ineq->mem();
             maxDbMem = std::max(dbMem, maxDbMem);
-            unattached.push_back(ineq);
+
+            if (ineq->isCoreConstraint) {
+                core.add(*ineq);
+            } else {
+                derived.add(*ineq);
+            }
         }
         return ineq;
     }
 
     void moveAllToCore() {
         for (Inequality<T>* ineq: derived.all) {
-            ineq.isCoreConstraint = true;
+            ineq->isCoreConstraint = true;
         }
         core.transferFrom(derived);
     }
@@ -2443,19 +2526,11 @@ public:
             hasDetached = false;
         }
 
-        attachUnattached();
+        core.attachUnattached();
+        derived.attachUnattached();
         // std::cout << "after init:\n";
         // std::cout << clausePropagator;
         // propagate();
-    }
-
-    void attachUnattached() {
-        for (Inequality<T>* ineq: unattached) {
-            if (ineq != nullptr) {
-                _attach(*ineq);
-            }
-        }
-        unattached.clear();
     }
 
     int attachCount(Inequality<T>* ineq) {
@@ -2489,7 +2564,6 @@ public:
 
             if (ineq->isAttached && ineq->ids.size() == 0) {
                 ineq->isAttached = false;
-                ineq->unRegisterOccurence(*this);
                 constraintLookup.erase(ineq);
                 lookup_requests += 1;
 
@@ -2538,47 +2612,34 @@ public:
     }
 
     long long estimateNumEffected(Substitution& sub) {
-        long long estimate = 0;
-        for (auto it: sub.map) {
-            Lit from = it.first;
-            Lit to   = it.second;
+        return core.estimateNumEffected(sub) + derived.estimateNumEffected(sub);
+    }
 
-            if (to != Substitution::one()) {
-                estimate += occurs[from].size();
-            }
+    void addIfNeccessary(std::vector<InequalityPtr<T>>& result, Inequality<T>* ineq, Substitution& sub) {
+        InequalityPtr<T> rhs = ineq->copy();
+        rhs->substitute(sub);
+        if (!ineq->implies(*rhs) && !find(rhs.get())
+            ) {
+            result.emplace_back(std::move(rhs));
         }
-        return estimate;
     }
 
     std::vector<InequalityPtr<T>> computeEffected(
             Substitution& sub,
-            uint64_t includeIds = std::numeric_limits<uint64_t>::max())
+            bool onlyCore = false)
     {
         Timer timer(timeEffected);
-        std::unordered_set<Inequality<T>*> unique;
-        for (auto it: sub.map) {
-            Lit from = it.first;
-            Lit to   = it.second;
 
-            // constraints are normalized, if a literal is set to
-            // one then this is the same as weakening, hence we do
-            // not need to add it to the set of effected
-            // constraints
-            if (to != Substitution::one()) {
-                unique.insert(occurs[from].begin(), occurs[to].end());
-            }
-        }
 
         std::vector<InequalityPtr<T>> result;
+        for (Inequality<T>* ineq: core.computeEffected(sub)) {
+            addIfNeccessary(result, ineq, sub);
+        }
 
-        for (Inequality<T>* ineq: unique) {
-            if (ineq->minId <= includeIds) {
-                InequalityPtr<T> rhs = ineq->copy();
-                rhs->substitute(sub);
-                if (!ineq->implies(*rhs) && !find(rhs.get())
-                    ) {
-                    result.emplace_back(std::move(rhs));
-                }
+
+        if (!onlyCore) {
+            for (Inequality<T>* ineq: derived.computeEffected(sub)) {
+                addIfNeccessary(result, ineq, sub);
             }
         }
 
@@ -2652,26 +2713,6 @@ public:
             }
         }
     };
-
-    struct addOccurence {
-        template<typename TIneq>
-        void operator()(TIneq& ineq, PropEngine<T>& engine, Inequality<T>& w){
-            for (auto& term: ineq.terms) {
-                engine.occurs[term.lit].emplace(&w);
-            }
-        }
-    };
-
-    struct rmOccurence {
-        template<typename TIneq>
-        void operator()(TIneq& ineq, PropEngine<T>& engine, Inequality<T>& w){
-            for (auto& term: ineq.terms) {
-                engine.occurs[term.lit].erase(&w);
-            }
-        }
-    };
-
-
 };
 
 /**
@@ -3333,14 +3374,14 @@ public:
         return handle->mem();
     }
 
-    void registerOccurence(PropEngine<T>& prop) {
+    void registerOccurence(PropagatorGroup<T>& prop) {
         assert(frozen);
-        return unpacked::call(typename PropEngine<T>::addOccurence(), handle.get(), prop, *this);
+        return unpacked::call(typename PropagatorGroup<T>::addOccurence(), handle.get(), prop, *this);
     }
 
-    void unRegisterOccurence(PropEngine<T>& prop) {
+    void unRegisterOccurence(PropagatorGroup<T>& prop) {
         assert(frozen);
-        return unpacked::call(typename PropEngine<T>::rmOccurence(), handle.get(), prop, *this);
+        return unpacked::call(typename PropagatorGroup<T>::rmOccurence(), handle.get(), prop, *this);
     }
 };
 

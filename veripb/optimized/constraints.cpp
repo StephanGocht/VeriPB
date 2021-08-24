@@ -138,9 +138,9 @@ int hashColision = 0;
             .def("computeEffected", &PropEngine<CoefType>::computeEffected)
             .def("estimateNumEffected", &PropEngine<CoefType>::estimateNumEffected)
             .def("find", &PropEngine<CoefType>::find)
-            .def("moveToCore", &PropEngine<CoefType>::computeEffected)
-            .def("moveMultipleToCore", &PropEngine<CoefType>::computeEffected)
-            .def("moveAllToCore", &PropEngine<CoefType>::computeEffected);
+            .def("moveToCore", &PropEngine<CoefType>::moveToCore)
+            .def("moveMultipleToCore", &PropEngine<CoefType>::moveMultipleToCore)
+            .def("moveAllToCore", &PropEngine<CoefType>::moveAllToCore);
 
 
 

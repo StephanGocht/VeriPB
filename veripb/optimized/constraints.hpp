@@ -2200,6 +2200,7 @@ private:
 
 public:
     PropagatorGroup<T> core;
+    PropagatorGroup<T> derived;
 
     LitIndexedVec<OccursList> occurs;
     std::vector<Inequality<T>*> unattached;
@@ -2221,6 +2222,7 @@ public:
         , propMaster(_nVars)
         , tmpPropagator(propMaster, _nVars)
         , core(propMaster, _nVars)
+        , derived(propMaster, _nVars)
         , occurs(2 * (_nVars + 1))
         , timeEffected(0)
         , timeFind(0)
@@ -2228,6 +2230,7 @@ public:
         , timeRUP(0)
     {
         core.activatePropagators();
+        derived.activatePropagators();
     }
 
     void printStats() {
@@ -2331,7 +2334,11 @@ public:
 
     void _attach(Inequality<T>& ineq) {
         ineq.wasAttached = true;
-        core.add(ineq);
+        if (ineq.isCoreConstraint) {
+            core.add(ineq);
+        } else {
+            derived.add(ineq);
+        }
     }
 
     Inequality<T>* attach(Inequality<T>* toAttach, uint64_t id) {
@@ -2358,6 +2365,12 @@ public:
         return ineq;
     }
 
+    void moveToCore(Inequality<T>& ineq) {
+        assert(ineq.isCoreConstraint == false);
+        derived.remove(ineq);
+        core.add(ineq);
+    }
+
     void initPropagation() {
         Timer timer(timeInitProp);
 
@@ -2365,6 +2378,7 @@ public:
             if (!propMaster.isTrailClean()) {
                 propMaster.cleanupTrail();
                 core.doPropagationsAt0();
+                derived.doPropagationsAt0();
             }
             // either cleanupWatches here or when detached, currently
             // watches should be cleaned while detached
@@ -2432,7 +2446,11 @@ public:
                     assert(unattached.back() == ineq);
                     unattached.pop_back();
                 } else {
-                    core.remove(*ineq);
+                    if (ineq->isCoreConstraint) {
+                        core.remove(*ineq);
+                    } else {
+                        derived.remove(*ineq);
+                    }
 
                     if (ineq->isReason()) {
                         hasDetached = true;
@@ -2992,6 +3010,7 @@ private:
 public:
     bool isAttached = false;
     bool wasAttached = false;
+    bool isCoreConstraint = false;
     uint64_t minId = std::numeric_limits<uint64_t>::max();
     std::unordered_set<uint64_t> ids;
     uint detachCount = 0;

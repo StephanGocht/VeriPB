@@ -2210,6 +2210,7 @@ public:
     }
 
     long long estimateNumEffected(Substitution& sub) {
+        registerOccurences();
         long long estimate = 0;
         for (auto it: sub.map) {
             Lit from = it.first;
@@ -2330,8 +2331,6 @@ public:
     PropagatorGroup<T> core;
     PropagatorGroup<T> derived;
 
-
-    std::vector<Inequality<T>*> unattached;
     std::chrono::duration<double> timeEffected = std::chrono::seconds(1);
     std::chrono::duration<double> timeFind = std::chrono::seconds(1);
     std::chrono::duration<double> timeInitProp = std::chrono::seconds(1);
@@ -2356,8 +2355,8 @@ public:
         , timeInitProp(0)
         , timeRUP(0)
     {
-        core.activatePropagators();
         derived.activatePropagators();
+        core.activatePropagators();
     }
 
     void printStats() {
@@ -2568,25 +2567,17 @@ public:
                 lookup_requests += 1;
 
                 dbMem -= ineq->mem();
-                auto foundIt = std::find(
-                    unattached.rbegin(), unattached.rend(), ineq);
 
-                if (foundIt != unattached.rend()) {
-                    std::swap(*foundIt, unattached.back());
-                    assert(unattached.back() == ineq);
-                    unattached.pop_back();
+                if (ineq->isCoreConstraint) {
+                    core.remove(*ineq);
                 } else {
-                    if (ineq->isCoreConstraint) {
-                        core.remove(*ineq);
-                    } else {
-                        derived.remove(*ineq);
-                    }
-
-                    if (ineq->isReason()) {
-                        hasDetached = true;
-                    }
-                    ineq->markedForDeletion();
+                    derived.remove(*ineq);
                 }
+
+                if (ineq->isReason()) {
+                    hasDetached = true;
+                }
+                ineq->markedForDeletion();
             }
         }
     }

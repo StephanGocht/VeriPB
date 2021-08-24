@@ -1,0 +1,29 @@
+pseudo-Boolean proof version 1.1
+f 0
+pre_order simple
+    vars
+        left u1
+        right v1
+        aux
+    qed
+
+    def
+        -1 u1 1 v1 >= 0 ;
+    qed
+
+    transitivity
+        vars
+            fresh_right w1
+        qed
+        proof
+            proofgoal #1
+                p 1 2 + 3 +
+                c -1
+            qed
+        qed
+    qed
+qed
+load_order simple x1
+dom 1 ~x1 >= 1 ; x1 -> 0
+load_order simple ~x1
+dom 1 x1 >= 1 ; x1 -> 1

@@ -2020,6 +2020,7 @@ public:
 
                 bool keepWatch = true;
                 if (propMaster.getAssignment().value[next->other] != State::True) {
+                    assert(next->ineq->header.isMarkedForDeletion == false);
                     keepWatch = next->ineq->updateWatch(*this, falsifiedLit);
                 }
                 if (keepWatch) {
@@ -2086,8 +2087,8 @@ public:
     PropagationMaster& propMaster;
     std::vector<Inequality<T>*> propagatingAt0;
     std::unordered_set<Inequality<T>*> all;
-    std::unordered_set<Inequality<T>*> unattached;
-    std::unordered_set<Inequality<T>*> unregisteredOccurences;
+    std::vector<Inequality<T>*> unattached;
+    std::vector<Inequality<T>*> unregisteredOccurences;
 
     typedef std::unordered_set<Inequality<T>*>  OccursList;
     LitIndexedVec<OccursList> occurs;
@@ -2167,8 +2168,8 @@ public:
 
     void add(Inequality<T>& ineq) {
         all.insert(&ineq);
-        unattached.insert(&ineq);
-        unregisteredOccurences.insert(&ineq);
+        unattached.push_back(&ineq);
+        unregisteredOccurences.push_back(&ineq);
 
         if (ineq.isPropagatingAt0()) {
             this->propagatingAt0.push_back(&ineq);
@@ -2178,12 +2179,10 @@ public:
     void remove(Inequality<T>& ineq) {
         if (ineq.isPropagatingAt0()) {
             propagatingAt0.erase(
-                std::remove_if(
+                std::remove(
                     propagatingAt0.begin(),
                     propagatingAt0.end(),
-                    [&ineq](auto& other){
-                        return other == &ineq;
-                    }
+                    &ineq
                 ),
                 propagatingAt0.end()
             );
@@ -2194,7 +2193,7 @@ public:
         size_t size;
 
         size = unattached.size();
-        unattached.erase(&ineq);
+        unattached.erase(std::remove(unattached.begin(), unattached.end(), &ineq), unattached.end());
         if (size == unattached.size()) {
             // we need to clear the watches now, a lazy removal is not
             // possible, because the constraint is not necessarily
@@ -2203,7 +2202,7 @@ public:
         }
 
         size = unregisteredOccurences.size();
-        unregisteredOccurences.erase(&ineq);
+        unregisteredOccurences.erase(std::remove(unregisteredOccurences.begin(), unregisteredOccurences.end(), &ineq), unregisteredOccurences.end());
         if (size == unregisteredOccurences.size()) {
             ineq.unRegisterOccurence(*this);
         }

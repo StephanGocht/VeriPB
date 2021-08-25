@@ -55,6 +55,7 @@ void ClausePropagator::propagate() {
 
             bool keepWatch = true;
             if (assignment.value[next->other] != State::True) {
+                assert(next->ineq->header.isMarkedForDeletion == false);
                 keepWatch = next->ineq->updateWatch(*this, falsifiedLit, false);
             }
             if (keepWatch) {

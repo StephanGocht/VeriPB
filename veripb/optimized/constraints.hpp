@@ -13,9 +13,9 @@
 #include <iomanip>
 #include <type_traits>
 #include <numeric>
+#include <list>
 
 #include "BigInt.hpp"
-#include "SwitchSet.hpp"
 
 #ifndef NDEBUG
     #include <unistd.h>
@@ -2086,12 +2086,20 @@ public:
 
 template<typename T>
 class PropagatorGroup {
+private:
+    std::array<std::list<Inequality<T>*>, 4> lists;
 public:
     PropagationMaster& propMaster;
     std::vector<Inequality<T>*> propagatingAt0;
-    std::unordered_set<Inequality<T>*> all;
-    SwitchSet<Inequality<T>*> unattached;
-    SwitchSet<Inequality<T>*> unregisteredOccurences;
+
+
+
+
+    enum class State {unhandled, unattached, unregistered, handled};
+
+    std::list<Inequality<T>*>& get(State state) {
+        return lists[static_cast<int>(state)];
+    }
 
     typedef std::unordered_set<Inequality<T>*>  OccursList;
     LitIndexedVec<OccursList> occurs;
@@ -2111,9 +2119,10 @@ public:
 
     void clear() {
         propagatingAt0.clear();
-        all.clear();
-        unattached.clear();
-        unregisteredOccurences.clear();
+
+        for (auto& list:lists) {
+            list.clear();
+        }
 
         for (OccursList& ol:occurs) {
             ol.clear();
@@ -2126,14 +2135,6 @@ public:
 
     void increaseNumVarsTo(size_t nVars) {
         occurs.resize(2 * (nVars + 1));
-    }
-
-    void transferFrom(PropagatorGroup& other) {
-        for (Inequality<T>* ineq: other.all) {
-            add(*ineq);
-        }
-
-        other.clear();
     }
 
     void activatePropagators() {
@@ -2155,24 +2156,34 @@ public:
     }
 
     void attachUnattached() {
-        for (Inequality<T>* ineq: this->unattached) {
-            ineq->wasAttached = true;
-            ineq->initWatch(*this);
+        for (State state: {State::unhandled, State::unattached}) {
+            for (Inequality<T>* ineq: get(state)) {
+                ineq->wasAttached = true;
+                ineq->initWatch(*this);
+                ineq->_groupState = (state == State::unhandled) ? State::unregistered : State::handled;
+            }
         }
-        this->unattached.clear();
+
+        get(State::unregistered).splice(get(State::unregistered).end(), get(State::unhandled));
+        get(State::handled).splice(get(State::handled).end(), get(State::unattached));
     }
 
     void registerOccurences() {
-        for (Inequality<T>* ineq: this->unregisteredOccurences) {
-            ineq->registerOccurence(*this);
+        for (State state: {State::unhandled, State::unregistered}) {
+            for (Inequality<T>* ineq: get(state)) {
+                ineq->registerOccurence(*this);
+                ineq->_groupState = (state == State::unhandled) ? State::unattached : State::handled;
+            }
         }
-        this->unregisteredOccurences.clear();
+
+        get(State::unattached).splice(get(State::unattached).end(), get(State::unhandled));
+        get(State::handled).splice(get(State::handled).end(), get(State::unregistered));
     }
 
     void add(Inequality<T>& ineq) {
-        all.insert(&ineq);
-        unattached.insert(&ineq);
-        unregisteredOccurences.insert(&ineq);
+        get(State::unhandled).push_front(&ineq);
+        ineq._groupIter = get(State::unhandled).begin();
+        ineq._groupState = State::unhandled;
 
         if (ineq.isPropagatingAt0()) {
             this->propagatingAt0.push_back(&ineq);
@@ -2188,22 +2199,17 @@ public:
             }
         }
 
-        all.erase(&ineq);
-
-        size_t size;
-
-        size = unattached.size();
-        unattached.erase(&ineq);
-        if (size == unattached.size()) {
+        get(ineq._groupState).erase(ineq._groupIter);
+        if (ineq._groupState == State::unregistered
+                || ineq._groupState == State::handled) {
             // we need to clear the watches now, a lazy removal is not
             // possible, because the constraint is not necessarily
             // deleted, but may be reattached to a different set.
             ineq.clearWatches(*this);
         }
 
-        size = unregisteredOccurences.size();
-        unregisteredOccurences.erase(&ineq);
-        if (size == unregisteredOccurences.size()) {
+        if (ineq._groupState == State::unattached
+                || ineq._groupState == State::handled) {
             ineq.unRegisterOccurence(*this);
         }
     }
@@ -2487,10 +2493,15 @@ public:
     }
 
     void moveAllToCore() {
-        for (Inequality<T>* ineq: derived.all) {
-            ineq->isCoreConstraint = true;
+        using State = typename PropagatorGroup<T>::State;
+        for (State state: {State::unhandled, State::unattached,
+                State::unregistered, State::handled}) {
+            for (Inequality<T>* ineq: derived.get(state)) {
+                ineq->isCoreConstraint = true;
+                core.add(*ineq);
+            }
         }
-        core.transferFrom(derived);
+        derived.clear();
     }
 
     void moveMultipleToCore(std::vector<Inequality<T>*> ineqs) {
@@ -3101,6 +3112,10 @@ public:
     uint64_t minId = std::numeric_limits<uint64_t>::max();
     std::unordered_set<uint64_t> ids;
     uint detachCount = 0;
+
+    // used exclusively by PropagatorGroup
+    typename std::list<Inequality*>::iterator _groupIter;
+    typename PropagatorGroup<T>::State _groupState;
 
     Inequality(Inequality& other)
         : handle(other.handle->copy())

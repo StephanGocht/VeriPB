@@ -1,3 +1,5 @@
+#pragma once
+
 #include <vector>
 #include <iostream>
 #include <sstream>
@@ -13,6 +15,7 @@
 #include <numeric>
 
 #include "BigInt.hpp"
+#include "SwitchSet.hpp"
 
 #ifndef NDEBUG
     #include <unistd.h>
@@ -2087,8 +2090,8 @@ public:
     PropagationMaster& propMaster;
     std::vector<Inequality<T>*> propagatingAt0;
     std::unordered_set<Inequality<T>*> all;
-    std::vector<Inequality<T>*> unattached;
-    std::vector<Inequality<T>*> unregisteredOccurences;
+    SwitchSet<Inequality<T>*> unattached;
+    SwitchSet<Inequality<T>*> unregisteredOccurences;
 
     typedef std::unordered_set<Inequality<T>*>  OccursList;
     LitIndexedVec<OccursList> occurs;
@@ -2168,8 +2171,8 @@ public:
 
     void add(Inequality<T>& ineq) {
         all.insert(&ineq);
-        unattached.push_back(&ineq);
-        unregisteredOccurences.push_back(&ineq);
+        unattached.insert(&ineq);
+        unregisteredOccurences.insert(&ineq);
 
         if (ineq.isPropagatingAt0()) {
             this->propagatingAt0.push_back(&ineq);
@@ -2178,14 +2181,11 @@ public:
 
     void remove(Inequality<T>& ineq) {
         if (ineq.isPropagatingAt0()) {
-            propagatingAt0.erase(
-                std::remove(
-                    propagatingAt0.begin(),
-                    propagatingAt0.end(),
-                    &ineq
-                ),
-                propagatingAt0.end()
-            );
+            auto it = std::find(propagatingAt0.rbegin(), propagatingAt0.rend(), &ineq);
+            if (it != propagatingAt0.rend()) {
+                std::swap(*it, propagatingAt0.back());
+                propagatingAt0.pop_back();
+            }
         }
 
         all.erase(&ineq);
@@ -2193,7 +2193,7 @@ public:
         size_t size;
 
         size = unattached.size();
-        unattached.erase(std::remove(unattached.begin(), unattached.end(), &ineq), unattached.end());
+        unattached.erase(&ineq);
         if (size == unattached.size()) {
             // we need to clear the watches now, a lazy removal is not
             // possible, because the constraint is not necessarily
@@ -2202,7 +2202,7 @@ public:
         }
 
         size = unregisteredOccurences.size();
-        unregisteredOccurences.erase(std::remove(unregisteredOccurences.begin(), unregisteredOccurences.end(), &ineq), unregisteredOccurences.end());
+        unregisteredOccurences.erase(&ineq);
         if (size == unregisteredOccurences.size()) {
             ineq.unRegisterOccurence(*this);
         }

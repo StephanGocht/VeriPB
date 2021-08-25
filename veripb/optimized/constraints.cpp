@@ -137,7 +137,6 @@ int hashColision = 0;
             .def("increaseNumVarsTo", &PropEngine<CoefType>::increaseNumVarsTo)
             .def("printStats", &PropEngine<CoefType>::printStats)
             .def("computeEffected", &PropEngine<CoefType>::computeEffected)
-            .def("estimateNumEffected", &PropEngine<CoefType>::estimateNumEffected)
             .def("find", &PropEngine<CoefType>::find)
             .def("moveToCore", &PropEngine<CoefType>::moveToCore)
             .def("moveMultipleToCore", &PropEngine<CoefType>::moveMultipleToCore)
@@ -168,43 +167,6 @@ int hashColision = 0;
             .def("substitute", &Inequality<CoefType>::substitute)
             .def("weaken", &Inequality<CoefType>::weaken);
         cppIneq.attr("__hash__") = py::none();
-
-        // py::class_<PropEngine<BigInt>>(m, "PropEngineBigInt")
-        //     .def(py::init<size_t>())
-        //     .def("attach", &PropEngine<BigInt>::attach)
-        //     .def("detach", &PropEngine<BigInt>::detach)
-        //     .def("getDeletions", &PropEngine<BigInt>::getDeletions)
-        //     .def("attachCount", &PropEngine<BigInt>::attachCount)
-        //     .def("checkSat", &PropEngine<BigInt>::checkSat)
-        //     .def("propagatedLits", &PropEngine<BigInt>::propagatedLits)
-        //     .def("increaseNumVarsTo", &PropEngine<BigInt>::increaseNumVarsTo)
-        //     .def("printStats", &PropEngine<BigInt>::printStats)
-        //     .def("computeEffected", &PropEngine<BigInt>::computeEffected)
-        //     .def("estimateNumEffected", &PropEngine<BigInt>::estimateNumEffected)
-        //     .def("find", &PropEngine<BigInt>::find);
-
-
-        // auto cppIneqBigInt = py::class_<Inequality<BigInt>>(m, "CppInequalityBigInt")
-        //     .def(py::init<std::vector<BigInt>&, std::vector<int>&, BigInt>())
-        //     .def_readonly("minId", &Inequality<BigInt>::minId)
-        //     .def("saturate", &Inequality<BigInt>::saturate)
-        //     .def("divide", &Inequality<BigInt>::divide)
-        //     .def("multiply", &Inequality<BigInt>::multiply)
-        //     .def("add", &Inequality<BigInt>::add)
-        //     .def("contract", &Inequality<BigInt>::contract)
-        //     .def("copy", &Inequality<BigInt>::copy)
-        //     .def("implies", &Inequality<BigInt>::implies)
-        //     .def("expand", &Inequality<BigInt>::expand)
-        //     .def("negated", &Inequality<BigInt>::negated)
-        //     .def("rupCheck", &Inequality<BigInt>::rupCheck)
-        //     .def("__eq__", &Inequality<BigInt>::eq)
-        //     .def("__repr__", &Inequality<BigInt>::repr)
-        //     .def("toString", &Inequality<BigInt>::toString)
-        //     .def("toOPB", &Inequality<BigInt>::repr)
-        //     .def("isContradiction", &Inequality<BigInt>::isContradiction)
-        //     .def("substitute", &Inequality<BigInt>::substitute)
-        //     .def("weaken", &Inequality<BigInt>::weaken);
-        // cppIneqBigInt.attr("__hash__") = py::none();
 
     }
 #endif

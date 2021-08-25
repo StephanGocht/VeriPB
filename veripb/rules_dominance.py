@@ -690,12 +690,11 @@ class AddRedundant(MultiGoalRule):
         witness = self.witness.get()
 
         if self.autoProveAll:
-            estimateNumEffected = context.propEngine.estimateNumEffected(witness)
             # rup check would be expensive if we only derive a new
             # reification, so only do rup check first if there are
             # many effected constraints, otherwise it will be cheap to
             # compute the effected constraitns anyway.
-            if estimateNumEffected > 2:
+            if getattr(context, "autoRUPstreak", 6) > 5:
                 if ineq.rupCheck(context.propEngine) or \
                         context.propEngine.find(ineq) is not None:
                     self.autoProof(context, antecedents)

@@ -2214,20 +2214,6 @@ public:
         }
     }
 
-    long long estimateNumEffected(Substitution& sub) {
-        registerOccurences();
-        long long estimate = 0;
-        for (auto it: sub.map) {
-            Lit from = it.first;
-            Lit to   = it.second;
-
-            if (to != Substitution::one()) {
-                estimate += occurs[from].size();
-            }
-        }
-        return estimate;
-    }
-
     std::unordered_set<Inequality<T>*> computeEffected(Substitution& sub) {
         registerOccurences();
         std::unordered_set<Inequality<T>*> unique;
@@ -2610,10 +2596,6 @@ public:
             }
         }
         return assignment;
-    }
-
-    long long estimateNumEffected(Substitution& sub) {
-        return core.estimateNumEffected(sub) + derived.estimateNumEffected(sub);
     }
 
     void addIfNeccessary(std::vector<InequalityPtr<T>>& result, Inequality<T>* ineq, Substitution& sub) {

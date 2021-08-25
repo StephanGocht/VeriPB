@@ -138,6 +138,8 @@ class Autoprover():
         self.dbSubstituted = None
         self.dbSet = None
         self.assignment = None
+        self.wasRUP = False
+        self.triedRUP = False
 
     # @TimedFunction.time("Autoprover::propagate")
     def propagate(self):
@@ -190,7 +192,10 @@ class Autoprover():
         success = nxtGoal.rupCheck(self.propEngine)
         if success:
             if self.verbose:
-                print("    automatically proved %s by RUP check" % (str(nxtGoalId)))
+                if nxtGoalId is not None:
+                    print("    automatically proved %s by RUP check." % (str(nxtGoalId)))
+                else:
+                    print("    automatically proved constraint to be added by RUP check.")
             return True
         return False
 
@@ -234,6 +239,12 @@ class Autoprover():
                         print("    automatically proved %s, constraint is trivial." % (str(nxtGoalId)))
                     continue
 
+                if not self.triedRUP and self.rupImplication(None, self.context.ineqFactory.fromTerms([], 1)):
+                    self.wasRUP = True
+                    break
+
+                self.triedRUP = True
+
                 if self.rupImplication(nxtGoalId, nxtGoal):
                     continue
 
@@ -262,3 +273,8 @@ def autoProof(context, db, subgoals):
 
     prover = Autoprover(context, db, goals)
     prover()
+
+    if prover.wasRUP:
+        context.autoRUPstreak = getattr(context, "autoRUPstreak", 0) + 1
+    else:
+        context.autoRUPstreak = 0

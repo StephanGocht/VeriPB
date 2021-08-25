@@ -474,7 +474,7 @@ public:
         result.reserve(constraints.size());
         for (auto& ptr: constraints) {
             if (needToSetCore) {
-                // ptr->isCoreConstraint = true;
+                ptr->isCoreConstraint = true;
             }
             result.push_back(ptr.get());
         }

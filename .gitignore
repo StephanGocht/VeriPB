@@ -21,3 +21,10 @@ veripb/optimized/.rendered.constraints
 veripb/optimized/constraints
 build/
 dist/
+notes/
+test.cpp
+testparser
+tests/integration_tests/rename.bash
+veripb/optimized/a.out
+veripb/optimized/simplified.cpp
+veripb/optimized/testparser

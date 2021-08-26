@@ -99,7 +99,7 @@ class Verifier():
                 "progressBar": False,
                 "proofGraph": None,
                 "requireUnsat": None,
-                "isCheckDeletionOn": True
+                "isCheckDeletionOn": False
             }
 
         def computeNumUse(self):

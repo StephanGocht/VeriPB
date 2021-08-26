@@ -1,0 +1,5 @@
+pseudo-Boolean proof version 1.2
+f 2
+p 1 2 +
+core id -1
+del id 1

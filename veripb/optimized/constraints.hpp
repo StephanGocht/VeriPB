@@ -3125,7 +3125,6 @@ public:
         : handle(other.handle->copy())
     {
         assert(other.loaded == false);
-        this->minId = other.minId;
     }
 
     template<typename TIneq>

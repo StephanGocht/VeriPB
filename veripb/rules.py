@@ -121,6 +121,35 @@ class DeleteConstraints(EmptyRule):
     def deleteConstraints(self):
         return self.toDelete
 
+def idOrFind(words, context, delete = False):
+    type_key = next(words)
+    if type_key == "id":
+        which = list(map(int, words))
+
+        if (which[-1] == 0):
+            which = which[:-1]
+
+        if 0 in which:
+            raise ValueError("Can not delete constraint with index 0.")
+    elif type_key == "find":
+
+        cppWordIter = words.wordIter.getNative()
+        ineq = context.ineqFactory.parse(cppWordIter, allowMultiple = False)
+
+        if delete:
+            which = context.propEngine.getDeletions(ineq)
+        else:
+            which = context.propEngine.find(ineq)
+            if which is None:
+                raise ValueError("Can not find constraint %s."%(ineq))
+            else:
+                which = [which.minId]
+
+    else:
+        raise ValueError("Expected constraint type ('id' or 'find').")
+
+    return which
+
 
 @register_rule
 class DeleteConstraints2(EmptyRule):
@@ -128,23 +157,7 @@ class DeleteConstraints2(EmptyRule):
 
     @classmethod
     def parse(cls, words, context):
-        del_type = next(words)
-        if del_type == "id":
-            which = list(map(int, words))
-
-            if (which[-1] == 0):
-                which = which[:-1]
-
-            if 0 in which:
-                raise ValueError("Can not delete constraint with index 0.")
-        elif del_type == "find":
-
-            cppWordIter = words.wordIter.getNative()
-            ineq = context.ineqFactory.parse(cppWordIter, allowMultiple = False)
-
-            which = context.propEngine.getDeletions(ineq)
-
-        return cls(which)
+        return cls(idOrFind(words,context, delete = True))
 
     def __init__(self, toDelete):
         self.toDelete = toDelete
@@ -655,6 +668,25 @@ class LoadAxiom(Rule):
         return 1
 
     def antecedentIDs(self):
+        return []
+
+@register_rule
+class MarkCore(EmptyRule):
+    Ids = ["core"]
+
+    @classmethod
+    def parse(cls, words, context):
+        return cls(idOrFind(words,context))
+
+    def __init__(self, toMark):
+        self.which = toMark
+
+    def antecedentIDs(self):
+        return self.which
+
+    def compute(self, antecedents, context):
+        for ineq in antecedents:
+            context.propEngine.moveToCore(ineq)
         return []
 
 class LevelStack():

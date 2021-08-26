@@ -2622,6 +2622,8 @@ public:
 
     void addIfNeccessary(std::vector<InequalityPtr<T>>& result, Inequality<T>* ineq, Substitution& sub) {
         InequalityPtr<T> rhs = ineq->copy();
+        // we want to keep the id, as they will be used for subgoals
+        rhs->copyId(*ineq);
         rhs->substitute(sub);
         if (!ineq->implies(*rhs) && !find(rhs.get())
             ) {
@@ -3168,6 +3170,11 @@ public:
             handle->toJunkyard();
         }
     }
+
+    void copyId(Inequality<T>& other) {
+        minId = other.minId;
+    }
+
 
     void normalize() {
         expand();

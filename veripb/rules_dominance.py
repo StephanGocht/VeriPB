@@ -695,7 +695,7 @@ class AddRedundant(MultiGoalRule):
             # many effected constraints, otherwise it will be cheap to
             # compute the effected constraitns anyway.
             if getattr(context, "autoRUPstreak", 6) > 5:
-                if ineq.rupCheck(context.propEngine) or \
+                if ineq.rupCheck(context.propEngine, False) or \
                         context.propEngine.find(ineq) is not None:
                     self.autoProof(context, antecedents)
                     return super().compute(antecedents, context)

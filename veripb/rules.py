@@ -214,7 +214,7 @@ class ReverseUnitPropagation(Rule):
     @TimedFunction.time("ReverseUnitPropagation.compute")
     def compute(self, antecedents, context):
         context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
-        success = self.constraint.rupCheck(context.propEngine)
+        success = self.constraint.rupCheck(context.propEngine, False)
 
         if success:
             return [self.constraint]

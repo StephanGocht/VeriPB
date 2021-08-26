@@ -67,6 +67,7 @@ cpp: ${CPP_FILES_COMPILED} ${HPP_FILES}
 		-lgmp -lgmpxx -DPY_BINDINGS
 
 
+
 dist:
 	echo "creating distribution requires pyinstaller and staticx"
 	echo "pip3 install pyinstaller staticx"

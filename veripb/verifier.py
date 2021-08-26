@@ -255,6 +255,12 @@ class Verifier():
 
             self.db[i] = None
             self.detach(ineq, i)
+
+            if ineq.isCoreConstraint:
+                if not ineq.rupCheck(self.context.propEngine, True):
+                    raise InvalidProof("Could not verify deletion of core constraint %s",
+                        self.context.ineqFactory.toString(ineq))
+
             deleted[id(ineq)] = ineq
 
 

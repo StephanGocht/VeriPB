@@ -148,6 +148,7 @@ int hashColision = 0;
         auto cppIneq = py::class_<Inequality<CoefType>>(m, "CppInequality")
             .def(py::init<std::vector<CoefType>&, std::vector<int>&, CoefType>())
             .def_readonly("minId", &Inequality<CoefType>::minId)
+            .def_readonly("isCoreConstraint", &Inequality<CoefType>::isCoreConstraint)
             .def("saturate", &Inequality<CoefType>::saturate)
             .def("divide", &Inequality<CoefType>::divide)
             .def("multiply", &Inequality<CoefType>::multiply)

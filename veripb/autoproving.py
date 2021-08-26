@@ -189,7 +189,7 @@ class Autoprover():
 
     #@TimedFunction.time("Autoprover::rupImplication")
     def rupImplication(self, nxtGoalId, nxtGoal):
-        success = nxtGoal.rupCheck(self.propEngine)
+        success = nxtGoal.rupCheck(self.propEngine, False)
         if success:
             if self.verbose:
                 if nxtGoalId is not None:

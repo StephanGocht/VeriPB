@@ -2088,6 +2088,7 @@ template<typename T>
 class PropagatorGroup {
 private:
     std::array<std::list<Inequality<T>*>, 4> lists;
+    bool _isActive = false;
 public:
     PropagationMaster& propMaster;
     std::vector<Inequality<T>*> propagatingAt0;
@@ -2137,16 +2138,26 @@ public:
         occurs.resize(2 * (nVars + 1));
     }
 
+    bool isActive() {
+        return _isActive;
+    }
+
     void activatePropagators() {
-        propMaster.activatePropagator(clausePropagator);
-        propMaster.activatePropagator(ineq32Propagator);
-        propMaster.activatePropagator(ineqPropagator);
+        if (!_isActive) {
+            _isActive = true;
+            propMaster.activatePropagator(clausePropagator);
+            propMaster.activatePropagator(ineq32Propagator);
+            propMaster.activatePropagator(ineqPropagator);
+        }
     }
 
     void deactivatePropagators() {
-        propMaster.deactivatePropagator(clausePropagator);
-        propMaster.deactivatePropagator(ineq32Propagator);
-        propMaster.deactivatePropagator(ineqPropagator);
+        if (_isActive) {
+            _isActive = false;
+            propMaster.deactivatePropagator(clausePropagator);
+            propMaster.deactivatePropagator(ineq32Propagator);
+            propMaster.deactivatePropagator(ineqPropagator);
+        }
     }
 
     void doPropagationsAt0() {
@@ -2505,27 +2516,38 @@ public:
         ineq.isCoreConstraint = true;
     }
 
-    void initPropagation() {
+    void initPropagation(bool coreOnly = false) {
         Timer timer(timeInitProp);
 
-        if (hasDetached) {
-            if (!propMaster.isTrailClean()) {
-                propMaster.cleanupTrail();
-                core.doPropagationsAt0();
+        if (coreOnly && derived.isActive()) {
+            derived.deactivatePropagators();
+            PropState emptyTrail;
+            propMaster.reset(emptyTrail);
+            core.doPropagationsAt0();
+        } else if (hasDetached && !propMaster.isTrailClean()) {
+            propMaster.cleanupTrail();
+
+            core.doPropagationsAt0();
+            if (!coreOnly) {
                 derived.doPropagationsAt0();
             }
+        } else if (!coreOnly && !derived.isActive()) {
+            derived.activatePropagators();
+            derived.doPropagationsAt0();
+        }
+
+        core.attachUnattached();
+        if (!coreOnly) {
+            derived.attachUnattached();
+        }
+
+        if (hasDetached) {
             // either cleanupWatches here or when detached, currently
             // watches should be cleaned while detached
             // propMaster.cleanupWatches();
             MasterJunkyard::get().clearAll();
             hasDetached = false;
         }
-
-        core.attachUnattached();
-        derived.attachUnattached();
-        // std::cout << "after init:\n";
-        // std::cout << clausePropagator;
-        // propagate();
     }
 
     int attachCount(Inequality<T>* ineq) {
@@ -2647,9 +2669,9 @@ public:
 
     struct rupCheck {
         template<typename TIneq>
-        bool operator()(const TIneq& redundant, PropEngine<T>& engine) {
+        bool operator()(const TIneq& redundant, PropEngine<T>& engine, bool onlyCore) {
             Timer timer(engine.timeRUP);
-            engine.initPropagation();
+            engine.initPropagation(onlyCore);
 
             // Fully propagating is too time consuming in some cases
             // in connection with redundancy checks. Consider that we
@@ -3309,9 +3331,9 @@ public:
         return unpacked::call2(InplaceIneqOps::implies(), handle.get(), other.handle.get());
     }
 
-    bool rupCheck(PropEngine<T>& propEngine) {
+    bool rupCheck(PropEngine<T>& propEngine, bool onlyCore = false) {
         this->contract();
-        return unpacked::call(typename PropEngine<T>::rupCheck(), handle.get(), propEngine);
+        return unpacked::call(typename PropEngine<T>::rupCheck(), handle.get(), propEngine, onlyCore);
     }
 
     Inequality& substitute(Substitution& sub) {

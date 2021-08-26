@@ -1,0 +1,34 @@
+pseudo-Boolean proof version 1.2
+pre_order two
+    vars
+        left u1 u0
+        right v1 v0
+        aux
+    qed
+
+    def
+        -2 u1 -1 u0 2 v1 1 v0 >= 0 ;
+    qed
+
+    transitivity
+        vars
+            fresh_right w1 w0
+        qed
+        proof
+            proofgoal #1
+                p 1 2 + 3 +
+                c 4
+            qed
+        qed
+    qed
+qed
+f 2
+load_order two x1 x0
+dom 1 ~x0 >= 1 ; x0 -> ~x1
+del find 1 x1 >= 1 ;
+** if the above deletion would be successful then we could derive
+** contradiction on a satisfiable instance:
+** dom 1 ~x1 >= 1 ; x1 -> 0 x0 -> 1
+* p 2 3 + 4 +
+* c -1
+

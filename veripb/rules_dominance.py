@@ -144,6 +144,8 @@ class Order:
 class OrderContext:
     @classmethod
     def setup(cls, context):
+        # we access this directly in the verifier on deletion,
+        # remember to change there if changed here.
         try:
             return context.orderContext
         except AttributeError:

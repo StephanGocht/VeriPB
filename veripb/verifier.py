@@ -98,7 +98,8 @@ class Verifier():
                 "trace": False,
                 "progressBar": False,
                 "proofGraph": None,
-                "requireUnsat": None
+                "requireUnsat": None,
+                "isCheckDeletionOn": True
             }
 
         def computeNumUse(self):
@@ -116,6 +117,14 @@ class Verifier():
             group.add_argument("--no-invariants", dest=name+".isInvariantsOn",
                 action="store_false",
                 help="Turn off invariant checking.")
+
+            group.add_argument("--checkDeletion", dest=name+".isCheckDeletionOn",
+                action="store_true",
+                default=defaults["isCheckDeletionOn"],
+                help="Turn on checking deletions in core set via RUP.")
+            group.add_argument("--no-checkDeletion", dest=name+".isCheckDeletionOn",
+                action="store_false",
+                help="Disable checking deletions in core, but forbids deletion when order is loaded.")
 
             group.add_argument("--requireUnsat", dest=name+".requireUnsat",
                 action="store_true",
@@ -257,9 +266,14 @@ class Verifier():
             self.detach(ineq, i)
 
             if ineq.isCoreConstraint:
-                if not ineq.rupCheck(self.context.propEngine, True):
-                    raise InvalidProof("Could not verify deletion of core constraint %s",
-                        self.context.ineqFactory.toString(ineq))
+                if self.settings.isCheckDeletionOn:
+                    if not ineq.rupCheck(self.context.propEngine, True):
+                        raise InvalidProof("Could not verify deletion of core constraint %s",
+                            self.context.ineqFactory.toString(ineq))
+                else:
+                    orderContext = getattr(self.context, "orderContext", None)
+                    if orderContext is not None and len(orderContext.activeOrder.vars) > 0:
+                        raise InvalidProof("Tried to delete core constraint while order was loaded.")
 
             deleted[id(ineq)] = ineq
 

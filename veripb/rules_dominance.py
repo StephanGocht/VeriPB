@@ -221,7 +221,7 @@ class LoadOrder(EmptyRule):
             raise ValueError(
                 "Order does not specify right number of"
                 "variables. Expected: %i, Got: %i"
-                % (len(order.vars), len(order.leftVars)))
+                % (len(order.leftVars), len(lits)))
 
         orderContext.activateOrder(order, lits)
 

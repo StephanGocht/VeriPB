@@ -2510,10 +2510,11 @@ public:
     }
 
     void moveToCore(Inequality<T>& ineq) {
-        assert(ineq.isCoreConstraint == false);
-        derived.remove(ineq);
-        core.add(ineq);
-        ineq.isCoreConstraint = true;
+        if (!ineq.isCoreConstraint) {
+            derived.remove(ineq);
+            core.add(ineq);
+            ineq.isCoreConstraint = true;
+        }
     }
 
     void initPropagation(bool coreOnly = false) {
@@ -2572,7 +2573,9 @@ public:
         return result;
     }
 
-    void detach(Inequality<T>* ineq, uint64_t id) {
+    bool detach(Inequality<T>* ineq, uint64_t id) {
+        bool erased = false;
+
         if (ineq != nullptr) {
             ineq->ids.erase(id);
             if (ineq->minId == id && ineq->ids.size() > 0) {
@@ -2580,6 +2583,8 @@ public:
             }
 
             if (ineq->isAttached && ineq->ids.size() == 0) {
+                erased = true;
+
                 ineq->isAttached = false;
                 constraintLookup.erase(ineq);
                 lookup_requests += 1;
@@ -2598,6 +2603,8 @@ public:
                 ineq->markedForDeletion();
             }
         }
+
+        return erased;
     }
 
     std::vector<int> propagatedLits() {

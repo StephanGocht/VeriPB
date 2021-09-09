@@ -212,7 +212,7 @@ class Verifier():
 
     @TimedFunction.time("propEngine.detach")
     def detach(self, constraint, constraintId):
-        self.context.propEngine.detach(constraint, constraintId)
+        return self.context.propEngine.detach(constraint, constraintId)
 
     def handleRule(self, ruleNum, rule):
         self.checked_rules += 1
@@ -263,9 +263,9 @@ class Verifier():
                 continue
 
             self.db[i] = None
-            self.detach(ineq, i)
+            wasLastReference = self.detach(ineq, i)
 
-            if ineq.isCoreConstraint:
+            if wasLastReference and ineq.isCoreConstraint:
                 if self.settings.isCheckDeletionOn:
                     if not ineq.rupCheck(self.context.propEngine, True):
                         raise InvalidProof("Could not verify deletion of core constraint %s",

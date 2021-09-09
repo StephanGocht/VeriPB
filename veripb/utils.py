@@ -233,6 +233,10 @@ def runUI(*args, **kwargs):
         logging.error("Not Implemented: %s" % str(e))
         return 3
 
+    except MemoryError as e:
+        logging.error("MemoryError, probably out of memory.")
+        return 5
+
     except Exception as e:
         if logging.getLogger().getEffectiveLevel() != logging.DEBUG:
             logging.error("Sorry, there was an internal error. Please rerun with debugging "

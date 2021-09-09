@@ -6,6 +6,7 @@ from env import veripb
 from veripb import run, InvalidProof, ParseError
 
 from veripb.utils import Settings as MiscSettings
+from veripb.verifier import Verifier
 
 class TestIntegration(unittest.TestCase):
     def run_single(self, formulaPath):
@@ -13,10 +14,11 @@ class TestIntegration(unittest.TestCase):
         print("veripb %s %s"%(formulaPath, proofPath))
 
         miscSettings = MiscSettings({"arbitraryPrecision": True})
+        verifierSettings = Verifier.Settings({"isCheckDeletionOn": True})
 
         with formulaPath.open() as formula:
             with proofPath.open() as proof:
-                run(formula, proof, miscSettings = miscSettings)
+                run(formula, proof, verifierSettings, miscSettings)
 
     def correct_proof(self, formulaPath):
         self.run_single(formulaPath)

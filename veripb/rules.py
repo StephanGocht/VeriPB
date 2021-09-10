@@ -341,8 +341,14 @@ class Solution(Rule):
 
     @TimedFunction.time("Solution.compute")
     def compute(self, antecedents, context):
-        if not context.propEngine.checkSat(self.partialAssignment):
-            raise SolutionCheckFailed()
+        missingAssignments = context.propEngine.checkSat(self.partialAssignment)
+        if len(missingAssignments) > 0:
+            if missingAssignments[0] == 0:
+                raise SolutionCheckFailed("(conflict)")
+            else:
+                missing = ", ".join(context.ineqFactory.num2Name(x) for x in missingAssignments)
+                error = "(unassigned variables: %s)"%missing
+                raise SolutionCheckFailed(error)
 
         return [context.ineqFactory.fromTerms([Term(1, -lit) for lit in self.partialAssignment], 1)]
 

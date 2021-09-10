@@ -2422,7 +2422,7 @@ public:
         propMaster.propagate();
     }
 
-    bool propagate4sat(std::vector<int>& lits) {
+    std::vector<int> propagate4sat(std::vector<int>& lits) {
         AutoReset reset(this->propMaster);
 
         for (int lit: lits) {
@@ -2439,22 +2439,23 @@ public:
 
         propagate();
 
-        bool success = false;
+        std::vector<int> missing;
+
         if (!propMaster.isConflicting()) {
-            success = true;
             for (uint var = 1; var <= nVars; var++) {
                 auto val = propMaster.getAssignment().value[Lit(var)];
                 if (val == State::Unassigned) {
-                    success = false;
-                    break;
+                    missing.push_back(var);
                 }
             }
+        } else {
+            missing.push_back(0);
         }
 
-        return success;
+        return missing;
     }
 
-    bool checkSat(std::vector<int>& lits) {
+    std::vector<int> checkSat(std::vector<int>& lits) {
         // AutoReset reset(this->propMaster);
         initPropagation();
         propagate();

@@ -2452,7 +2452,20 @@ public:
             missing.push_back(0);
         }
 
-        return missing;
+        if (missing.size() > 0) {
+            for (int var: missing) {
+                Lit l(var);
+                propMaster.enqueue(l, nullptr);
+            }
+        }
+
+        propagate();
+
+        if (!propMaster.isConflicting()) {
+            missing.clear();
+        }
+
+        return  missing;
     }
 
     std::vector<int> checkSat(std::vector<int>& lits) {

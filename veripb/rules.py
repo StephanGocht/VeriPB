@@ -319,13 +319,13 @@ class SolutionCheckFailed(InvalidProof):
         result += super().__str__()
         return result
 
-def checkSolution(propEngine, assignment):
+def checkSolution(propEngine, ineqFactory, assignment):
     missingAssignments = propEngine.checkSat(assignment)
     if len(missingAssignments) > 0:
         if missingAssignments[0] == 0:
             raise SolutionCheckFailed("(conflict)")
         else:
-            missing = ", ".join(context.ineqFactory.num2Name(x) for x in missingAssignments)
+            missing = ", ".join( (ineqFactory.num2Name(x) for x in missingAssignments) )
             error = "(unassigned variables: %s)"%missing
             raise SolutionCheckFailed(error)
 
@@ -352,7 +352,7 @@ class Solution(Rule):
 
     @TimedFunction.time("Solution.compute")
     def compute(self, antecedents, context):
-        checkSolution(context.propEngine, self.partialAssignment)
+        checkSolution(context.propEngine, context.ineqFactory, self.partialAssignment)
 
         return [context.ineqFactory.fromTerms([Term(1, -lit) for lit in self.partialAssignment], 1)]
 
@@ -396,7 +396,7 @@ class ObjectiveBound(Rule):
 
     @TimedFunction.time("ObjectiveBound.compute")
     def compute(self, antecedents, context):
-        checkSolution(context.propEngine, self.partialAssignment)
+        checkSolution(context.propEngine, context.ineqFactory , self.partialAssignment)
 
         objValue = 0
         numFoundValues = 0

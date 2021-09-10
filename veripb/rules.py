@@ -319,6 +319,17 @@ class SolutionCheckFailed(InvalidProof):
         result += super().__str__()
         return result
 
+def checkSolution(propEngine, assignment):
+    missingAssignments = propEngine.checkSat(assignment)
+    if len(missingAssignments) > 0:
+        if missingAssignments[0] == 0:
+            raise SolutionCheckFailed("(conflict)")
+        else:
+            missing = ", ".join(context.ineqFactory.num2Name(x) for x in missingAssignments)
+            error = "(unassigned variables: %s)"%missing
+            raise SolutionCheckFailed(error)
+
+
 @register_rule
 class Solution(Rule):
     Ids = ["v"]
@@ -341,14 +352,7 @@ class Solution(Rule):
 
     @TimedFunction.time("Solution.compute")
     def compute(self, antecedents, context):
-        missingAssignments = context.propEngine.checkSat(self.partialAssignment)
-        if len(missingAssignments) > 0:
-            if missingAssignments[0] == 0:
-                raise SolutionCheckFailed("(conflict)")
-            else:
-                missing = ", ".join(context.ineqFactory.num2Name(x) for x in missingAssignments)
-                error = "(unassigned variables: %s)"%missing
-                raise SolutionCheckFailed(error)
+        checkSolution(context.propEngine, self.partialAssignment)
 
         return [context.ineqFactory.fromTerms([Term(1, -lit) for lit in self.partialAssignment], 1)]
 
@@ -392,8 +396,7 @@ class ObjectiveBound(Rule):
 
     @TimedFunction.time("ObjectiveBound.compute")
     def compute(self, antecedents, context):
-        if not context.propEngine.checkSat(self.partialAssignment):
-            raise SolutionCheckFailed()
+        checkSolution(context.propEngine, self.partialAssignment)
 
         objValue = 0
         numFoundValues = 0

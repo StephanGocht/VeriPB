@@ -12,7 +12,7 @@ from veripb.timed_function import TimedFunction
 
 from collections import deque
 
-from veripb.autoproving import autoProof
+from veripb.autoproving import autoProof, TemporaryAttach
 
 from veripb.optimized.constraints import maxId as getMaxConstraintId
 constraintMaxId = getMaxConstraintId()
@@ -241,16 +241,13 @@ class MultiGoalRule(EmptyRule):
 
         if self.subContext.subgoals:
             added = list()
-            for c in self.constraints:
-                if c is not None:
-                    added.append(context.propEngine.attach(c, 0))
 
-            try:
-                autoProof(context, db, self.subContext.subgoals)
-            finally:
-                for c in added:
+            with TemporaryAttach(context.propEngine) as temporary:
+                for c in self.constraints:
                     if c is not None:
-                        context.propEngine.detach(c, 0)
+                        temporary.attach(c)
+
+                autoProof(context, db, self.subContext.subgoals)
 
         self.constraints = self.subContext.toAdd
         self.subContexts.pop()

@@ -126,6 +126,25 @@ class Substitution:
         self.sort()
         return hash((tuple(self.constants), tuple(self.substitutions)))
 
+class TemporaryAttach():
+    def __init__(self, propEngine):
+        self.propEngine = propEngine
+        self.attached = []
+
+    def attach(self, constraint):
+        self.attached.append(self.propEngine.attach(constraint, 0))
+
+
+    def detachAll(self):
+        for c in self.attached:
+            self.propEngine.detach(c, 0)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exec_type, exec_value, exec_traceback):
+        self.detachAll()
+
 class Autoprover():
     #@TimedFunction.time("Autoprover::setup")
     def __init__(self, context, db, subgoals):
@@ -220,17 +239,14 @@ class Autoprover():
             asRhs = nxtGoal.getAsRightHand()
             if asRhs is None:
                 asLhs = nxtGoal.getAsLeftHand()
-                for c in asLhs:
-                    if c is not None:
-                        self.propEngine.attach(c, 0)
-                try:
-                    if self.rupImplication(nxtGoalId, self.context.ineqFactory.fromTerms([], 1)):
-                        continue
-                finally:
+
+                with TemporaryAttach(self.propEngine) as temporary:
                     for c in asLhs:
                         if c is not None:
-                            self.propEngine.detach(c, 0)
+                            temporary.attach(c)
 
+                    if self.rupImplication(nxtGoalId, self.context.ineqFactory.fromTerms([], 1)):
+                        continue
 
             else:
                 nxtGoal = asRhs.copy()

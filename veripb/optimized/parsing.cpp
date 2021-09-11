@@ -104,6 +104,9 @@ public:
     static std::istream& getline(std::istream& stream, WordIter& it) {
         it.fileInfo.line += 1;
         std::istream& result = std::getline(stream, it.line);
+        if (!result.eof() && result.fail()) {
+            throw ParseError(it, "Failed to read line.");
+        }
         if (!it.line.empty() && it.line.back() == '\r') {
             it.line.pop_back();
         }

@@ -223,25 +223,32 @@ def runUI(*args, **kwargs):
 
         if len(hint) > 0:
             print("Hint: %s" %(str(e)))
-        return 1
+        return 5
 
     except ParseError as e:
         logging.error(e)
-        return 2
+        return 4
+
+    except MemoryError as e:
+        try:
+            logging.error("MemoryError, probably out of memory.")
+
+        except MemoryError:
+            # it could be we do not have enough memory for reporting
+            # out of memory.
+            pass
+
+        return 3
 
     except NotImplementedError as e:
         logging.error("Not Implemented: %s" % str(e))
-        return 3
-
-    except MemoryError as e:
-        logging.error("MemoryError, probably out of memory.")
-        return 5
+        return 2
 
     except Exception as e:
         if logging.getLogger().getEffectiveLevel() != logging.DEBUG:
             logging.error("Sorry, there was an internal error. Please rerun with debugging "
                 "and make a bug report.")
-            return 4
+            return 1
         else:
             print("Sorry, there was an internal error. Because you are running in "
                 "debug mode I will give you the exception.")

@@ -108,6 +108,7 @@ public:
             throw ParseError(it, "Failed to read line.");
         }
         if (!it.line.empty() && it.line.back() == '\r') {
+            // remove trailing \r to support windows files opened under linux
             it.line.pop_back();
         }
         it.init();

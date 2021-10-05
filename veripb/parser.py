@@ -54,15 +54,13 @@ class RuleParserBase():
         self.parseContext = ParseContext(context)
 
     def numRules(self, file):
-        pos = file.tell()
-        file.seek(0)
-
         num = 0
-        for line in file:
-            if not self.isEmpty(line):
-                num += 1
-
-        file.seek(pos)
+        with LineParser(file) as lines:
+            for line in lines:
+                for word in line:
+                    if word[0] != self.commentChar:
+                        num += 1
+                    break
         # don't count the proof header line
         return num - 1
 
@@ -93,7 +91,6 @@ class RuleParserBase():
                     raise ParseError("Expected Header.")
 
             for words in lines:
-
                 if dumpLine:
                     print("line %03d: %s"% (lines.iter.getLine(), lines.iter.getLineText().rstrip()))
 
@@ -426,6 +423,7 @@ class LineParser():
             self.iter.getColumn())
 
     def __exit__(self, exec_type, exec_value, exec_traceback):
+        self.file.close()
         if exec_type is not None:
             if issubclass(exec_type, ValueError):
                 self.raiseParseError(exec_value)

@@ -4,6 +4,8 @@ from veripb.rules import DummyRule, IsContradiction
 from veripb import InvalidProof
 from veripb.timed_function import TimedFunction
 
+from string import Template
+
 import sys
 import logging
 import time
@@ -99,7 +101,8 @@ class Verifier():
                 "progressBar": False,
                 "proofGraph": None,
                 "requireUnsat": None,
-                "isCheckDeletionOn": False
+                "isCheckDeletionOn": False,
+                "useColor": False
             }
 
         def computeNumUse(self):
@@ -134,6 +137,14 @@ class Verifier():
                 action="store_false",
                 help="Do not require proof to contain contradiction, supress warning.")
 
+            group.add_argument("--useColor", dest=name+".useColor",
+                action="store_true",
+                default=defaults["useColor"],
+                help="Require proof to contain contradiction.")
+            group.add_argument("--no-useColor", dest=name+".useColor",
+                action="store_false",
+                help="Do not require proof to contain contradiction, supress warning.")
+
             group.add_argument("--trace", dest = name+".trace",
                 action="store_true",
                 default=False,
@@ -165,6 +176,18 @@ class Verifier():
 
     def print_stats(self):
         print("c statistic: num rules checked: %i"%(self.checked_rules))
+
+    def print(self, *args, **kwargs):
+        if not self.settings.useColor:
+            print(*args, **kwargs)
+        else:
+            colors = {
+                "cid":"\u001b[36m",
+                "reset":"\u001b[0m",
+                "ienq":"\u001b[34;1m"
+            }
+            args = [Template(arg).substitute(**colors) for arg in args]
+            print(*args, **kwargs)
 
     def antecedents(self, ids, ruleNum):
         if ids == "all":
@@ -232,7 +255,7 @@ class Verifier():
             constraint = self.attach(constraint, constraintId)
             if self.settings.trace and ruleNum > 0:
                 didPrint = True
-                print("  ConstraintId %(line)03d: %(ineq)s"%{
+                self.print("  ConstraintId ${cid}%(line)03d${reset}: ${ienq}%(ineq)s${reset}"%{
                     "line": constraintId,
                     "ineq": self.context.ineqFactory.toString(constraint)
                 })

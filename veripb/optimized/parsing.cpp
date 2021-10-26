@@ -105,7 +105,7 @@ public:
         it.fileInfo.line += 1;
         std::istream& result = std::getline(stream, it.line);
         if (!result.eof() && result.fail()) {
-            throw ParseError(it, "Failed to read line.");
+            throw ParseError(it, "Failed to read line (IOError).");
         }
         if (!it.line.empty() && it.line.back() == '\r') {
             // remove trailing \r to support windows files opened under linux

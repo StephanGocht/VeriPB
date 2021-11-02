@@ -179,15 +179,19 @@ class Verifier():
 
     def print(self, *args, **kwargs):
         if not self.settings.useColor:
-            print(*args, **kwargs)
+            colors = {
+                "cid":"",
+                "reset":"",
+                "ienq":""
+            }
         else:
             colors = {
                 "cid":"\u001b[36m",
                 "reset":"\u001b[0m",
                 "ienq":"\u001b[34;1m"
             }
-            args = [Template(arg).substitute(**colors) for arg in args]
-            print(*args, **kwargs)
+        args = [Template(arg).substitute(**colors) for arg in args]
+        print(*args, **kwargs)
 
     def antecedents(self, ids, ruleNum):
         if ids == "all":

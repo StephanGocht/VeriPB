@@ -520,12 +520,9 @@ public:
     static const int smallMaxCharCount = 9;
 
 private:
-    T degree;
-
     CoeffNormalizer<SmallInt, T> small;
     CoeffNormalizer<T, T> large;
 
-    bool isEq;
     bool isClause;
     bool isSmall;
     bool hasDuplicates;
@@ -533,6 +530,8 @@ private:
     VarDouplicateDetection duplicateDetection;
 
 public:
+    T degree;
+    bool isEq;
 
     std::vector<Term<T>> largeTerms;
     std::vector<Term<int32_t>> smallTerms;
@@ -573,10 +572,15 @@ public:
 
     void nextLargeCoeff(T&& coeff) {
         if (this->isSmall) {
-            switchToLargeTerms();
+            if (coeff <= std::numeric_limits<SmallInt>::max()) {
+                this->small.coeff = convertInt<SmallInt>(coeff);
+            } else {
+                switchToLargeTerms();
+                this->large.coeff = std::move(coeff);
+            }
+        } else {
+            this->large.coeff = std::move(coeff);
         }
-
-        this->large.coeff = std::move(coeff);
     }
 
     void nextLit(Lit lit){
@@ -596,8 +600,8 @@ public:
         }
     };
 
-    void setDegree(T degree) {
-        this->degree += degree;
+    void setDegree(T _degree) {
+        this->degree += _degree;
 
         if (this->isSmall) {
             if (this->hasDuplicates || this->isEq || this->degree > std::numeric_limits<SmallInt>::max()) {
@@ -616,6 +620,26 @@ public:
         isEq = false;
     }
 
+    void flip() {
+        degree = -degree;
+        if (isSmall) {
+            for (auto& term: smallTerms) {
+                degree += term.coeff;
+                term.lit = ~term.lit;
+            }
+        } else {
+            for (auto& term: largeTerms) {
+                degree += term.coeff;
+                term.lit = ~term.lit;
+            }
+        }
+
+    }
+
+    void negate() {
+        flip();
+        degree += 1;
+    }
 
     std::array<std::unique_ptr<Inequality<T>>, 2> getInequalities() {
 
@@ -633,11 +657,7 @@ public:
         }
         std::unique_ptr<Inequality<T>> leq = nullptr;
         if (isEq) {
-            degree = -degree;
-            for (Term<T>& term: largeTerms) {
-                degree += term.coeff;
-                term.lit = ~term.lit;
-            }
+            flip();
 
             leq = std::make_unique<Inequality<T>>(largeTerms, degree);
         }
@@ -716,7 +736,7 @@ public:
         while (it != WordIter::end && *it != ";") {
             T coeff = parseCoeff<T>(it, 0, it->size());
             ++it;
-            Lit lit = parseLit(it, variableNameManager);
+            Lit lit = this->parseLit(it);
 
             if (lit.isNegated()) {
                 coeff = -coeff;
@@ -728,6 +748,14 @@ public:
 
             ++it;
         }
+    }
+
+    Lit parseLit(WordIter& it) {
+        Lit lit = ::parseLit(it, variableNameManager);
+        if (formula) {
+            formula->maxVar = std::max(formula->maxVar, static_cast<size_t>(lit.var()));
+        }
+        return lit;
     }
 
     std::array<std::unique_ptr<Inequality<T>>, 2> parseConstraint(WordIter& it, bool geqOnly = false) {
@@ -746,12 +774,7 @@ public:
             }
             ++it;
 
-            Lit lit = parseLit(it, variableNameManager);
-            if (formula) {
-                formula->maxVar = std::max(formula->maxVar, static_cast<size_t>(lit.var()));
-            }
-
-            parsedTerms.nextLit(lit);
+            parsedTerms.nextLit(this->parseLit(it));
             ++it;
         }
 
@@ -772,18 +795,26 @@ public:
         parsedTerms.setDegree(parseCoeff<T>(it));
         ++it;
 
-        // if (*it == "==>") {
-        //     if (parsedTerms.isEq) {
-        //         throw ParseError(it, "Can not use implication on equalities.")
-        //     }
-        //     ++it;
-        //     Lit lit = parseLit(it, variableNameManager);
+        if (*it == "==>") {
+            if (parsedTerms.isEq) {
+                throw ParseError(it, "Can not use implication on equalities.");
+            }
+            ++it;
 
+            parsedTerms.negate();
+            parsedTerms.nextLargeCoeff(T(parsedTerms.degree));
+            parsedTerms.nextLit(this->parseLit(it));
+            ++it;
+        } else if (*it == "<==") {
+            if (parsedTerms.isEq) {
+                throw ParseError(it, "Can not use implication on equalities.");
+            }
+            ++it;
 
-        //     ++it;
-        // } else if (*it == "<==") {
-
-        // }
+            parsedTerms.nextLargeCoeff(T(parsedTerms.degree));
+            parsedTerms.nextLit(~this->parseLit(it));
+            ++it;
+        }
 
         it.expect(";");
         ++it;

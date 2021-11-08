@@ -143,6 +143,23 @@ class TestParsing(unittest.TestCase):
         self.checkParsing([(-val//2, 1), (-val//2, 2), (-val//2, 3), (-val//2, 4)], 0)
         self.checkParsing([(-val//2, 1), (-val//2, 2), (-val//2, 3), (-val//2, 4)], 0, eq = True)
 
+    def test_implication_1(self):
+        string = "1 x1 1 x2 1 x3 >= 2 <== x4 ;"
+        expect = self.ineqFactory.fromTerms([(1,1), (1,2), (1,3), (2,-4)], 2)
+        result = self.ineqFactory.parseString(string, allowMultiple = True)
+        assert result[0] == expect
+
+    def test_implication_2(self):
+        string = "1 x1 1 x2 1 x3 >= 2 ==> x4 ;"
+        expect = self.ineqFactory.fromTerms([(1,-1), (1,-2), (1,-3), (2, 4)], 2)
+        result = self.ineqFactory.parseString(string, allowMultiple = True)
+        assert result[0] == expect
+
+    def test_implication_3(self):
+        string = "-2 x1 1 x2 1 x3 >= 0 ==> x4 ;"
+        expect = self.ineqFactory.fromTerms([(2,1), (1,-2), (1,-3), (3,4)], 3)
+        result = self.ineqFactory.parseString(string, allowMultiple = True)
+        assert result[0] == expect
 
 class TestWordParser(unittest.TestCase):
     def test_working_1(self):

@@ -4,11 +4,11 @@
 *
 
 * these comments are for testing
-1 x1 +1 x2 >= 1;
-1 x2 +1 x3 >= 1;
-1 x1 +1 x3 +1 x4 >= 1;
+1 x1 +1 x2 >= 1 ;
+1 x2 +1 x3 >= 1 ;
+1 x1 +1 x3 +1 x4 >= 1 ;
 
 * we have three constraints so far
-1 x1 +1 x3 -1 x4 >= 0;
--1 x1 -1 x2 -1 x3 >= -1;
+1 x1 +1 x3 -1 x4 >= 0 ;
+-1 x1 -1 x2 -1 x3 >= -1 ;
 * now we have 5

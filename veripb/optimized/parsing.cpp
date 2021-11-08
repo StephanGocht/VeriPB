@@ -491,11 +491,166 @@ public:
     }
 };
 
+template<typename CoeffType, typename DegreeType>
+struct CoeffNormalizer {
+    CoeffType coeff;
+    Lit lit;
+
+    DegreeType normalize() {
+        if (coeff < 0) {
+            coeff = -coeff;
+            lit = ~lit;
+            return coeff;
+        } else {
+            return 0;
+        }
+    }
+
+    template<typename T>
+    void emplaceInto(T& vec) {
+        vec.emplace_back(coeff, lit);
+    }
+};
+
+template<typename T>
+class ParsedTerms {
+
+public:
+    using SmallInt = int32_t;
+    static const int smallMaxCharCount = 9;
+
+private:
+    T degree;
+
+    CoeffNormalizer<SmallInt, T> small;
+    CoeffNormalizer<T, T> large;
+
+    bool isEq;
+    bool isClause;
+    bool isSmall;
+    bool hasDuplicates;
+
+    VarDouplicateDetection duplicateDetection;
+
+public:
+
+    std::vector<Term<T>> largeTerms;
+    std::vector<Term<int32_t>> smallTerms;
+
+    ParsedTerms(){
+        reset();
+    }
+
+    void reset(){
+        degree = 0;
+        largeTerms.clear();
+        smallTerms.clear();
+        duplicateDetection.clear();
+        isEq = false;
+        isClause = true;
+        isSmall = true;
+        hasDuplicates = false;
+    }
+
+    void nextSmallCoeff(SmallInt coeff) {
+        if (this->isSmall) {
+            this->small.coeff = coeff;
+            this->isClause &= (coeff == 1 || coeff == -1);
+        } else {
+            this->large.coeff = coeff;
+        }
+    }
+
+    void switchToLargeTerms() {
+        this->isClause = false;
+        this->isSmall = false;
+        if (!smallTerms.empty()) {
+            assert(largeTerms.empty());
+            std::copy(smallTerms.begin(), smallTerms.end(), std::back_inserter(largeTerms));
+            smallTerms.clear();
+        }
+    }
+
+    void nextLargeCoeff(T&& coeff) {
+        if (this->isSmall) {
+            switchToLargeTerms();
+        }
+
+        this->large.coeff = std::move(coeff);
+    }
+
+    void nextLit(Lit lit){
+        if (duplicateDetection.add(lit.var())) {
+            this->hasDuplicates = true;
+            // throw ParseError(it, "Douplicated variables are not supported in constraints.");
+        }
+
+        if (this->isSmall) {
+            small.lit = lit;
+            degree += small.normalize();
+            small.emplaceInto(smallTerms);
+        } else {
+            large.lit = lit;
+            degree += large.normalize();
+            large.emplaceInto(largeTerms);
+        }
+    };
+
+    void setDegree(T degree) {
+        this->degree += degree;
+
+        if (this->isSmall) {
+            if (this->hasDuplicates || this->isEq || this->degree > std::numeric_limits<SmallInt>::max()) {
+                switchToLargeTerms();
+            }
+        }
+
+        this->isClause &= this->degree == 1;
+    }
+
+    void setEq() {
+        isEq = true;
+    }
+
+    void setGeq() {
+        isEq = false;
+    }
+
+
+    std::array<std::unique_ptr<Inequality<T>>, 2> getInequalities() {
+
+        std::unique_ptr<Inequality<T>> geq;
+        if (isClause) {
+            geq = std::make_unique<Inequality<T>>(
+                ClauseHandler(smallTerms.size(), smallTerms.size(), smallTerms.begin(), smallTerms.end()));
+        } else if (isSmall) {
+            SmallInt smallDegree = convertInt<SmallInt>(degree);
+            geq = std::make_unique<Inequality<T>>(
+                FixedSizeInequalityHandler<SmallInt>(smallTerms.size(), smallTerms, smallDegree));
+        } else {
+            switchToLargeTerms();
+            geq = std::make_unique<Inequality<T>>(largeTerms, degree);
+        }
+        std::unique_ptr<Inequality<T>> leq = nullptr;
+        if (isEq) {
+            degree = -degree;
+            for (Term<T>& term: largeTerms) {
+                degree += term.coeff;
+                term.lit = ~term.lit;
+            }
+
+            leq = std::make_unique<Inequality<T>>(largeTerms, degree);
+        }
+
+        return {std::move(geq), std::move(leq)};
+    }
+};
+
+
 template<typename T>
 class OPBParser {
     VariableNameManager& variableNameManager;
-    std::vector<Term<T>> terms;
-    std::vector<Term<int32_t>> smallTerms;
+    ParsedTerms<T> parsedTerms;
     VarDouplicateDetection duplicateDetection;
 
     std::unique_ptr<Formula<T>> formula;
@@ -576,74 +731,29 @@ public:
     }
 
     std::array<std::unique_ptr<Inequality<T>>, 2> parseConstraint(WordIter& it, bool geqOnly = false) {
-        terms.clear();
-        smallTerms.clear();
+        parsedTerms.reset();
 
-        bool isClause = true;
-        bool isSmall = true;
-        bool hasDuplicates = false;
-
-        T degreeOffset = 0;
-        T coeff;
-        int32_t smallCoeff;
         while (it != WordIter::end) {
             const string_view& word = *it;
             if (word == ">=" || word == "=") {
                 break;
             }
-            isSmall &= word.size() < 10;
-            if (!isSmall) {
-                coeff = parseCoeff<T>(it, 0, it->size());
-                isClause = false;
-            } else {
-                smallCoeff = parseCoeff<int32_t>(it, 0, it->size());
-                isClause &= (smallCoeff == 1);
-            }
 
+            if (word.size() > parsedTerms.smallMaxCharCount) {
+                parsedTerms.nextLargeCoeff(parseCoeff<T>(it, 0, it->size()));
+            } else {
+                parsedTerms.nextSmallCoeff(parseCoeff<typename ParsedTerms<T>::SmallInt>(it, 0, it->size()));
+            }
             ++it;
+
             Lit lit = parseLit(it, variableNameManager);
             if (formula) {
                 formula->maxVar = std::max(formula->maxVar, static_cast<size_t>(lit.var()));
             }
-            if (duplicateDetection.add(lit.var())) {
-                std::cout << lit.var() << std::endl;
-                hasDuplicates = true;
-                // throw ParseError(it, "Douplicated variables are not supported in constraints.");
-            }
 
-            if (!isSmall) {
-                if (coeff < 0) {
-                    coeff = -coeff;
-                    degreeOffset += coeff;
-                    if (degreeOffset < 0) {
-                        throw ParseError(it, "Overflow due to normalization.");
-                    }
-                    lit = ~lit;
-                }
-
-                if (!smallTerms.empty()) {
-                    assert(terms.empty());
-                    std::copy(smallTerms.begin(), smallTerms.end(), std::back_inserter(terms));
-                    smallTerms.clear();
-                }
-
-                terms.emplace_back(coeff, lit);
-            } else {
-                if (smallCoeff < 0) {
-                    smallCoeff = -smallCoeff;
-                    degreeOffset += smallCoeff;
-                    if (degreeOffset < 0) {
-                        throw ParseError(it, "Overflow due to normalization.");
-                    }
-                    lit = ~lit;
-                }
-
-                smallTerms.emplace_back(smallCoeff, lit);
-            }
+            parsedTerms.nextLit(lit);
             ++it;
         }
-
-        duplicateDetection.clear();
 
         std::vector<std::string> ops = {">=", "="};
         it.expectOneOf(ops);
@@ -652,61 +762,33 @@ public:
             throw ParseError(it, "Equality not allowed, only >= is allowed here.");
         }
 
+        if (isEq) parsedTerms.setEq(); else parsedTerms.setGeq();
         ++it;
+
         if (it == WordIter::end) {
             throw ParseError(it, "Expected degree.");
         }
-        assert(it->size() != 0);
-        const string_view& rhs = *it;
-        T degree;
-        if (rhs[rhs.size() - 1] == ';') {
-            degree = parseCoeff<T>(it, 0, rhs.size() - 1);
-            ++it;
-        } else {
-            degree = parseCoeff<T>(it);
-            ++it;
-            it.expect(";");
-            ++it;
-        }
-        isSmall  &= !hasDuplicates & !isEq;
-        isClause &= (degree == 1) & isSmall;
+
+        parsedTerms.setDegree(parseCoeff<T>(it));
+        ++it;
+
+        // if (*it == "==>") {
+        //     if (parsedTerms.isEq) {
+        //         throw ParseError(it, "Can not use implication on equalities.")
+        //     }
+        //     ++it;
+        //     Lit lit = parseLit(it, variableNameManager);
 
 
-        T normalizedDegree = degree + degreeOffset;
-        if (degree > normalizedDegree) {
-            throw ParseError(it, "Overflow due to normalization.");
-        }
+        //     ++it;
+        // } else if (*it == "<==") {
 
-        int32_t smallNormalizedDegree = 0;
-        std::unique_ptr<Inequality<T>> geq;
-        if (isClause) {
-            geq = std::make_unique<Inequality<T>>(
-                ClauseHandler(smallTerms.size(), smallTerms.size(), smallTerms.begin(), smallTerms.end()));
-        } else if (isSmall && normalizedDegree < std::numeric_limits<int32_t>::max()) {
-            smallNormalizedDegree = convertInt<int32_t>(normalizedDegree);
-            geq = std::make_unique<Inequality<T>>(
-                FixedSizeInequalityHandler<int32_t>(smallTerms.size(), smallTerms, smallNormalizedDegree));
-        } else {
-            isSmall = false;
-            if (!smallTerms.empty()) {
-                assert(terms.empty());
-                std::copy(smallTerms.begin(), smallTerms.end(), std::back_inserter(terms));
-                smallTerms.clear();
-            }
-            geq = std::make_unique<Inequality<T>>(terms, normalizedDegree);
-        }
-        std::unique_ptr<Inequality<T>> leq = nullptr;
-        if (isEq) {
-            normalizedDegree = -normalizedDegree;
-            for (Term<T>& term:terms) {
-                normalizedDegree += term.coeff;
-                term.lit = ~term.lit;
-            }
+        // }
 
-            leq = std::make_unique<Inequality<T>>(terms, normalizedDegree);
-        }
+        it.expect(";");
+        ++it;
 
-        return {std::move(geq), std::move(leq)};
+        return parsedTerms.getInequalities();
     }
 };
 

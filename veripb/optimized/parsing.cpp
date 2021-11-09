@@ -684,10 +684,15 @@ public:
     std::unique_ptr<Formula<T>> parse(std::ifstream& f, const std::string& fileName) {
         formula = std::make_unique<Formula<T>>();
         WordIter it(fileName);
-        if (!WordIter::getline(f, it)) {
-            throw ParseError(it, "Expected OPB header.");
-        }
-        parseHeader(it);
+
+        // We currently do not make use of the claimed number of
+        // variables (not even for checking if the numbers match),
+        // hence let us not parse the header. In general it would be
+        // nice to not force the header to be there.
+        // if (!WordIter::getline(f, it)) {
+        //     throw ParseError(it, "Expected OPB header.");
+        // }
+        // parseHeader(it);
 
         bool checkedObjective = false;
         while (WordIter::getline(f, it)) {

@@ -140,10 +140,10 @@ class Verifier():
             group.add_argument("--useColor", dest=name+".useColor",
                 action="store_true",
                 default=defaults["useColor"],
-                help="Require proof to contain contradiction.")
+                help="Enable colored trace output.")
             group.add_argument("--no-useColor", dest=name+".useColor",
                 action="store_false",
-                help="Do not require proof to contain contradiction, supress warning.")
+                help="Disable colored trace output.")
 
             group.add_argument("--trace", dest = name+".trace",
                 action="store_true",

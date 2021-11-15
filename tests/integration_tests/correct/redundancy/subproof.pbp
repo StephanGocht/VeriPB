@@ -1,0 +1,43 @@
+pseudo-Boolean proof version 1.2
+* the formula is a pigeon-hole instance that is a bit weird encoded
+f
+* input is not saturated, saturate input constraint
+p 1 s
+* the first at-most-one constraint is clauses, recover pseudo-Boolean constraint
+p 8 2 + 3 +
+* everything is divisible, lets just divide!
+p 9 2 d
+* we could just add everything together now to derive contradiction
+* p 10 4 + 5 + 6 + 7 +
+* c 11
+* but that is boring so let us show instead that w.l.o.g pigeon one goes into hole one
+
+red 1 x1 >= 1 ; x1 -> x3 x3 -> x5 x5 -> x1 x2 -> x4 x4 -> x6 x6 -> x2 ; begin
+    proofgoal #1
+        * note that we can use relative ids using -1 to refer to the previously derived constraint -2 for the constraint before etc.
+        p -1 -2 + 5 + 6 +
+        p -1 4 +
+        * the constraint is not of the form 0 >= k, for k > 0 yet.
+        * This is fine for veryPB because the slack is negative but
+        * lets be nice and get rid of the lhs by weakening
+        * (x6 load the literal axiom 1 x6 >= 0 and ~x6 would load 1 ~x6 >= 0)
+        p -1 x6 +
+        c -1
+    end
+
+    * almost-all constraints in the database are symmetric and after substitution we
+    * find the constraint that needs to be implied already in the
+    * database. The only exception is constraint 1, which is not
+    * symmetric because it has a 2 coefficient for ~x1.
+    proofgoal 1
+        * this proof goal could also be omitted as it can be shown by RUP
+        p -1 2 +
+        c -1
+    end
+end
+
+* at this point we can show that if pigeon one goes to hole one then
+* then either pigeon two or three will go to hole two
+* but now the other pigeon has no hole left, which is figured out by propgation
+
+u >= 1 ; c -1

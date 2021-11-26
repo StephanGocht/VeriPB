@@ -71,7 +71,7 @@ with the ``--trace`` option, which will output the derived proof.
 
 For Example::
 
-    veripb --trace tests/integration_tests/correct/miniProof_polishnotation_1.opb tests/integration_tests/correct/miniProof_polishnotation_1.proof
+    veripb --trace tests/integration_tests/correct/miniProof_polishnotation_1.opb tests/integration_tests/correct/miniProof_polishnotation_1.pbp
 
 
 Formula Format

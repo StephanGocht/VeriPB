@@ -577,10 +577,14 @@ class ReversePolishNotation(Rule):
             elif ins == "*":
                 constraint = stack.pop()
                 factor = next(it)
+                if factor < 0:
+                    raise InvalidProof("Multiplication by negative number.")
                 stack.append(constraint.multiply(factor))
             elif ins == "d":
                 constraint = stack.pop()
                 divisor = next(it)
+                if divisor <= 0:
+                    raise InvalidProof("Division by non positive number.")
                 stack.append(constraint.divide(divisor))
             elif ins == "r":
                 second = stack.pop()

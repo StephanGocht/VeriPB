@@ -797,32 +797,41 @@ public:
             throw ParseError(it, "Expected degree.");
         }
 
-        parsedTerms.setDegree(parseCoeff<T>(it));
-        ++it;
-
-        if (*it == "==>") {
-            if (parsedTerms.isEq) {
-                throw ParseError(it, "Can not use implication on equalities.");
-            }
-            ++it;
-
-            parsedTerms.negate();
-            parsedTerms.nextLargeCoeff(T(parsedTerms.degree));
-            parsedTerms.nextLit(this->parseLit(it));
-            ++it;
-        } else if (*it == "<==") {
-            if (parsedTerms.isEq) {
-                throw ParseError(it, "Can not use implication on equalities.");
-            }
-            ++it;
-
-            parsedTerms.nextLargeCoeff(T(parsedTerms.degree));
-            parsedTerms.nextLit(~this->parseLit(it));
-            ++it;
+        bool hasSemicolon = false;
+        size_t length = it->size();
+        if ((*it)[length - 1] == ';') {
+            hasSemicolon = true;
+            length -= 1;
         }
 
-        it.expect(";");
+        parsedTerms.setDegree(parseCoeff<T>(it, 0, length));
         ++it;
+
+        if (!hasSemicolon) {
+            if (*it == "==>") {
+                if (parsedTerms.isEq) {
+                    throw ParseError(it, "Can not use implication on equalities.");
+                }
+                ++it;
+
+                parsedTerms.negate();
+                parsedTerms.nextLargeCoeff(T(parsedTerms.degree));
+                parsedTerms.nextLit(this->parseLit(it));
+                ++it;
+            } else if (*it == "<==") {
+                if (parsedTerms.isEq) {
+                    throw ParseError(it, "Can not use implication on equalities.");
+                }
+                ++it;
+
+                parsedTerms.nextLargeCoeff(T(parsedTerms.degree));
+                parsedTerms.nextLit(~this->parseLit(it));
+                ++it;
+            }
+
+            it.expect(";");
+            ++it;
+        }
 
         return parsedTerms.getInequalities();
     }

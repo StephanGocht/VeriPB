@@ -472,7 +472,7 @@ class IsContradiction(Rule):
 
 @register_rule
 class ReversePolishNotation(Rule):
-    Ids = ["p"]
+    Ids = ["p", "pol"]
 
     @classmethod
     def parse(cls, line, context):

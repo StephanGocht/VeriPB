@@ -509,12 +509,11 @@ class ReversePolishNotation(Rule):
         with MaybeWordParser(line) as words:
             sequence = list(map(f, words))
 
-            if len(sequence) > 0:
-                if sequence[-1] == 0:
-                    sequence.pop()
-                    stackSize -= 1
-                if sequence[-1] == ";":
-                    sequence.pop()
+            if sequence and sequence[-1] == 0:
+                sequence.pop()
+                stackSize -= 1
+            if sequence and sequence[-1] == ";":
+                sequence.pop()
 
             if stackSize != 1:
                 raise ValueError("Stack should contain exactly one element at end of polish notation.");

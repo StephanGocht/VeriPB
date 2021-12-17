@@ -141,4 +141,5 @@ Execution with proof logging
 ----------------------------
 
 ::
+
     ./kissat instance.cnf out.pbp --no-binary

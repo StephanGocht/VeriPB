@@ -94,6 +94,31 @@ void ClausePropagator::cleanupWatches() {
 
 // int main(int argc, char const *argv[])
 // {
+//     numLexOrder cmp;
+//     std::vector<std::string> values = {
+//         "x_00",
+//         "x_0",
+//         "x_123",
+//         "x_00123",
+//         "x_0123",
+//         "y_1",
+//         "y_0",
+//         "x_123_002",
+//         "x_123_001",
+//         "x_023_001",
+//         "x_23_001"
+//     };
+
+//     std::sort(values.begin(),values.end(), cmp);
+
+//     for (auto s : values) {
+//         std::cout << s << std::endl;
+//     }
+//     return 0;
+// }
+
+// int main(int argc, char const *argv[])
+// {
 //     /* code */
 //     {
 //     Inequality<CoefType> foo({1,1,1},{1,1,1},1);

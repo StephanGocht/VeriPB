@@ -193,9 +193,11 @@ struct numLexOrder {
                         ++itB; ++nZeroB;
                     };
 
-                    if (itA == a.end() || itB == b.end()) continue;
-
-                    if (!std::isdigit(*itA) && !std::isdigit(*itB) && nZeroA != nZeroB) {
+                    // both are zero compare number of zeros
+                    if ((itA == a.end() || !std::isdigit(*itA))
+                        && (itB == b.end() || !std::isdigit(*itB))
+                        && nZeroA != nZeroB)
+                    {
                         return nZeroA < nZeroB;
                     }
 
@@ -217,9 +219,9 @@ struct numLexOrder {
                     continue;
                 }
             } else if (numMode) {
-                if (nZeroA < nZeroB) {
+                if (nZeroA > nZeroB) {
                     return true;
-                } else if (nZeroB < nZeroA) {
+                } else if (nZeroA < nZeroB) {
                     return false;
                 }
                 numMode = false;
@@ -236,9 +238,9 @@ struct numLexOrder {
             ++itB;
         }
 
-        if (nZeroA < nZeroB) {
+        if (nZeroA > nZeroB) {
             return true;
-        } else if (nZeroB < nZeroA) {
+        } else if (nZeroA < nZeroB) {
             return false;
         }
 

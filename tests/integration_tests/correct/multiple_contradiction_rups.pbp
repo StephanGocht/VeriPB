@@ -1,0 +1,58 @@
+pseudo-Boolean proof version 1.2
+f 84 0
+# 1
+* guessing iv0_eq_0, decision stack is [ iv0_eq_0 ]
+u 1 ~iv0_eq_0 -1 iv0_b_0 >= 0 ;
+u 1 ~iv0_eq_0 1 iv0_b_0 >= 0 ;
+# 2
+u 1 ~iv0_eq_0 1 ~iv2_eq_0 >= 1 ;
+u 3 ~iv0_eq_0 -1 iv2_b_0 -2 iv2_b_1 >= -2 ;
+u 3 ~iv0_eq_0 1 iv2_b_0 2 iv2_b_1 >= 1 ;
+u 3 ~iv0_eq_0 -1 iv2_b_0 -2 iv2_b_1 >= -2 ;
+u 3 ~iv0_eq_0 1 iv2_b_0 2 iv2_b_1 >= 1 ;
+u 1 ~iv0_eq_0 1 ~iv3_eq_0 >= 1 ;
+u 1 ~iv0_eq_0 -1 iv3_b_0 >= -1 ;
+u 1 ~iv0_eq_0 1 iv3_b_0 >= 1 ;
+u 1 ~iv0_eq_0 -1 iv3_b_0 >= -1 ;
+u 1 ~iv0_eq_0 1 iv3_b_0 >= 1 ;
+* all different, found hall set { varidx 1 varidx 2 } having values { 1 2 } and so varidx 3 != 1
+p 20 37 + 81 + 82 + 0
+u 1 ~iv0_eq_0 >= 1 ;
+# 1
+* backtracking
+u 1 ~iv0_eq_0 >= 1 ;
+w 2
+* guessing iv0_eq_1, decision stack is [ iv0_eq_1 ]
+u 1 ~iv0_eq_1 -1 iv0_b_0 >= -1 ;
+u 1 ~iv0_eq_1 1 iv0_b_0 >= 1 ;
+# 2
+u 1 ~iv0_eq_1 1 ~iv1_eq_1 >= 1 ;
+u 3 ~iv0_eq_1 -1 iv1_b_0 -2 iv1_b_1 >= -2 ;
+u 3 ~iv0_eq_1 1 iv1_b_0 2 iv1_b_1 >= 2 ;
+u 3 ~iv0_eq_1 -1 iv1_b_0 -2 iv1_b_1 >= -2 ;
+u 3 ~iv0_eq_1 1 iv1_b_0 2 iv1_b_1 >= 2 ;
+u 1 ~iv0_eq_1 1 ~iv2_eq_1 >= 1 ;
+u 1 ~iv0_eq_1 1 ~iv2_eq_2 >= 1 ;
+u 3 ~iv0_eq_1 -1 iv2_b_0 -2 iv2_b_1 >= 0 ;
+u 3 ~iv0_eq_1 1 iv2_b_0 2 iv2_b_1 >= 0 ;
+u 1 ~iv0_eq_1 1 ~iv3_eq_1 >= 1 ;
+u 1 ~iv0_eq_1 -1 iv3_b_0 >= 0 ;
+u 1 ~iv0_eq_1 1 iv3_b_0 >= 0 ;
+u 1 ~iv0_eq_1 -1 iv3_b_0 >= 0 ;
+u 1 ~iv0_eq_1 1 iv3_b_0 >= 0 ;
+u 1 ~iv0_eq_1 >= 1 ;
+# 1
+* backtracking
+u 1 ~iv0_eq_1 >= 1 ;
+w 2
+u 1 ~iv0_eq_0 >= 1 ;
+u -1 iv0_b_0 >= -1 ;
+u 1 iv0_b_0 >= 1 ;
+u >= 1 ;
+# 0
+* backtracking
+u >= 1 ;
+w 1
+* asserting contradiction
+u >= 1 ;
+c 123 0

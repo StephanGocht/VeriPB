@@ -1,0 +1,101 @@
+* #variable= 24 #constraint= 84
+* Test case by Ciaran (previous bug fixed by 3982df616545b042dab74c19100789f8b048ac66)
+* variable iv0 0 .. 1 binary encoding
+1 iv0_b_0 >= 0 ;
+-1 iv0_b_0 >= -1 ;
+* variable iv0 direct encoding
+1 iv0_eq_0 1 iv0_eq_1 >= 1 ;
+-1 iv0_eq_0 -1 iv0_eq_1 >= -1 ;
+1 ~iv0_eq_0 1 ~iv0_b_0 >= 1 ;
+1 iv0_eq_0 1 iv0_b_0 >= 1 ;
+1 ~iv0_eq_1 1 iv0_b_0 >= 1 ;
+1 iv0_eq_1 1 ~iv0_b_0 >= 1 ;
+* variable iv0 greater or equal encoding
+1 iv0_ge_0 >= 1 ;
+1 iv0_ge_0 1 ~iv0_ge_1 >= 1 ;
+1 ~iv0_eq_0 1 iv0_ge_0 >= 1 ;
+1 ~iv0_eq_0 1 ~iv0_ge_1 >= 1 ;
+1 iv0_eq_0 1 iv0_eq_1 1 ~iv0_ge_0 >= 1 ;
+1 ~iv0_ge_0 1 iv0_ge_1 1 iv0_eq_0 >= 1 ;
+1 ~iv0_ge_1 1 iv0_ge_0 >= 1 ;
+1 ~iv0_eq_1 1 iv0_ge_1 >= 1 ;
+1 iv0_eq_1 1 ~iv0_ge_1 >= 1 ;
+* variable iv1 1 .. 2 binary encoding
+1 iv1_b_0 2 iv1_b_1 >= 1 ;
+-1 iv1_b_0 -2 iv1_b_1 >= -2 ;
+* variable iv1 direct encoding
+1 iv1_eq_1 1 iv1_eq_2 >= 1 ;
+-1 iv1_eq_1 -1 iv1_eq_2 >= -1 ;
+2 ~iv1_eq_1 1 iv1_b_0 1 ~iv1_b_1 >= 2 ;
+1 iv1_eq_1 1 ~iv1_b_0 1 iv1_b_1 >= 1 ;
+2 ~iv1_eq_2 1 ~iv1_b_0 1 iv1_b_1 >= 2 ;
+1 iv1_eq_2 1 iv1_b_0 1 ~iv1_b_1 >= 1 ;
+* variable iv1 greater or equal encoding
+1 iv1_ge_1 >= 1 ;
+1 iv1_ge_1 1 ~iv1_ge_2 >= 1 ;
+1 ~iv1_eq_1 1 iv1_ge_1 >= 1 ;
+1 ~iv1_eq_1 1 ~iv1_ge_2 >= 1 ;
+1 iv1_eq_1 1 iv1_eq_2 1 ~iv1_ge_1 >= 1 ;
+1 ~iv1_ge_1 1 iv1_ge_2 1 iv1_eq_1 >= 1 ;
+1 ~iv1_ge_2 1 iv1_ge_1 >= 1 ;
+1 ~iv1_eq_2 1 iv1_ge_2 >= 1 ;
+1 iv1_eq_2 1 ~iv1_ge_2 >= 1 ;
+* variable iv2 0 .. 2 binary encoding
+1 iv2_b_0 2 iv2_b_1 >= 0 ;
+-1 iv2_b_0 -2 iv2_b_1 >= -2 ;
+* variable iv2 direct encoding
+1 iv2_eq_0 1 iv2_eq_1 1 iv2_eq_2 >= 1 ;
+-1 iv2_eq_0 -1 iv2_eq_1 -1 iv2_eq_2 >= -1 ;
+2 ~iv2_eq_0 1 ~iv2_b_0 1 ~iv2_b_1 >= 2 ;
+1 iv2_eq_0 1 iv2_b_0 1 iv2_b_1 >= 1 ;
+2 ~iv2_eq_1 1 iv2_b_0 1 ~iv2_b_1 >= 2 ;
+1 iv2_eq_1 1 ~iv2_b_0 1 iv2_b_1 >= 1 ;
+2 ~iv2_eq_2 1 ~iv2_b_0 1 iv2_b_1 >= 2 ;
+1 iv2_eq_2 1 iv2_b_0 1 ~iv2_b_1 >= 1 ;
+* variable iv2 greater or equal encoding
+1 iv2_ge_0 >= 1 ;
+1 iv2_ge_0 1 ~iv2_ge_1 >= 1 ;
+1 ~iv2_eq_0 1 iv2_ge_0 >= 1 ;
+1 ~iv2_eq_0 1 ~iv2_ge_1 >= 1 ;
+1 iv2_eq_0 1 iv2_eq_1 1 iv2_eq_2 1 ~iv2_ge_0 >= 1 ;
+1 ~iv2_ge_0 1 iv2_ge_1 1 iv2_eq_0 >= 1 ;
+1 ~iv2_ge_1 1 iv2_ge_0 >= 1 ;
+1 iv2_ge_1 1 ~iv2_ge_2 >= 1 ;
+1 ~iv2_eq_1 1 iv2_ge_1 >= 1 ;
+1 ~iv2_eq_1 1 ~iv2_ge_2 >= 1 ;
+1 iv2_eq_1 1 iv2_eq_2 1 ~iv2_ge_1 >= 1 ;
+1 ~iv2_ge_1 1 iv2_ge_2 1 iv2_eq_1 >= 1 ;
+1 ~iv2_ge_2 1 iv2_ge_1 >= 1 ;
+1 ~iv2_eq_2 1 iv2_ge_2 >= 1 ;
+1 iv2_eq_2 1 ~iv2_ge_2 >= 1 ;
+* variable iv3 0 .. 1 binary encoding
+1 iv3_b_0 >= 0 ;
+-1 iv3_b_0 >= -1 ;
+* variable iv3 direct encoding
+1 iv3_eq_0 1 iv3_eq_1 >= 1 ;
+-1 iv3_eq_0 -1 iv3_eq_1 >= -1 ;
+1 ~iv3_eq_0 1 ~iv3_b_0 >= 1 ;
+1 iv3_eq_0 1 iv3_b_0 >= 1 ;
+1 ~iv3_eq_1 1 iv3_b_0 >= 1 ;
+1 iv3_eq_1 1 ~iv3_b_0 >= 1 ;
+* variable iv3 greater or equal encoding
+1 iv3_ge_0 >= 1 ;
+1 iv3_ge_0 1 ~iv3_ge_1 >= 1 ;
+1 ~iv3_eq_0 1 iv3_ge_0 >= 1 ;
+1 ~iv3_eq_0 1 ~iv3_ge_1 >= 1 ;
+1 iv3_eq_0 1 iv3_eq_1 1 ~iv3_ge_0 >= 1 ;
+1 ~iv3_ge_0 1 iv3_ge_1 1 iv3_eq_0 >= 1 ;
+1 ~iv3_ge_1 1 iv3_ge_0 >= 1 ;
+1 ~iv3_eq_1 1 iv3_ge_1 >= 1 ;
+1 iv3_eq_1 1 ~iv3_ge_1 >= 1 ;
+* constraint all different
+-1 iv0_eq_0 -1 iv2_eq_0 >= -1 ;
+-1 iv0_eq_1 -1 iv1_eq_1 -1 iv2_eq_1 >= -1 ;
+-1 iv1_eq_2 -1 iv2_eq_2 >= -1 ;
+* constraint all different
+-1 iv2_eq_0 -1 iv3_eq_0 >= -1 ;
+-1 iv1_eq_1 -1 iv2_eq_1 -1 iv3_eq_1 >= -1 ;
+-1 iv1_eq_2 -1 iv2_eq_2 >= -1 ;
+* constraint all different
+-1 iv0_eq_0 -1 iv3_eq_0 >= -1 ;
+-1 iv0_eq_1 -1 iv3_eq_1 >= -1 ;

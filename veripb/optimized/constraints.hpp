@@ -1122,7 +1122,7 @@ public:
     }
 
     bool isPropagatingAt0() {
-        return terms.size() == 1;
+        return terms.size() <= 1;
     }
 
     void initWatch(ClausePropagator& prop) {
@@ -1364,7 +1364,7 @@ public:
 
     bool isPropagatingAt0() {
         if (terms.size() == 0) {
-            return false;
+            return degree > 0;
         }
 
         if (maxCoeff == 0) {

@@ -145,6 +145,12 @@ def idOrFind(words, context, delete = False):
             else:
                 which = [which.minId]
 
+    elif type_key == "range":
+        which = list(map(int, words))
+        if len(which) != 2:
+            raise ValueError("Expected exactly two arguments.")
+        return list(range(which[0], which[1]))
+
     else:
         raise ValueError("Expected constraint type ('id' or 'find').")
 

@@ -534,9 +534,10 @@ class SubVerifier(EmptyRule):
     def compute(self, antecedents, context):
         # context for sub verifier
         svContext = verifier.Context()
+        svContext.newIneqFactory = context.newIneqFactory
+        svContext.ineqFactory = svContext.newIneqFactory()
         svContext.newPropEngine = context.newPropEngine
         svContext.propEngine = svContext.newPropEngine()
-        svContext.ineqFactory = context.ineqFactory
         svContext.ruleCount = getattr(context, "ruleCount", 0)
 
         self._newParseContext = ParseContext(svContext)
@@ -551,6 +552,8 @@ class SubVerifier(EmptyRule):
             verify(context.rules)
         except StopSubVerifier:
             self.exitSubVerifier(context, svContext)
+            svContext.propEngine = None
+            svContext.ineqFactory = None
         else:
             raise InvalidProof("Subproof not finished.")
 

@@ -149,7 +149,10 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
 
     context = Context()
 
-    context.ineqFactory = CppIneqFactory(miscSettings.enableFreeNames)
+    def newIneqFactory():
+        return CppIneqFactory(miscSettings.enableFreeNames)
+    context.ineqFactory = newIneqFactory()
+    context.newIneqFactory = newIneqFactory
 
     if miscSettings.drat or miscSettings.cnf:
         parser = parseCnf
@@ -165,10 +168,13 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
     context.formula = formula["constraints"]
     context.objective = formula["objective"]
 
-    def newPropEngine():
-        return CppPropEngine(formula["numVariables"])
+    def newPropEngine(initFormulaSize = False):
+        if initFormulaSize:
+            return CppPropEngine(formula["numVariables"])
+        else:
+            return CppPropEngine(0)
 
-    context.propEngine = newPropEngine()
+    context.propEngine = newPropEngine(True)
     context.newPropEngine = newPropEngine
 
 
@@ -200,6 +206,8 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
             verify.print_stats()
 
         if profile:
+            heap = hpy()
+            print(heap.heap())
             pr.disable()
             convert2kcachegrind(pr.getstats(), 'callgrind.out.py.profile')
 

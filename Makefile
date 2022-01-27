@@ -20,7 +20,8 @@ PYTHON_COMPILED_C=$(PYTHON:.py=.c)
 # if you want to use asan you need prepend the following
 # when running veripb, if compiled with gcc
 # LD_PRELOAD=$(gcc -print-file-name=libasan.so)
-CXX_FLAGS?=-O3 -g
+CXX_FLAGS?=-O3
+CXX_FLAGS:=${CXX_FLAGS} -g
 CXX_FLAGS:=${CXX_FLAGS} -DNDEBUG
 # CXX_FLAGS:=${CXX_FLAGS} -fsanitize=address
 

@@ -564,6 +564,10 @@ public:
         : value(2 * (nVars + 1), State::Unassigned)
     {}
 
+    size_t get_mem_usage() {
+        return sizeof(State) * value.capacity();
+    }
+
     void assign(Lit lit) {
         value[lit] = State::True;
         value[~lit] = State::False;
@@ -792,6 +796,7 @@ public:
     virtual void propagate() = 0;
     virtual void cleanupWatches() = 0;
     virtual void increaseNumVarsTo(size_t) = 0;
+    virtual size_t get_mem_usage() = 0;
     virtual void reset(size_t pos) {
         if (qhead > pos)
             qhead = pos;
@@ -851,6 +856,15 @@ public:
         activePropagators.erase(
             std::find(activePropagators.begin(), activePropagators.end(), &propagator)
         );
+    }
+
+    size_t get_mem_usage() {
+        size_t result = 0;
+        for (auto& prop: knownPropagators) {
+            result += prop->get_mem_usage();
+        }
+
+        return result + phase.get_mem_usage() + assignment.get_mem_usage();
     }
 
     void increaseNumVarsTo(size_t _nVars) {
@@ -1015,6 +1029,15 @@ public:
     void watch(Lit lit, WatchedType& w) {
         // std::cout << "adding watch  " << lit << std::endl;
         watchlist[lit].push_back(w);
+    }
+
+    size_t get_mem_usage() {
+        size_t result = 0;
+        for (auto& wl: watchlist) {
+            result += sizeof(WatchedType) * wl.capacity();
+        }
+
+        return result + sizeof(WatchList) * watchlist.capacity();
     }
 
     virtual void increaseNumVarsTo(size_t nVars) {
@@ -1987,6 +2010,15 @@ public:
         watchlist[lit].push_back(w);
     }
 
+    size_t get_mem_usage() {
+        size_t result = 0;
+        for (auto& wl: watchlist) {
+            result += sizeof(WatchedType) * wl.capacity();
+        }
+
+        return result + sizeof(WatchList) * watchlist.capacity();
+    }
+
     virtual void increaseNumVarsTo(size_t _nVars){
         watchlist.resize(2 * (_nVars + 1));
     }
@@ -2134,6 +2166,11 @@ public:
         clausePropagator.clear();
         ineq32Propagator.clear();
         ineqPropagator.clear();
+    }
+
+    size_t get_mem_usage() {
+        // memory of propagators is counted in propmaster
+        return sizeof(OccursList) * occurs.capacity();
     }
 
     void increaseNumVarsTo(size_t nVars) {
@@ -2363,6 +2400,10 @@ public:
         core.activatePropagators();
     }
 
+    size_t get_mem_usage() {
+        return core.get_mem_usage() + derived.get_mem_usage() + propMaster.get_mem_usage();
+    }
+
     void printStats() {
         std::cout << "c statistic: used database memory: "
             << std::fixed << std::setprecision(3)
@@ -2375,6 +2416,10 @@ public:
         std::cout << "c statistic: maximal used database memory: "
             << std::fixed << std::setprecision(3)
             << static_cast<float>(maxDbMem) / 1024 / 1024 / 1024 << " GB" << std::endl;
+
+        std::cout << "c statistic: number variables:" << nVars << std::endl;
+        std::cout << "c statistic: variable memory use estimate:" << static_cast<float>(nVars) * 324 / 1024 / 1024 / 1024 << " GB" << std::endl;
+        std::cout << "c statistic: variable memory use:" << static_cast<float>(get_mem_usage()) / 1024 / 1024 / 1024 << " GB" << std::endl;
 
         std::cout << "c statistic: visit: " << visit << std::endl;
         std::cout << "c statistic: visit_sat: " << visit_sat << std::endl;

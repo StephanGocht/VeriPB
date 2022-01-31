@@ -80,7 +80,7 @@ https://gitlab.com/MIAOresearch/minisat_with_xorengine
 Instances
 ---------
 
-Any CNF instances, e.g., from the `SAT competition <https://satcompetition.github.io/2020/>`_.
+Any CNF instances, e.g., from the `SAT competition <https://satcompetition.github.io/2020/>`_. For instances with Xors see the `supplementary material of the parity paper <https://doi.org/10.5281/zenodo.4569840>`_.
 
 Execution with proof logging
 ----------------------------

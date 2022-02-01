@@ -3,9 +3,10 @@ VeriPB - Verifier for pseudo-Boolean proofs
 .. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.3548581.svg
    :target: https://doi.org/10.5281/zenodo.3548581
 
-VeriPB is a tool for verifying refutations (proofs of unsatisfiability)
-and more (such as verifying that a valid solution is found) in python
-and c++. A description of the proof file format can be found below.
+VeriPB is a tool for verifying refutations (proofs of
+unsatisfiability) and more (such as verifying that a valid solution is
+found) written in python and c++. A quick overview of the proof file
+format can be found below.
 
 Currently its focus is on linear pseudo-Boolean proofs utilizing
 cutting planes reasoning. VeriPB has already been used for various
@@ -13,16 +14,10 @@ applications including proof logging of
 
 * subgraph isomorphism [GMN2020]_,
 * clique and maximum common (connected) subgraph [GMMNPT2020]_,
-* constraint programming with all different constraints [EGMN20]_ and
-* parity reasoning in the context of CDCL SAT solvers [GN21]_.
+* constraint programming with all different constraints [EGMN20]_,
+* parity reasoning in the context of CDCL SAT solvers [GN21]_ and
+* dominance and symmetry breaking [BSCJ22]_.
 
-WARNING
-=======
-The current default setting only uses fixed bitwdith integers and does
-not contain code for catching overflows. This means that trying to
-verify proofs that contain or result in large numbers leads to
-undefined behaviour. If you need to use large coefficients, you can
-try the ``--arbitraryPrecision`` option.
 
 ATTENTION
 =========
@@ -44,18 +39,16 @@ Installation
 
 ::
 
-    git clone git@gitlab.com:miao_research/VeriPB.git
+    git clone git@gitlab.com:MIAOresearch/VeriPB.git
     cd ./VeriPB
     pip3 install --user ./
 
-Run ``veripb --help`` for help. Note that the first call to veripb
-after installation or update will take a while as it is compiling
-code.
+Run ``veripb --help`` for help.
 
 Update
 ------
 
-If installed as described above the tool can be updated with
+If installed as described above the tool can be updated form the VeriPB directory with
 
 ::
 
@@ -67,11 +60,11 @@ Getting Started
 
 A good way to getting started is probably to have a look at the
 examples under ``tests/integration_tests/correct`` and to run VeriPB
-with the ``--trace`` option, which will output the derived proof.
+with the ``--trace --useColor`` option, which will output the derived proof.
 
 For Example::
 
-    veripb --trace tests/integration_tests/correct/miniProof_polishnotation_1.opb tests/integration_tests/correct/miniProof_polishnotation_1.pbp
+    veripb --trace --useColor tests/integration_tests/correct/miniProof_polishnotation_1.opb tests/integration_tests/correct/miniProof_polishnotation_1.pbp
 
 
 Formula Format
@@ -79,7 +72,7 @@ Formula Format
 
 The formula is provided in `OPB <http://www.cril.univ-artois.fr/PB12/format.pdf>`_ format. A short overview can be
 found
-`here <https://gitlab.com/miao_research/roundingsat/-/blob/master/InputFormats.md>`_.
+`here <https://gitlab.com/MIAOresearch/roundingsat/-/blob/master/InputFormats.md>`_.
 
 The verifier also supports an extension to OPB, which allows to use
 arbitrary variable names instead of x1, x2, ... Variable names must
@@ -104,13 +97,17 @@ TLDR;
     * load formula
     f [nProblemConstraints]
     * compute constraint in polish notation
-    p [sequence of operations in reverse polish notation]
+    pol [sequence of operations in reverse polish notation]
     * introduce constraint that is verified by reverse unit propagation
-    u  [OPB style constraint]
+    rup  [OPB style constraint]
     * delete constraints
-    d [constraintId1] [constraintId2] [constraintId3] ...
+    del [constraintId1] [constraintId2] [constraintId3] ...
     * verify contradiction
     c [which]
+    * add constraint by redundancy based strengthening
+    red [OPB style constraint] ; [substitution]
+    * add constraint by dominance based strengthening
+    dom [OPB style constraint] ; [substitution]
 
 Introduction
 ------------
@@ -183,12 +180,12 @@ Examples of contradicting constraints::
     3 x1 -2 x2 >= 4 ;
 
 
-reverse (p)olish notation
+reverse (pol)ish notation
 -------------------------
 
 ::
 
-    p [sequence in reverse polish notation]
+    pol [sequence in reverse polish notation]
 
 Add a new constraint with ConstraintId := IDmax + 1. How to derive the constraint is describe by a 0 terminated sequence of
 arithmetic operations over the constraints. These are written down in
@@ -245,18 +242,18 @@ with a single rule.
 
 For example::
 
-    p 42 3 * 43 + s 2 d
+    pol 42 3 * 43 + s 2 d
 
 Creates a new constraint by taking 3 times the constraint with index
 42, then adds constraint 43, followed by a saturation step and a
 division by 2.
 
-reverse (u)nit propagation
+reverse unit propagation (RUP)
 --------------------------
 
 ::
 
-    u [OPB style constraint]
+    rup [OPB style constraint]
 
 Use reverse unit propagation to check if the constraint is implied,
 i.e., it temporarily adds the negation of the constraint and performs
@@ -267,12 +264,53 @@ know that the constraint is implied and the check passes.
 If the reverse unit propagation check passes then the constraint is
 added with ConstraintId := IDmax + 1. Otherwise, verification fails.
 
-It is also possible to introduce redundant constraints that can be
-checked with unit propagation.
+
+(del)ete constraint
+-------------------
 
 ::
 
-    u w [literal1] [literal2] ... ; [OPB style constraint]
+    del id [constraintId1] [constraintId2] [constraintId3] ...
+    del spec [OPB style constraint]
+    del range [constraintIdStart] [constraintIdEnd]
+
+Delete constraints with given constrain ids, spacification or in the
+range from start to end, including start but not end. Note that
+constraints will be deleted completely including propagations caused.
+
+If an order is loaded and a constarint marked as core is deleted, then
+additional checks might be required.
+
+Strengthening Rules
+===================
+
+Substitution
+------------
+
+A substitution ``[substitution]`` is a space seperated sequence of
+multiple mappings from a variable to a constant or a literal.
+
+::
+
+    [variable] -> 0
+    [variable] -> 1
+    [variable] -> [literal]
+
+Using ``->`` is optional and can improve readability.
+
+For example::
+    x1 -> 0 x2 -> ~x3
+    x1 0 x2 ~x3
+
+
+Redundancy Based Strengthening
+------------------------------
+
+
+::
+
+    red [OPB style constraint] ; [substitution]
+
 
 Adding the constraint is successful if it passes the map redundancy
 check via unit propagation or syntactic checks, i.e., if it can be
@@ -287,38 +325,90 @@ literals. More formally it is checked that,
 
 For details, please refer to [GN21]_.
 
+If the redundancy rule is used in the context of optimization and / or
+dominance breaking, additional conditions are checked. For details,
+please refer to [BSCJ]_.
 
-(d)elete constraint
--------------------
+Subproofs
+---------
+
+For both strengthening rules it is possible to provide an explicit
+subproof. A suproof starts by ending the strengthening step with ``;
+begin`` and is concluded by ``end``. Within a subproof it is possible
+to specify proof goals using ``proofgoal [goalId]``, which are in turn
+terminated by ``end``. Each proofgoal needs to derive contradiction
+using the provided constraints.
+
+Example ::
+
+    red 1 x1 >= 1 ; x1 -> 1 ; begin
+        proofgoal #1
+            pol -1 -2 +
+            c -1
+        end
+
+        proofgoal 1
+            rup >= 1 ;
+            c -1
+        end
+    end
+
+The ``[goalId]`` are as follows: If a goal originates from a
+constraint in the database the ``[goalId]`` is identical to the
+constraintId of the constraint in the database. Otherwise the goalId
+starts with a ``#`` folowed by a number which is increased for each
+goal in the following order (if applicable): the constraint to be
+derived (only redundancy), one goal per constraint in the order, one
+goal for the negated order (only dominance), objective condition (only
+for optimization problems). Tip: Use ``--trace`` option to display
+required goals.
+
+Dominance Based Strengthening
+-----------------------------
+
+For details, please refer to [BSCJ]_. For syntax have a look at the
+example under ``tests/integration_tests/correct/dominance/example.pbp`` .
+
+Template: ::
+
+    pre_order simple
+        * specify variables
+        vars
+            left u1
+            right v1
+        end
+
+        * define the order
+        def
+            -1 u1 1 v1 >= 0 ;
+        end
+
+        * proof goal: transitivity
+        transitivity
+            vars
+                fresh_right w1
+            end
+            proof
+                proofgoal #1
+                    p 1 2 + 3 +
+                    c -1
+                qed
+            qed
+        qed
+    end
+
+    load_order simple x1
+    dom 1 ~x1 >= 1 ; x1 0
+
+
+Moving constraints to core
+--------------------------
 
 ::
 
-    d [constraintId1] [constraintId2] [constraintId3] ...
-
-Delete constraints with given constrain ids. This verifier currently
-implements weak propagating semantic for deletion (see below) but will
-change to strong semantic in the foreseeable future, possibly keeping
-weak propagating semantic via a parameter settings.
-
-Weak semantic
-^^^^^^^^^^^^^
-
-The constraints should no longer be used after deletion. It is
-implementation specific if verification fails if they are accessed
-after deletion. Especially, the verifier is not required to delete
-constraints. The goal of the weak semantic is purely for performance
-benefits during verification.
-
-Weak propagating semantic
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Same as weak semantic, but guarantees to keep unit propagations that
-were caused by deleted constraints.
-
-Strong semantic
-^^^^^^^^^^^^^^^
-
-Constraints are guaranteed to be deleted.
+    core id [constraintId1] [constraintId2] ...
+    core spec [opb style constraint]
+    core range [constraintIdStart] [constraintIdEnd]
 
 
 Convenience Rules and Rules for Sanity Checks
@@ -498,10 +588,18 @@ derivations that are already implemented are correct.
 References
 ==========
 
+.. _BSCJ22:
+
+[BSCJ22] Certified Symmetry and Dominance Breaking for Combinatorial
+Optimisation, Bart Bogaerts, Stephan Gocht, Ciaran McCreesh, Jakob
+Nordström, Proceedings of the AAAI Conference on Artificial
+Intelligence, 2022 (to appear).
+
 .. _GN21:
 
-[GN21] Certifying Parity Reasoning Efficiently Using Pseudo-Boolean Proofs,
-Stephan Gocht, Jakob Nordström, (to apear AAAI '21).
+[GN21] Certifying Parity Reasoning Efficiently Using Pseudo-Boolean
+Proofs, Stephan Gocht, Jakob Nordström, Proceedings of the AAAI
+Conference on Artificial Intelligence, 2021, 35, 3768-3777.
 
 .. _GMMNPT2020:
 

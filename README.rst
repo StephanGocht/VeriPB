@@ -327,7 +327,7 @@ For details, please refer to [GN21]_.
 
 If the redundancy rule is used in the context of optimization and / or
 dominance breaking, additional conditions are checked. For details,
-please refer to [BSCJ]_.
+please refer to [BSCJ22]_.
 
 Subproofs
 ---------
@@ -366,7 +366,7 @@ required goals.
 Dominance Based Strengthening
 -----------------------------
 
-For details, please refer to [BSCJ]_. For syntax have a look at the
+For details, please refer to [BSCJ22]_. For syntax have a look at the
 example under ``tests/integration_tests/correct/dominance/example.pbp`` .
 
 Template: ::

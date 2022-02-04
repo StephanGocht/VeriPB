@@ -1016,6 +1016,19 @@ int main(int argc, char const *argv[])
         if (it.get() == "pseudo-Boolean") {
 
         } else if (it.get() == "f") {
+        } else if (it.get() == "a") {
+            auto c = parseOpbConstraint<CoefType>(manager, it);
+            Inequality<CoefType>* ineq;
+            {
+                Timer timer(timeAttach);
+                ineq = engine.attach(c[0].get(), ++id);
+            }
+
+            if (ineq == c[0].get()) {
+                constraints.emplace_back(std::move(c[0]));
+            } else {
+                constraints.push_back(nullptr);
+            }
         } else if (it.get() == "u") {
             rupSteps += 1;
             it.next();

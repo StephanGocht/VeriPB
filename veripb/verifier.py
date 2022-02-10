@@ -210,6 +210,10 @@ class Verifier():
                     raise InvalidProof("Rule %i is trying to access constraint "\
                         "(constraintId %i), which is not derived, yet."\
                         %(ruleNum, i))
+                elif i <= -len(self.db):
+                    raise InvalidProof("Rule %i is trying to access invalid id "\
+                        "(constraintId %i)."\
+                        %(ruleNum, len(self.db) + i))
 
                 constraint = self.db[i]
                 if constraint is None:

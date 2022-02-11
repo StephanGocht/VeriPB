@@ -5,6 +5,7 @@ from veripb.constraints import Term
 from veripb.parser import OPBParser, MaybeWordParser
 from veripb.timed_function import TimedFunction
 from veripb.rules_register import register_rule
+from veripb.optimized.constraints import Assignment
 
 from veripb import InvalidProof
 
@@ -364,6 +365,47 @@ class Solution(Rule):
 
     def numConstraints(self):
         return 1
+
+    def antecedentIDs(self):
+        return []
+
+    def isGoal(self):
+        return True
+
+    def deleteConstraints(self):
+        return []
+
+@register_rule
+class OriginalSolution(Rule):
+    Ids = ["ov"]
+
+    @classmethod
+    def parse(cls, line, context):
+        def lit2int(name):
+            if name[0] == "~":
+                return -context.ineqFactory.name2Num(name[1:])
+            else:
+                return context.ineqFactory.name2Num(name)
+
+        with MaybeWordParser(line) as words:
+            result = list(map(lit2int, words))
+
+        return cls(Assignment(result))
+
+    def __init__(self, assignment):
+        self.assignment = assignment
+
+    @TimedFunction.time("Solution.compute")
+    def compute(self, antecedents, context):
+        for c in context.formula:
+            if not c.isSAT(self.assignment):
+                error = "Constraint %s not satisfied!"%(context.ineqFactory.toString(c))
+                raise SolutionCheckFailed(error)
+
+        return []
+
+    def numConstraints(self):
+        return 0
 
     def antecedentIDs(self):
         return []

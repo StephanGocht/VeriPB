@@ -167,7 +167,8 @@ int hashColision = 0;
             .def("moveMultipleToCore", &PropEngine<CoefType>::moveMultipleToCore)
             .def("moveAllToCore", &PropEngine<CoefType>::moveAllToCore);
 
-
+        py::class_<Assignment>(m, "Assignment")
+            .def(py::init<std::vector<int>&>());
 
 
         auto cppIneq = py::class_<Inequality<CoefType>>(m, "CppInequality")
@@ -189,6 +190,7 @@ int hashColision = 0;
             .def("toString", &Inequality<CoefType>::toString)
             .def("toOPB", &Inequality<CoefType>::repr)
             .def("isContradiction", &Inequality<CoefType>::isContradiction)
+            .def("isSAT", &Inequality<CoefType>::isSAT)
             .def("isTrivial", &Inequality<CoefType>::isTrivial)
             .def("substitute", &Inequality<CoefType>::substitute)
             .def("weaken", &Inequality<CoefType>::weaken);

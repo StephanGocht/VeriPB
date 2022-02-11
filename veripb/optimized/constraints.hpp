@@ -564,6 +564,17 @@ public:
         : value(2 * (nVars + 1), State::Unassigned)
     {}
 
+    Assignment(std::vector<int>& assignment)
+        : value(2 * (assignment.size() + 1), State::Unassigned)
+    {
+        for (int int_lit: assignment) {
+            Lit lit(int_lit);
+            assign(lit);
+        }
+    }
+
+
+
     size_t get_mem_usage() {
         return sizeof(State) * value.capacity();
     }
@@ -1602,15 +1613,7 @@ public:
         return keepWatch;
     }
 
-    bool isSatisfied(const Assignment& a) const {
-        T slack = -this->degree;
-        for (const Term<T>& term:this->terms) {
-            if (a[term.lit] == State::True) {
-                slack += term.coeff;
-            }
-        }
-        return slack >= 0;
-    }
+
 };
 
 template<typename T>
@@ -2790,6 +2793,25 @@ public:
     };
 };
 
+
+struct isSAT {
+    template<typename TIneq>
+    bool operator()(const TIneq& constraint, Assignment& assignment) {
+        using T = typename TIneq::TTerm::coeff_type;
+
+        T slack = -constraint.degree;
+        for (const auto& term:constraint.terms) {
+            if (assignment[term.lit] == State::True) {
+                slack += term.coeff;
+                if (slack >= 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+};
+
 /**
  * stores constraint in (literal) normalized form, the sign of the
  * literal is stored in the coefficient
@@ -3403,6 +3425,11 @@ public:
         other.contract();
 
         return unpacked::call2(InplaceIneqOps::implies(), handle.get(), other.handle.get());
+    }
+
+    bool isSAT(Assignment& assignment) {
+        this->contract();
+        return unpacked::call(::isSAT(), handle.get(), assignment);
     }
 
     bool rupCheck(PropEngine<T>& propEngine, bool onlyCore = false) {

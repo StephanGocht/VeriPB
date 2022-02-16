@@ -1570,7 +1570,9 @@ public:
         for (size_t i = 0; i < this->watchSize; i++) {
             if (value[terms[i].lit] == State::False) {
                 if (init) {for (;k < terms.size(); k++) {
-                    if (prop.propMaster.getPhase()[terms[k].lit] == State::True) {
+                    // idea from Jan: initialize watches based on phase
+                    if (prop.propMaster.getPhase()[terms[k].lit] == State::True
+                            && value[terms[k].lit] != State::False) {
                         swapWatch(prop,i,k,keepWatch,blockingLiteral,falsifiedLit,init);
                         if (computeSlack) {
                             slack += terms[i].coeff;

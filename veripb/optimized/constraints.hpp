@@ -16,6 +16,7 @@
 #include <list>
 
 #include "BigInt.hpp"
+#include "Logging.hpp"
 
 #ifndef NDEBUG
     #include <unistd.h>
@@ -735,6 +736,7 @@ public:
     virtual bool isMarkedForDeletion() = 0;
     virtual void setIsReason() = 0;
     virtual void unsetIsReason() = 0;
+    virtual void print(std::ostream&) = 0;
     virtual ~Reason(){};
 };
 
@@ -770,6 +772,10 @@ public:
 
     virtual void unsetIsReason() {
         constraint->header.isReason = false;
+    }
+
+    virtual void print(std::ostream& out) {
+        out << *constraint;
     }
 
     static ReasonPtr aquire(TConstraint& _constraint, TPropagator& _propagator) {
@@ -853,6 +859,36 @@ public:
         , phase(nVars)
     {
         trail.reserve(nVars);
+    }
+
+    void dbgPrintState() {
+        LOG(debug) << "assignment: ";
+        for (size_t var = 1; var < this->getAssignment().value.size() / 2; var++) {
+            auto val = this->getAssignment().value[Lit(var)];
+            if (val == State::True) {
+                LOG(debug) << var << " ";
+            } else if (val == State::False) {
+                LOG(debug) << -static_cast<int>(var) << " ";
+            }
+        }
+        LOG(debug) << EOM;
+
+        LOG(debug) << "trail: " << EOM;
+        for (size_t i = 0; i < trail.size(); ++i) {
+            LOG(debug) << trail[i] << ": ";
+            reasons[i]->print(logging::Streams::debug());
+            LOG(debug) << EOM;
+        }
+
+        if (this->isConflicting()) {
+            LOG(debug) << "confl: ";
+            if (this->conflictReason) {
+                this->conflictReason->print(logging::Streams::debug());
+            } else {
+                LOG(debug) << "by decision";
+            }
+            LOG(debug) << EOM;
+        }
     }
 
     void addPropagator(Propagator& propagator) {

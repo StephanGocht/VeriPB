@@ -215,6 +215,7 @@ class Autoprover():
                     print("    automatically proved %s by RUP check." % (str(nxtGoalId)))
                 else:
                     print("    automatically proved constraint to be added by RUP check.")
+                    self.getPropagatedAssignment()
             return True
         return False
 

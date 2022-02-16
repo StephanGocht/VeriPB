@@ -1524,6 +1524,7 @@ public:
         if (init) {
             computeWatchSize();
         }
+        assert(watchSize != 0 || terms.size() == 0 || degree <= 0);
 
         // use statick variable to avoid reinizialisation for BigInts,
         // prevents prallel or recursive execution!
@@ -2252,6 +2253,10 @@ public:
                 ineq->wasAttached = true;
                 ineq->initWatch(*this);
                 ineq->_groupState = (state == State::unhandled) ? State::unregistered : State::handled;
+
+                if (ineq->isPropagatingAt0()) {
+                    this->propagatingAt0.push_back(ineq);
+                }
             }
         }
 
@@ -2275,10 +2280,6 @@ public:
         get(State::unhandled).push_front(&ineq);
         ineq._groupIter = get(State::unhandled).begin();
         ineq._groupState = State::unhandled;
-
-        if (ineq.isPropagatingAt0()) {
-            this->propagatingAt0.push_back(&ineq);
-        }
     }
 
     void remove(Inequality<T>& ineq) {

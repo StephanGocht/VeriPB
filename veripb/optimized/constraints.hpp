@@ -842,7 +842,7 @@ private:
     std::vector<Propagator*> knownPropagators;
     std::vector<Propagator*> activePropagators;
 public:
-    std::chrono::duration<double> timeCleanupTrail = std::chrono::seconds(1);
+    std::chrono::duration<double> timeCleanupTrail = std::chrono::seconds(0);
 
     const Assignment& getAssignment() {return assignment;}
     const Assignment& getPhase() {return phase;}

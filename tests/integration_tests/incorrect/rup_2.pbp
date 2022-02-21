@@ -1,0 +1,7 @@
+pseudo-Boolean proof version 1.2
+f
+u 1 x4 >= 1 ;
+u >= 0 ;
+u 1 x4 1 x3 >= 2 ;
+d 3
+u 1 x1 1 x2 >= 1 ;

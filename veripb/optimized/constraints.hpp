@@ -2847,7 +2847,11 @@ struct isSAT {
                 }
             }
         }
-        return false;
+        if (slack >= 0) {
+            return true;
+        } else {
+            return false;
+        }
     }
 };
 

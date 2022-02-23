@@ -515,15 +515,31 @@ TLDR;
 Given a partial assignment in form of a list of ``[literal]``, i.e.
 variable names with ``~`` as prefix to indicate negation, check that:
 
-* after unit propagation we are left with a full assignment, i.e. an
-  assignment that assigns all variables that are mentioned in a
-  constraint in the formula or the proof
+* after unit propagation we are left with a full assignment to the
+  current database, i.e. an assignment that assigns all variables that
+  are mentioned in a constraint in the formula or the proof
 
-* the full assignment does not violate any constraint
+* the full assignment does not violate any constraint in the current
+  database
 
 If the check is successful then the clause consisting of the negation
 of all literals is added with ConstraintId := IDmax + 1. If the check
 is not successful then verification fails.
+
+(ov) original solution
+------------
+
+::
+
+    ov [literal] [literal] ...
+    ov x1 ~x2
+
+Given an assignment in form of a list of ``[literal]``, i.e.
+variable names with ``~`` as prefix to indicate negation, check that:
+
+* each constraint in the original formula is satisfied
+
+If the check is not successful then verification fails.
 
 (o) optimal value
 -----------------

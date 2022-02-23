@@ -585,6 +585,22 @@ of C is not implemented yet. Using this rule we can simply add C
 without providing a derivation and check with VeriPB that all other
 derivations that are already implemented are correct.
 
+Acknowledgements
+================
+
+This work was done in part while the author
+
+* was supported by the Swedish Research Council grant 2016-00782
+* was participating in a program at the Simons Institute for the Theory of Computing. 
+
+I thank Jan Elffers and Jo Devriendt for interesting discussions that
+helped to improve the performance of VeriPB as well as Bart Bogaerts and
+Ciaran Mccreesh for their significant contributions to the proof
+format and providing interesting applications for it. Last but not
+least, I thank my PhD supervisor Jakob Nordström for all of the above
+and without whom this work would not have been possible.
+
+
 References
 ==========
 

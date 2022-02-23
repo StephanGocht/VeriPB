@@ -666,6 +666,8 @@ class AddRedundant(MultiGoalRule):
         #     allowEq = False)
         # ineq = parser.parseConstraint(words)
 
+        context.canLoadFormula = False
+
         substitution = Substitution.parse(
             words = words,
             ineqFactory = context.ineqFactory)
@@ -765,6 +767,8 @@ class DominanceRule(MultiGoalRule):
     def parse(cls, line, context):
         orderContext = OrderContext.setup(context)
         order = orderContext.activeOrder
+
+        context.canLoadFormula = False
 
         with MaybeWordParser(line) as words:
             parser = OPBParser(

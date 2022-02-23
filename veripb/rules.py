@@ -671,6 +671,9 @@ class LoadFormula(Rule):
     @classmethod
     def parse(cls, line, context):
         context.foundLoadFormula = True
+        if getattr(context, "canLoadFormula", True) == False:
+            raise ValueError("You are not allowed to load the formula"\
+                "after using redundancy checks")
         numConstraints = len(context.formula)
         with MaybeWordParser(line) as words:
             try:
@@ -708,6 +711,10 @@ class LoadAxiom(Rule):
 
     @classmethod
     def parse(cls, line, context):
+        if getattr(context, "canLoadFormula", True) == False:
+            raise ValueError("You are not allowed to load the formula"\
+                "after using redundancy checks")
+
         with MaybeWordParser(line) as words:
             num = words.nextInt()
             words.expectEnd()

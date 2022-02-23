@@ -28,3 +28,6 @@ tests/integration_tests/rename.bash
 veripb/optimized/a.out
 veripb/optimized/simplified.cpp
 veripb/optimized/testparser
+
+veripb.sublime-project
+veripb.sublime-workspace

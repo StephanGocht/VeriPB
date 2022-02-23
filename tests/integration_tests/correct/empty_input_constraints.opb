@@ -1,0 +1,4 @@
+* #variable= 3 #constraint= 1
+>= 0 ;
+>= -1 ;
+>= 1 ;

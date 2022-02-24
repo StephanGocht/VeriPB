@@ -337,20 +337,30 @@ def checkSolution(propEngine, ineqFactory, assignment):
             raise SolutionCheckFailed(error)
 
 
+def parse_assignment(context, words):
+    def lit2int(name):
+        if name[0] == "~":
+            return -context.ineqFactory.name2Num(name[1:])
+        else:
+            return context.ineqFactory.name2Num(name)
+
+    nVars = context.ineqFactory.numVars()
+    result = list(map(lit2int, words))
+
+    context.propEngine.increaseNumVarsTo(context.ineqFactory.numVars())
+    # Should we produce an error or at least a warning if a variable is defined that was not used before?
+    # if nVars < context.ineqFactory.numVars():
+    #     raise InvalidProof("Variable " + context.ineqFactory.num2Name(nVars + 1) + " not defined.")
+    return result
+
 @register_rule
 class Solution(Rule):
     Ids = ["v"]
 
     @classmethod
     def parse(cls, line, context):
-        def lit2int(name):
-            if name[0] == "~":
-                return -context.ineqFactory.name2Num(name[1:])
-            else:
-                return context.ineqFactory.name2Num(name)
-
         with MaybeWordParser(line) as words:
-            result = list(map(lit2int, words))
+            result = parse_assignment(context, words)
 
         return cls(result)
 
@@ -381,14 +391,8 @@ class OriginalSolution(Rule):
 
     @classmethod
     def parse(cls, line, context):
-        def lit2int(name):
-            if name[0] == "~":
-                return -context.ineqFactory.name2Num(name[1:])
-            else:
-                return context.ineqFactory.name2Num(name)
-
         with MaybeWordParser(line) as words:
-            result = list(map(lit2int, words))
+            result = parse_assignment(context, words)
 
         return cls(Assignment(result))
 
@@ -428,14 +432,8 @@ class ObjectiveBound(Rule):
 
     @classmethod
     def parse(cls, line, context):
-        def lit2int(name):
-            if name[0] == "~":
-                return -context.ineqFactory.name2Num(name[1:])
-            else:
-                return context.ineqFactory.name2Num(name)
-
         with MaybeWordParser(line) as words:
-            result = list(map(lit2int, words))
+            result = parse_assignment(context, words)
 
         return cls(result)
 

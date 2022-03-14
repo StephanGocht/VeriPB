@@ -844,15 +844,23 @@ class CNFParser {
     VarDouplicateDetection duplicateDetection;
 
     std::unique_ptr<Formula<T>> formula;
-
+    bool weighted;
+    T weighted_partial_top; // Max weight of clause, which generates hard clause
+    int vars_claimed_header;
 public:
-    CNFParser(VariableNameManager& mngr):
-        variableNameManager(mngr)
+    CNFParser(VariableNameManager& mngr, bool weighted = false):
+        variableNameManager(mngr),
+        weighted(weighted)
     {}
 
 
     std::unique_ptr<Formula<T>> parse(std::ifstream& f, const std::string& fileName) {
         formula = std::make_unique<Formula<T>>();
+
+        if(weighted){
+            formula->hasObjective = true;
+        }
+
         WordIter it(fileName);
 
         bool foundHeader = false;
@@ -869,7 +877,11 @@ public:
         }
 
         if (!foundHeader) {
-            throw ParseError(it, "Expected CNF header.");
+            if(weighted){
+                throw ParseError(it, "Expected WCNF header.");
+            } else{
+                throw ParseError(it, "Expected CNF header.");
+            }
         }
 
         return std::move(formula);
@@ -878,12 +890,31 @@ public:
     void parseHeader(WordIter& it) {
         it.expect("p");
         ++it;
-        it.expect("cnf");
+
+        if(weighted){
+            it.expect("wcnf");
+        } else{
+            it.expect("cnf");
+        }
         ++it;
         formula->claimedNumVar = parseInt(it, "Expected number of variables.");
+        vars_claimed_header = formula->claimedNumVar;
         ++it;
         formula->claimedNumC = parseInt(it, "Expected number of constraints.");
         ++it;
+
+        if(weighted){
+            if(it != WordIter::end){
+                //T coeff = parseCoeff<T>(it, 0, it->size());
+                weighted_partial_top = parseCoeff<T>(it, 0, it->size());
+            }
+            else{
+                weighted_partial_top = std::numeric_limits<T>::max(); // TODO: check for the weights
+            }
+
+            ++it;
+        }
+
         if (it != WordIter::end) {
             throw ParseError(it, "Expected end of header line.");
         }
@@ -898,14 +929,47 @@ public:
         char* bufferStart;
 
         bool hasDuplicates = false;
+
+        int weight = 0;
+        
         while (it != WordIter::end && *it != "0") {
+            // If no weight has been parsed yet, this means that the first value will be the weight of the clause. 
+            // Assumption: add a relaxation variable with name "xi" with i a number in the range [nbvar+1, nbvar+nbclauses].
+            if(weighted && weight==0){
+                weight = parseInt(it, "Value expected");
+                
+                if(weight < weighted_partial_top){
+                    formula->claimedNumVar++; // Claim another variable as relaxation variable.
+
+                    std::string name = "x"+ std::to_string(formula->claimedNumVar);
+                    string_view relaxVarName(name);
+                    
+                    Lit lit = variableNameManager.getLit(relaxVarName); // getLit also calls getVar, which adds the variable name to the variable name manager if not exists.
+
+                    terms.emplace_back(1, lit);
+                    
+                    formula->objectiveCoeffs.push_back(weight);
+                    formula->objectiveVars.push_back(lit.var());
+                    formula->maxVar = std::max(formula->maxVar, static_cast<size_t>(lit.var()));
+                }
+                ++it;
+                continue;
+            }
+
             // parse int to give nice error messages if input is not
             // an integer, out put is not used because we construct
             // string to be consistent with arbitrary variable names
-            parseInt(it, "Expected literal.");
+            int parsed_var = parseInt(it, "Expected literal.");
             if (it->size() > 11) {
                 throw ParseError(it, "Literal too large.");
             }
+
+            // Check to see that no variables higher than the claimed variables in the header are parsed
+            std::cout << "variable : " << parsed_var << std::endl;
+            if(abs(parsed_var) > vars_claimed_header){
+                throw ParseError(it, "More variables in the formula than claimed by the header.");
+            }
+
             bufferStart = bufferEnd - it->size();
             std::copy(it->begin(), it->end(), bufferStart);
             if (bufferStart[0] == '-') {
@@ -978,6 +1042,14 @@ template<typename T>
 std::unique_ptr<Formula<T>> parseCnf(std::string fileName, VariableNameManager& varMgr) {
     std::ifstream f(fileName);
     CNFParser<T> parser(varMgr);
+    std::unique_ptr<Formula<T>> result = parser.parse(f, fileName);
+    return result;
+}
+
+template<typename T>
+std::unique_ptr<Formula<T>> parseWcnf(std::string fileName, VariableNameManager& varMgr) {
+    std::ifstream f(fileName);
+    CNFParser<T> parser(varMgr, true);
     std::unique_ptr<Formula<T>> result = parser.parse(f, fileName);
     return result;
 }
@@ -1114,6 +1186,7 @@ void init_parsing(py::module &m){
     // m.def("parseOpbBigInt", &parseOpb<BigInt>, "Parse opb file with arbitrary precision.");
     m.def("parseCnf", &parseCnf<CoefType>, "Parse cnf file with fixed precision.");
     // m.def("parseCnfBigInt", &parseCnf<BigInt>, "Parse cnf file with arbitrary precision.");
+    m.def("parseWcnf", &parseWcnf<CoefType>, "Parse wcnf file with fixed precision.");
 
     m.def("parseConstraintOpb", &parseOpbConstraint<CoefType>, "Parse opb consraint with fixed precision.");
     // m.def("parseConstraintOpbBigInt", &parseOpbConstraint<BigInt>, "Parse opb constraint with arbitrary precision.");

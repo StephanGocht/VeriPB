@@ -965,7 +965,6 @@ public:
             }
 
             // Check to see that no variables higher than the claimed variables in the header are parsed
-            std::cout << "variable : " << parsed_var << std::endl;
             if(abs(parsed_var) > vars_claimed_header){
                 throw ParseError(it, "More variables in the formula than claimed by the header.");
             }

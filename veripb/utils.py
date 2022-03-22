@@ -17,7 +17,7 @@ from veripb.timed_function import TimedFunction
 from veripb.parser import RuleParser
 from veripb.exceptions import ParseError
 from veripb.optimized.constraints import PropEngine as CppPropEngine
-from veripb.optimized.parsing import parseOpb,parseCnf
+from veripb.optimized.parsing import parseOpb,parseCnf,parseWcnf
 from veripb.constraints import PropEngine,CppIneqFactory
 from time import perf_counter
 
@@ -31,7 +31,7 @@ if profile:
     from guppy import hpy
 
 @TimedFunction.time("LoadFormula")
-def loadFormula(file, parser, varMgr):
+def loadFormula(file, parser, varMgr, miscSettings):
     formula = parser(file, varMgr)
     return {
         "numVariables": formula.maxVar,
@@ -66,6 +66,7 @@ class Settings():
         return {
             "drat": False,
             "cnf": False,
+            "wcnf": False,
             "arbitraryPrecision": False,
             "enableFreeNames": True,
             "printStats": False
@@ -89,6 +90,12 @@ class Settings():
             '--cnf',
             help="Process CNF with PB proof.",
             action="store_true", dest=name+".cnf", default=False
+        )
+
+        group.add_argument(
+            '--wcnf',
+            help="Process WCNF with PB proof.",
+            action="store_true", dest=name+".wcnf", default=False
         )
 
         group.add_argument("--arbitraryPrecision",
@@ -156,11 +163,13 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
 
     if miscSettings.drat or miscSettings.cnf:
         parser = parseCnf
+    elif miscSettings.wcnf:
+        parser = parseWcnf
     else:
         parser = parseOpb
 
     try:
-        formula = loadFormula(formulaFile.name, parser, context.ineqFactory.varNameMgr)
+        formula = loadFormula(formulaFile.name, parser, context.ineqFactory.varNameMgr, miscSettings)
     except ParseError as e:
         e.fileName = formulaFile.name
         raise e

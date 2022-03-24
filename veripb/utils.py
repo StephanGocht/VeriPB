@@ -31,7 +31,7 @@ if profile:
     from guppy import hpy
 
 @TimedFunction.time("LoadFormula")
-def loadFormula(file, parser, varMgr, miscSettings):
+def loadFormula(file, parser, varMgr):
     formula = parser(file, varMgr)
     return {
         "numVariables": formula.maxVar,
@@ -169,7 +169,7 @@ def run(formulaFile, rulesFile, verifierSettings = None, miscSettings = Settings
         parser = parseOpb
 
     try:
-        formula = loadFormula(formulaFile.name, parser, context.ineqFactory.varNameMgr, miscSettings)
+        formula = loadFormula(formulaFile.name, parser, context.ineqFactory.varNameMgr)
     except ParseError as e:
         e.fileName = formulaFile.name
         raise e

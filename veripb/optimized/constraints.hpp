@@ -2573,6 +2573,7 @@ public:
             lookup_requests += 1;
         }
 
+        ineq->attachCount += 1;
         ineq->ids.insert(id);
         ineq->minId = std::min(ineq->minId, id);
 
@@ -2657,19 +2658,17 @@ public:
     int attachCount(Inequality<T>* ineq) {
         Inequality<T>* tmp;
         assert( (tmp = find(ineq), tmp == nullptr || tmp == ineq) );
-        return ineq->ids.size() - ineq->detachCount;
+        return ineq->attachCount;
     }
 
     std::vector<uint64_t> getDeletions(Inequality<T>* ineq) {
         std::vector<uint64_t> result;
 
-        Inequality<T>* attachedIneq = find(ineq);
-        if (attachedIneq) {
-            attachedIneq->detachCount += 1;
-            if (attachedIneq->ids.size() <= attachedIneq->detachCount) {
-                std::copy(attachedIneq->ids.begin(), attachedIneq->ids.end(), std::back_inserter(result));
-                attachedIneq->ids.clear();
-                attachedIneq->detachCount = 0;
+        if (ineq && ineq->attachCount > 0) {
+            ineq->attachCount -= 1;
+            if (ineq->attachCount == 0) {
+                std::copy(ineq->ids.begin(), ineq->ids.end(), std::back_inserter(result));
+                ineq->ids.clear();
             }
         }
 
@@ -3250,7 +3249,7 @@ public:
     bool isCoreConstraint = false;
     uint64_t minId = std::numeric_limits<uint64_t>::max();
     std::unordered_set<uint64_t> ids;
-    uint detachCount = 0;
+    uint attachCount = 0;
 
     // used exclusively by PropagatorGroup
     typename std::list<Inequality*>::iterator _groupIter;

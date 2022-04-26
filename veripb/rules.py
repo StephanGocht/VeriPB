@@ -99,8 +99,70 @@ class EqualityCheckFailed(InvalidProof):
 class ReverseUnitPropagationFailed(InvalidProof):
     pass
 
+def idOrFind(words, context):
+    type_key = next(words)
+    if type_key == "id":
+        which = list(map(int, words))
+
+        if (which[-1] == 0):
+            which = which[:-1]
+
+        if 0 in which:
+            raise ValueError("Can not access constraint with index 0.")
+    elif type_key == "find":
+
+        cppWordIter = words.wordIter.getNative()
+        ineq = context.ineqFactory.parse(cppWordIter, allowMultiple = False)
+
+        which = context.propEngine.find(ineq)
+        if which is None:
+            raise ValueError("Can not find constraint %s."%(ineq))
+        else:
+            which = [which.minId]
+
+    elif type_key == "range":
+        which = list(map(int, words))
+        if len(which) != 2:
+            raise ValueError("Expected exactly two arguments.")
+        return list(range(which[0], which[1]))
+
+    else:
+        raise ValueError("Expected constraint type ('id' or 'find').")
+
+    return (which, type_key)
+
+
 @register_rule
-class DeleteConstraints(EmptyRule):
+class DeleteConstraints2(EmptyRule):
+    Ids = ["del"]
+
+    @classmethod
+    def parse(cls, words, context):
+        return cls(*idOrFind(words,context))
+
+    def __init__(self, toDelete, deletionType):
+        self.toDelete = toDelete
+        self.deletionType = deletionType
+
+    def compute(self, antecedents, context):
+        actualDeletion = set()
+        for ineqid, ineq in zip(self.toDelete, antecedents):
+            deletions = context.propEngine.getDeletions(ineq)
+            actualDeletion.update(deletions)
+            if not deletions and self.deletionType != "find":
+                actualDeletion.add(ineqid)
+
+        self.toDelete = list(actualDeletion)
+        return []
+
+    def antecedentIDs(self):
+        return self.toDelete
+
+    def deleteConstraints(self):
+        return self.toDelete
+
+@register_rule
+class DeleteConstraints(DeleteConstraints2):
     Ids = ["d"] #(d)elete
 
     @classmethod
@@ -114,63 +176,8 @@ class DeleteConstraints(EmptyRule):
             if 0 in which:
                 raise ValueError("Can not delete constraint with index 0.")
 
-        return cls(which)
+        return cls(which, "id")
 
-    def __init__(self, toDelete):
-        self.toDelete = toDelete
-
-    def deleteConstraints(self):
-        return self.toDelete
-
-def idOrFind(words, context, delete = False):
-    type_key = next(words)
-    if type_key == "id":
-        which = list(map(int, words))
-
-        if (which[-1] == 0):
-            which = which[:-1]
-
-        if 0 in which:
-            raise ValueError("Can not delete constraint with index 0.")
-    elif type_key == "find":
-
-        cppWordIter = words.wordIter.getNative()
-        ineq = context.ineqFactory.parse(cppWordIter, allowMultiple = False)
-
-        if delete:
-            which = context.propEngine.getDeletions(ineq)
-        else:
-            which = context.propEngine.find(ineq)
-            if which is None:
-                raise ValueError("Can not find constraint %s."%(ineq))
-            else:
-                which = [which.minId]
-
-    elif type_key == "range":
-        which = list(map(int, words))
-        if len(which) != 2:
-            raise ValueError("Expected exactly two arguments.")
-        return list(range(which[0], which[1]))
-
-    else:
-        raise ValueError("Expected constraint type ('id' or 'find').")
-
-    return which
-
-
-@register_rule
-class DeleteConstraints2(EmptyRule):
-    Ids = ["del"]
-
-    @classmethod
-    def parse(cls, words, context):
-        return cls(idOrFind(words,context, delete = True))
-
-    def __init__(self, toDelete):
-        self.toDelete = toDelete
-
-    def deleteConstraints(self):
-        return self.toDelete
 
 @register_rule
 class Assumption(Rule):
@@ -741,7 +748,8 @@ class MarkCore(EmptyRule):
 
     @classmethod
     def parse(cls, words, context):
-        return cls(idOrFind(words,context))
+        ids, _ = idOrFind(words,context)
+        return cls(ids)
 
     def __init__(self, toMark):
         self.which = toMark

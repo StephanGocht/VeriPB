@@ -280,6 +280,7 @@ class Verifier():
 
             self.db.append(constraint)
 
+        # Delete rule expects delete to happen after compute!
         deletedConstraints = [i for i in rule.deleteConstraints() if self.db[i] is not None]
         if self.settings.trace and len(deletedConstraints) > 0:
             didPrint = True

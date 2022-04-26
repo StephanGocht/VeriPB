@@ -1,0 +1,7 @@
+pseudo-Boolean proof version 1.2
+f
+red 1 x1 >= 1 ; x1 1
+u 1 x1 >= 1 ;
+del find 1 x1 >= 1 ;
+del id 1
+is_deleted 1 x1 >= 1 ;

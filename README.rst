@@ -16,7 +16,7 @@ applications including proof logging of
 * clique and maximum common (connected) subgraph [GMMNPT2020]_,
 * constraint programming with all different constraints [EGMN20]_,
 * parity reasoning in the context of CDCL SAT solvers [GN21]_ and
-* dominance and symmetry breaking [BSCJ22]_.
+* dominance and symmetry breaking [BGMN22]_.
 
 
 ATTENTION
@@ -327,7 +327,7 @@ For details, please refer to [GN21]_.
 
 If the redundancy rule is used in the context of optimization and / or
 dominance breaking, additional conditions are checked. For details,
-please refer to [BSCJ22]_.
+please refer to [BGMN22]_.
 
 Subproofs
 ---------
@@ -366,7 +366,7 @@ required goals.
 Dominance Based Strengthening
 -----------------------------
 
-For details, please refer to [BSCJ22]_. For syntax have a look at the
+For details, please refer to [BGMN22]_. For syntax have a look at the
 example under ``tests/integration_tests/correct/dominance/example.pbp`` .
 
 Template: ::
@@ -604,25 +604,33 @@ derivations that are already implemented are correct.
 Acknowledgements
 ================
 
-This work was done in part while the author
+VeriPB was developed by Stephan Gocht. The underlying proof system was
+designed jointly by Bart Bogaerts, Stephan Gocht, Ciaran McCreesh, and
+Jakob Nordström, while investigating and implementing proof logging
+for different applications. We are also grateful to Jo Devriendt and
+Jan Elffers for many valuable discussions that have helped to improve
+the performance of VeriPB.
+
+This work was done in part while the author Stephan Gocht
 
 * was supported by the Swedish Research Council grant 2016-00782
 * was participating in a program at the Simons Institute for the Theory of Computing. 
-
-I thank Jan Elffers and Jo Devriendt for interesting discussions that
-helped to improve the performance of VeriPB as well as Bart Bogaerts and
-Ciaran Mccreesh for their significant contributions to the proof
-format and providing interesting applications for it. Last but not
-least, I thank my PhD supervisor Jakob Nordström for all of the above
-and without whom this work would not have been possible.
 
 
 References
 ==========
 
-.. _BSCJ22:
+.. _GNMO22:
 
-[BSCJ22] Certified Symmetry and Dominance Breaking for Combinatorial
+[GMN22] Stephan Gocht, Jakob Nordström Ruben Martins and Andy Oertel.
+Certified CNF Translations for Pseudo-Boolean Solving. In Proceedings
+of the 25nd International Conference on Theory and Applications of
+Satisfiability Testing (SAT '22), 2022 (to appear).
+
+
+.. _BGMN22:
+
+[BGMN22] Certified Symmetry and Dominance Breaking for Combinatorial
 Optimisation, Bart Bogaerts, Stephan Gocht, Ciaran McCreesh, Jakob
 Nordström, Proceedings of the AAAI Conference on Artificial
 Intelligence, 2022 (to appear).
@@ -632,6 +640,18 @@ Intelligence, 2022 (to appear).
 [GN21] Certifying Parity Reasoning Efficiently Using Pseudo-Boolean
 Proofs, Stephan Gocht, Jakob Nordström, Proceedings of the AAAI
 Conference on Artificial Intelligence, 2021, 35, 3768-3777.
+
+.. _GMN21:
+
+[GMN21] Stephan Gocht, Ciaran McCreesh and Jakob Nordström. VeriPB: The Easy
+Way to Make Your Combinatorial Search Algorithm Trustworthy. From
+Constraint Programming to Trustworthy AI, workshop at the 26th
+International Conference on Principles and Practice of Constraint
+Programming (CP '20), September 2020.
+
+`PDF <http://www.jakobnordstrom.se/docs/publications/VeriPB_CPTAI2020.pdf>`_
+
+`VIDEO <https://www.youtube.com/watch?v=SQ1-lF9clHQ>`_
 
 .. _GMMNPT2020:
 

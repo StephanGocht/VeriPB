@@ -643,15 +643,13 @@ Conference on Artificial Intelligence, 2021, 35, 3768-3777.
 
 .. _GMN21:
 
-[GMN21] Stephan Gocht, Ciaran McCreesh and Jakob Nordström. VeriPB: The Easy
-Way to Make Your Combinatorial Search Algorithm Trustworthy. From
-Constraint Programming to Trustworthy AI, workshop at the 26th
+[GMN21] Stephan Gocht, Ciaran McCreesh and Jakob Nordström. VeriPB:
+The Easy Way to Make Your Combinatorial Search Algorithm Trustworthy.
+From Constraint Programming to Trustworthy AI, workshop at the 26th
 International Conference on Principles and Practice of Constraint
-Programming (CP '20), September 2020.
-
-`PDF <http://www.jakobnordstrom.se/docs/publications/VeriPB_CPTAI2020.pdf>`_
-
-`VIDEO <https://www.youtube.com/watch?v=SQ1-lF9clHQ>`_
+Programming (CP '20), September 2020. `[PDF]
+<http://www.jakobnordstrom.se/docs/publications/VeriPB_CPTAI2020.pdf>`_
+`[VIDEO] <https://www.youtube.com/watch?v=SQ1-lF9clHQ>`_
 
 .. _GMMNPT2020:
 

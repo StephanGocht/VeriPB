@@ -588,7 +588,7 @@ class ReversePolishNotation(Rule):
                 current = next(self.instructions)
                 if isinstance(current, int):
                     return current
-                if current in ["*", "d", "r", "w"]:
+                if current in ["*", "d", "w"]:
                     # consume one more, remember that we swaped the right operand and operator
                     next(self.instructions)
 
@@ -598,7 +598,7 @@ class ReversePolishNotation(Rule):
             # needs to be a constant and not a constraint, so we (can) switch
             # positions, which makes it easier to distinguish constraints from
             # constants later on
-            if x in ["*", "d", "r", "w"]:
+            if x in ["*", "d", "w"]:
                 instructions[i] = instructions[i - 1]
                 instructions[i - 1] = x
 
@@ -638,11 +638,6 @@ class ReversePolishNotation(Rule):
                 if divisor <= 0:
                     raise InvalidProof("Division by non positive number.")
                 stack.append(constraint.divide(divisor))
-            elif ins == "r":
-                second = stack.pop()
-                first = stack.pop()
-                resolvedVar = next(it)
-                stack.append(first.resolve(second, resolvedVar))
             elif ins == "s":
                 constraint = stack.pop()
                 stack.append(constraint.saturate())

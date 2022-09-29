@@ -215,7 +215,7 @@ class Assumption(Rule):
 
 @register_rule
 class ReverseUnitPropagation(Rule):
-    Ids = ["u"]
+    Ids = ["u", "rup"]
 
     @classmethod
     def parse(cls, words, context):

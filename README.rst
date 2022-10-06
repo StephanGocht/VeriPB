@@ -37,25 +37,47 @@ Table of Contents
 Installation
 ============
 
+Install Requirements
+--------------------
+
 The following tools and libraries are required (with minimal suggested versions):
 
 * Python 3.6.9 with pip and setuptools installed
 * g++ 7.5.0
 * libgmp
+* git
 
-These can be installed in ubuntu / debian via
+These can be installed in Ubuntu / Debian via
 
 ::
 
-    apt-get update && apt-get install \
+    sudo apt-get update && apt-get install \
             python3 \
             python3-pip \
             python3-dev \
             g++ \
             libgmp-dev \
-        && pip3 install \
+            git
+    pip3 install --user \
             setuptools
 
+
+If the required tools can not be installed on the system (for example because
+the user has no root privileges), we recommend the use of `Anaconda
+<https://www.anaconda.com/>`_ . After installing anaconda as described on the
+webpage you need activate the environment (``source
+[path_to_anaconda]/bin/activate``). Then you can use
+
+::
+
+    conda install -y gxx_linux-64 gmp make
+
+to install the missing dependencies. Note that you will always need to
+activate the environment before installing or using VeriPB.
+
+
+Install VeriPB
+--------------
 
 When these requirenments are met, VeriPB can be installed via
 
@@ -66,6 +88,12 @@ When these requirenments are met, VeriPB can be installed via
     pip3 install --user ./
 
 Run ``veripb --help`` for help.
+
+Installation on Windows
+-----------------------
+
+For Windows we recommend to use `Windows-Subsystem for Linux (WSL) with Ubuntu<https://ubuntu.com/wsl>`_.
+Once Ubuntu on WSL is installed, the instructions above can be followed.
 
 Update
 ------

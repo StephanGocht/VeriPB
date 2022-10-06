@@ -3,3 +3,4 @@ build
 .eggs
 **/*.cpython*
 **/*.o
+*Dockerfile

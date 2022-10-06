@@ -37,6 +37,28 @@ Table of Contents
 Installation
 ============
 
+The following tools and libraries are required (with minimal suggested versions):
+
+* Python 3.6.9 with pip and setuptools installed
+* g++ 7.5.0
+* libgmp
+
+These can be installed in ubuntu / debian via
+
+::
+
+    apt-get update && apt-get install \
+            python3 \
+            python3-pip \
+            python3-dev \
+            g++ \
+            libgmp-dev \
+        && pip3 install \
+            setuptools
+
+
+When these requirenments are met, VeriPB can be installed via
+
 ::
 
     git clone git@gitlab.com:MIAOresearch/VeriPB.git

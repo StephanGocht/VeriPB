@@ -83,3 +83,9 @@ clean:
 	find . -name "*.so" -delete
 	find . -name "*.o" -delete
 	rm $(PYTHON_COMPILED_C) -f
+
+docker-local:
+	docker build .
+
+docker-remote:
+	docker build https://gitlab.com/MIAOresearch/VeriPB

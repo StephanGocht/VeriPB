@@ -88,4 +88,4 @@ docker-local:
 	docker build .
 
 docker-remote:
-	docker build https://gitlab.com/MIAOresearch/VeriPB
+	docker build https://gitlab.com/MIAOresearch/VeriPB.git
